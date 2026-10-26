@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"testing"
+	"sync"
+	"fmt"
 )
 
 type testProvider struct { name string }
