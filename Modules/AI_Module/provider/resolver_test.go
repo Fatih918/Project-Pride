@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"testing"
-	"sync"
 	"fmt"
+	"sync"
+	"testing"
 )
 
 type testProvider struct { name string }

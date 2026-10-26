@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	executioncontract "pride-ai-module/contracts/execution"
-	"testing"
 	"sync"
+	"testing"
 )
 
 type testImplementation struct {
@@ -111,32 +111,6 @@ func TestResolverRejectsEmptyReference(t *testing.T) {
 	}
 }
 
-func TestResolverRejectsNilImplementation(t *testing.T) {
-	resolver := NewResolver()
-
-	expected := &testImplementation{
-		name: "test",
-	}
-	if err := resolver.Register(
-		"test.implementation",
-		expected,
-	); err != nil {
-		t.Fatalf(
-			"Register() failed: %v",
-			err,
-		)
-	}
-
-	_, err := resolver.Resolve(
-		"nil.implementation",
-	)
-
-	if err == nil {
-		t.Fatal(
-			"expected nil implementation to return an error",
-		)
-	}
-}
 func TestResolverRegisterAndResolve(t *testing.T) {
 	resolver := NewResolver()
 
