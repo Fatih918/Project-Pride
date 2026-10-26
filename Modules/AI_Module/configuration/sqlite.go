@@ -424,6 +424,16 @@ func (s *SQLiteStore) Create(
 		configuration.CredentialRef,
 		enabled,
 	); err != nil {
+		// Normalize duplicate-reference behavior with MemoryStore.
+		// A failed insert may be caused by a duplicate primary key.
+		if _, lookupErr := s.getByRef(
+			ctx,
+			s.db,
+			configuration.Ref,
+		); lookupErr == nil {
+			return ErrConfigurationAlreadyExists
+		}
+
 		return fmt.Errorf(
 			"create AI configuration: %w",
 			err,
