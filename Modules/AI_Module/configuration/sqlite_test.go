@@ -735,3 +735,18 @@ func TestSQLiteStorePersistsAcrossConnections(
 		)
 	}
 }
+
+
+func TestSQLiteStoreLifecycleInvariantMatrix(t *testing.T) {
+	ctx := context.Background()
+	store, err := NewSQLiteStore(
+		ctx,
+		"file:configuration-lifecycle-invariants?mode=memory&cache=shared",
+	)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore() failed: %v", err)
+	}
+	defer store.Close()
+
+	runConfigurationLifecycleInvariantScenarios(t, store)
+}
