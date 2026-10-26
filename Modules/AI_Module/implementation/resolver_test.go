@@ -5,6 +5,7 @@ import (
 	"fmt"
 	executioncontract "pride-ai-module/contracts/execution"
 	"testing"
+	"sync"
 )
 
 type testImplementation struct {
@@ -304,4 +305,90 @@ func TestResolverRegisterAfterConstruction(
 			)
 		}
 	}
+}
+func TestResolverConcurrentRegisterAndResolve(t *testing.T) {
+	t.Parallel()
+
+	resolver := NewResolver()
+
+	const (
+		workers       = 20
+		registrations = 100
+	)
+
+	var wg sync.WaitGroup
+
+	// Concurrent registrations.
+	wg.Add(workers)
+
+	for worker := 0; worker < workers; worker++ {
+		worker := worker
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < registrations; i++ {
+				reference := fmt.Sprintf(
+					"concurrent.implementation.%d.%d",
+					worker,
+					i,
+				)
+
+				implementation := &testImplementation{
+					name: reference,
+				}
+
+				if err := resolver.Register(
+					reference,
+					implementation,
+				); err != nil {
+					t.Errorf(
+						"Register(%q) failed: %v",
+						reference,
+						err,
+					)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Concurrent resolutions after all registrations completed.
+	wg.Add(workers)
+
+	for worker := 0; worker < workers; worker++ {
+		worker := worker
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < registrations; i++ {
+				reference := fmt.Sprintf(
+					"concurrent.implementation.%d.%d",
+					worker,
+					i,
+				)
+
+				resolved, err := resolver.Resolve(reference)
+				if err != nil {
+					t.Errorf(
+						"Resolve(%q) failed: %v",
+						reference,
+						err,
+					)
+					continue
+				}
+
+				if resolved == nil {
+					t.Errorf(
+						"Resolve(%q) returned nil implementation",
+						reference,
+					)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
 }
