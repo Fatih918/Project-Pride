@@ -787,3 +787,154 @@ func TestMemoryStoreDeleteUnknownReference(
 		)
 	}
 }
+
+
+// Configuration lifecycle invariant matrix shared by MemoryStore and SQLiteStore.
+type configurationLifecycleStore interface {
+	Create(context.Context, AIConfiguration) error
+	GetByRef(context.Context, string) (AIConfiguration, error)
+	GetActive(context.Context) (AIConfiguration, error)
+	Delete(context.Context, string) error
+	Select(context.Context, string) error
+}
+
+func assertConfigurationLifecycleInvariant(
+	t *testing.T,
+	ctx context.Context,
+	store configurationLifecycleStore,
+	refs []string,
+) {
+	t.Helper()
+
+	enabledCount := 0
+	enabledRef := ""
+
+	for _, ref := range refs {
+		configuration, err := store.GetByRef(ctx, ref)
+		if errors.Is(err, ErrConfigurationRefNotFound) {
+			continue
+		}
+		if err != nil {
+			t.Fatalf("GetByRef(%q) failed while checking invariant: %v", ref, err)
+		}
+		if configuration.Enabled {
+			enabledCount++
+			enabledRef = configuration.Ref
+		}
+	}
+
+	if enabledCount > 1 {
+		t.Fatalf("invariant violated: %d configurations are enabled", enabledCount)
+	}
+
+	active, err := store.GetActive(ctx)
+	if errors.Is(err, ErrConfigurationNotFound) {
+		if enabledCount != 0 {
+			t.Fatalf("no active configuration but %d configuration(s) are enabled", enabledCount)
+		}
+		return
+	}
+	if err != nil {
+		t.Fatalf("GetActive() failed while checking invariant: %v", err)
+	}
+	if active.Ref == "" {
+		t.Fatal("active configuration has an empty reference")
+	}
+	if !active.Enabled {
+		t.Fatalf("active configuration %q is not enabled", active.Ref)
+	}
+	if enabledCount != 1 {
+		t.Fatalf("active configuration exists but enabled count is %d, want 1", enabledCount)
+	}
+	if enabledRef != active.Ref {
+		t.Fatalf("active reference %q does not match enabled reference %q", active.Ref, enabledRef)
+	}
+
+	persisted, err := store.GetByRef(ctx, active.Ref)
+	if err != nil {
+		t.Fatalf("active reference %q does not resolve to an existing configuration: %v", active.Ref, err)
+	}
+	if !persisted.Enabled {
+		t.Fatalf("referenced configuration %q exists but is not enabled", active.Ref)
+	}
+}
+
+func runConfigurationLifecycleInvariantScenarios(
+	t *testing.T,
+	store configurationLifecycleStore,
+) {
+	t.Helper()
+	ctx := context.Background()
+	refs := []string{"config-a", "config-b"}
+
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	configA := AIConfiguration{
+		Ref: "config-a", Name: "Configuration A", Type: "text",
+		ImplementationRef: "test.a", Enabled: false,
+	}
+	configB := AIConfiguration{
+		Ref: "config-b", Name: "Configuration B", Type: "text",
+		ImplementationRef: "test.b", Enabled: false,
+	}
+
+	if err := store.Create(ctx, configA); err != nil {
+		t.Fatalf("Create(A) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	if err := store.Create(ctx, configB); err != nil {
+		t.Fatalf("Create(B) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	if err := store.Select(ctx, configA.Ref); err != nil {
+		t.Fatalf("Select(A) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	if err := store.Select(ctx, configB.Ref); err != nil {
+		t.Fatalf("Select(B) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	// Deleting an inactive configuration must not disturb the active one.
+	if err := store.Delete(ctx, configA.Ref); err != nil {
+		t.Fatalf("Delete(inactive A) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	// Re-create A so duplicate-reference behavior can be checked while B is active.
+	if err := store.Create(ctx, configA); err != nil {
+		t.Fatalf("re-create A failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	duplicateA := configA
+	duplicateA.Name = "Duplicate A"
+	if err := store.Create(ctx, duplicateA); !errors.Is(err, ErrConfigurationAlreadyExists) {
+		t.Fatalf("Create(duplicate A) error = %v, want %v", err, ErrConfigurationAlreadyExists)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	if err := store.Select(ctx, "unknown-configuration"); !errors.Is(err, ErrConfigurationRefNotFound) {
+		t.Fatalf("Select(unknown) error = %v, want %v", err, ErrConfigurationRefNotFound)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	// Deleting the active B must clear active state without enabling A.
+	if err := store.Delete(ctx, configB.Ref); err != nil {
+		t.Fatalf("Delete(active B) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+
+	// A remains inactive after B is deleted; deleting it leaves no active config.
+	if err := store.Delete(ctx, configA.Ref); err != nil {
+		t.Fatalf("Delete(inactive A after B) failed: %v", err)
+	}
+	assertConfigurationLifecycleInvariant(t, ctx, store, refs)
+}
+
+func TestMemoryStoreLifecycleInvariantMatrix(t *testing.T) {
+	runConfigurationLifecycleInvariantScenarios(t, NewMemoryStore())
+}
