@@ -922,3 +922,25 @@ func (i *captureImplementation) Execute(
 }
 
 var _ implementation.AIImplementation = (*captureImplementation)(nil)
+
+
+// R5.5 — Credentials must not be implicitly propagated into response metadata.
+func TestServerDoesNotPropagateCredentialIntoResponseMetadata(t *testing.T) {
+	configProvider := newTestConfigurationProvider()
+	executor := newTestExecutor(configProvider, &testImplementation{})
+	server := NewServer(executor)
+
+	response, err := server.Execute(context.Background(), newValidRequest())
+	if err != nil {
+		t.Fatalf("Execute() failed: %v", err)
+	}
+	if response == nil {
+		t.Fatal("response must not be nil")
+	}
+
+	const credentialSentinel = "test-api-key"
+	metadataText := fmt.Sprint(response.GetMetadata().AsMap())
+	if strings.Contains(metadataText, credentialSentinel) {
+		t.Fatal("credential secret was propagated into response metadata")
+	}
+}
