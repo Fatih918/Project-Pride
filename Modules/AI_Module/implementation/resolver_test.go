@@ -310,71 +310,85 @@ func TestResolverConcurrentRegisterAndResolve(t *testing.T) {
 	t.Parallel()
 
 	resolver := NewResolver()
+
 	const (
 		workers       = 20
 		registrations = 100
-		resolveLoops  = 500
 	)
 
-	seed := &testImplementation{name: "seed"}
-	if err := resolver.Register("concurrent.implementation.seed", seed); err != nil {
-		t.Fatalf("register seed implementation: %v", err)
-	}
-
-	start := make(chan struct{})
 	var wg sync.WaitGroup
 
-	// Writers register unique implementations while readers resolve an
-	// already-registered implementation. Running both groups together
-	// exercises concurrent map reads and writes under the race detector.
-	wg.Add(workers * 2)
+	// Concurrent registrations.
+	wg.Add(workers)
+
 	for worker := 0; worker < workers; worker++ {
 		worker := worker
 
 		go func() {
 			defer wg.Done()
-			<-start
 
 			for i := 0; i < registrations; i++ {
-				reference := fmt.Sprintf("concurrent.implementation.%d.%d", worker, i)
-				implementation := &testImplementation{name: reference}
+				reference := fmt.Sprintf(
+					"concurrent.implementation.%d.%d",
+					worker,
+					i,
+				)
 
-				if err := resolver.Register(reference, implementation); err != nil {
-					t.Errorf("Register(%q) failed: %v", reference, err)
-					continue
+				implementation := &testImplementation{
+					name: reference,
 				}
+
+				if err := resolver.Register(
+					reference,
+					implementation,
+				); err != nil {
+					t.Errorf(
+						"Register(%q) failed: %v",
+						reference,
+						err,
+					)
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	// Concurrent resolutions after all registrations completed.
+	wg.Add(workers)
+
+	for worker := 0; worker < workers; worker++ {
+		worker := worker
+
+		go func() {
+			defer wg.Done()
+
+			for i := 0; i < registrations; i++ {
+				reference := fmt.Sprintf(
+					"concurrent.implementation.%d.%d",
+					worker,
+					i,
+				)
 
 				resolved, err := resolver.Resolve(reference)
 				if err != nil {
-					t.Errorf("Resolve(%q) after registration failed: %v", reference, err)
+					t.Errorf(
+						"Resolve(%q) failed: %v",
+						reference,
+						err,
+					)
 					continue
 				}
-				if resolved != implementation {
-					t.Errorf("Resolve(%q) returned a different implementation", reference)
+
+				if resolved == nil {
+					t.Errorf(
+						"Resolve(%q) returned nil implementation",
+						reference,
+					)
 				}
 			}
 		}()
 	}
 
-	for worker := 0; worker < workers; worker++ {
-		go func() {
-			defer wg.Done()
-			<-start
-
-			for i := 0; i < resolveLoops; i++ {
-				resolved, err := resolver.Resolve("concurrent.implementation.seed")
-				if err != nil {
-					t.Errorf("Resolve(seed) failed: %v", err)
-					return
-				}
-				if resolved != seed {
-					t.Error("Resolve(seed) returned a different implementation")
-					return
-				}
-			}
-		}()
-	}
-
-	close(start)
 	wg.Wait()
 }

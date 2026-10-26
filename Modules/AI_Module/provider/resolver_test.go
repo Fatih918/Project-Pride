@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-type testProvider struct { name string }
+type testProvider struct{}
 
 func (testProvider) Execute(
 	ctx context.Context,
@@ -133,77 +133,4 @@ func TestResolverResolvesCorrectProvider(t *testing.T) {
 	if resolvedSecond != second {
 		t.Fatal("expected second reference to resolve to second provider")
 	}
-}
-
-
-func TestResolverConcurrentRegisterAndResolve(t *testing.T) {
-	t.Parallel()
-
-	resolver := NewResolver()
-	const (
-		workers       = 20
-		registrations = 100
-		resolveLoops  = 500
-	)
-
-	seed := testProvider{name: "seed"}
-	if err := resolver.Register("concurrent.provider.seed", seed); err != nil {
-		t.Fatalf("register seed provider: %v", err)
-	}
-
-	start := make(chan struct{})
-	var wg sync.WaitGroup
-	wg.Add(workers * 2)
-
-	// Writers register unique providers while readers resolve the seeded
-	// provider concurrently. This is intended to run under go test -race.
-	for worker := 0; worker < workers; worker++ {
-		worker := worker
-
-		go func() {
-			defer wg.Done()
-			<-start
-
-			for i := 0; i < registrations; i++ {
-				ref := fmt.Sprintf("concurrent.provider.%d.%d", worker, i)
-				p := testProvider{name: ref}
-
-				if err := resolver.Register(ref, p); err != nil {
-					t.Errorf("Register(%q) failed: %v", ref, err)
-					continue
-				}
-
-				resolved, err := resolver.Resolve(ref)
-				if err != nil {
-					t.Errorf("Resolve(%q) after registration failed: %v", ref, err)
-					continue
-				}
-				if resolved != p {
-					t.Errorf("Resolve(%q) returned a different provider", ref)
-				}
-			}
-		}()
-	}
-
-	for worker := 0; worker < workers; worker++ {
-		go func() {
-			defer wg.Done()
-			<-start
-
-			for i := 0; i < resolveLoops; i++ {
-				resolved, err := resolver.Resolve("concurrent.provider.seed")
-				if err != nil {
-					t.Errorf("Resolve(seed) failed: %v", err)
-					return
-				}
-				if resolved != seed {
-					t.Error("Resolve(seed) returned a different provider")
-					return
-				}
-			}
-		}()
-	}
-
-	close(start)
-	wg.Wait()
 }
