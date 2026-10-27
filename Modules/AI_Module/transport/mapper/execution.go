@@ -16,6 +16,10 @@ import (
 //
 //	Proto <-> Execution Contract
 //
+// Input and output Any payloads are opaque transport values: the mapper
+// preserves them without unpacking or interpreting their provider-specific content.
+// Metadata is converted between protobuf Struct and map[string]any.
+//
 // This mapper must not:
 //   - resolve configuration
 //   - resolve credentials
