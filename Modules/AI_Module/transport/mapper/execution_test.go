@@ -278,7 +278,7 @@ func TestExecutionMapperToProtoResponseNilMetadata(t *testing.T) {
 	}
 }
 
-func TestExecutionMapperRejectsInvalidMetadata(t *testing.T) {
+func TestExecutionMapperRejectsMetadataThatCannotBecomeStruct(t *testing.T) {
 	mapper := NewExecutionMapper()
 
 	result := executioncontract.AIExecutionResult{
@@ -364,18 +364,3 @@ func TestExecutionMapperPreservesNestedMetadata(t *testing.T) {
 	}
 }
 
-func TestExecutionMapperRejectsMetadataThatCannotBecomeStruct(t *testing.T) {
-	mapper := NewExecutionMapper()
-
-	result := executioncontract.AIExecutionResult{
-		RequestID:  "req-invalid-struct",
-		Capability: "text.generate",
-		Metadata: map[string]any{
-			"unsupported": func() {},
-		},
-	}
-
-	if _, err := mapper.ToProtoResponse(result); err == nil {
-		t.Fatal("expected unsupported metadata value to return an error")
-	}
-}
