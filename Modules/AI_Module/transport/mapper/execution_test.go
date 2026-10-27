@@ -1,6 +1,7 @@
 package mapper
 
 import (
+	"reflect"
 	"testing"
 
 	executioncontract "pride-ai-module/contracts/execution"
@@ -293,5 +294,88 @@ func TestExecutionMapperRejectsInvalidMetadata(t *testing.T) {
 		t.Fatal(
 			"expected unsupported metadata value to return an error",
 		)
+	}
+}
+
+
+func TestExecutionMapperPreservesNestedMetadata(t *testing.T) {
+	mapper := NewExecutionMapper()
+
+	metadata, err := structpb.NewStruct(map[string]any{
+		"source":  "test",
+		"enabled": true,
+		"attempt": float64(3),
+		"tags":    []any{"alpha", "beta"},
+		"options": map[string]any{
+			"mode":  "safe",
+			"limit": float64(5),
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create metadata Struct: %v", err)
+	}
+
+	input, err := anypb.New(structpb.NewStringValue("opaque input"))
+	if err != nil {
+		t.Fatalf("failed to create input Any: %v", err)
+	}
+
+	request := &aiv1.ExecuteRequest{
+		RequestId:  "req-metadata-roundtrip",
+		Capability: "text.generate",
+		Input:      input,
+		Metadata:   metadata,
+	}
+
+	contractRequest, err := mapper.ToContractRequest(request)
+	if err != nil {
+		t.Fatalf("ToContractRequest() failed: %v", err)
+	}
+
+	if contractRequest.Input != input {
+		t.Fatal("input Any was not preserved as an opaque value")
+	}
+	if got, want := contractRequest.Metadata, metadata.AsMap(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("metadata changed during request mapping: got %#v, want %#v", got, want)
+	}
+
+	contractResult := executioncontract.AIExecutionResult{
+		RequestID:  contractRequest.RequestID,
+		Capability: contractRequest.Capability,
+		Output:     contractRequest.Input,
+		Metadata:   contractRequest.Metadata,
+	}
+	response, err := mapper.ToProtoResponse(contractResult)
+	if err != nil {
+		t.Fatalf("ToProtoResponse() failed: %v", err)
+	}
+
+	if response.RequestId != request.RequestId {
+		t.Fatalf("request ID changed: got %q, want %q", response.RequestId, request.RequestId)
+	}
+	if response.Capability != request.Capability {
+		t.Fatalf("capability changed: got %q, want %q", response.Capability, request.Capability)
+	}
+	if response.Output != input {
+		t.Fatal("output Any was not preserved as an opaque value")
+	}
+	if got, want := response.Metadata.AsMap(), metadata.AsMap(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("metadata changed during response mapping: got %#v, want %#v", got, want)
+	}
+}
+
+func TestExecutionMapperRejectsMetadataThatCannotBecomeStruct(t *testing.T) {
+	mapper := NewExecutionMapper()
+
+	result := executioncontract.AIExecutionResult{
+		RequestID:  "req-invalid-struct",
+		Capability: "text.generate",
+		Metadata: map[string]any{
+			"unsupported": func() {},
+		},
+	}
+
+	if _, err := mapper.ToProtoResponse(result); err == nil {
+		t.Fatal("expected unsupported metadata value to return an error")
 	}
 }
