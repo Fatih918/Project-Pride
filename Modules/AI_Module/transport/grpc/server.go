@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 
 	executioncontract "pride-ai-module/contracts/execution"
@@ -79,6 +80,24 @@ func (s *Server) Execute(
 		internalRequest,
 	)
 	if err != nil {
+		// Preserve a canonical error's category and safe message while
+		// ensuring every execution error is correlated with its request.
+		var aiErr *prideerrors.Error
+		if stderrors.As(err, &aiErr) && aiErr != nil {
+			if aiErr.RequestID == "" {
+				aiErr.WithRequestID(req.GetRequestId())
+			}
+		} else {
+			// Normalize non-PRIDE errors here so the request ID is not lost
+			// when the generic error is converted to a gRPC status.
+			err = prideerrors.New(
+				prideerrors.CodeUnknownError,
+				"AI execution failed",
+			).
+				WithRequestID(req.GetRequestId()).
+				WithCause(err)
+		}
+
 		return nil, prideerrors.GRPCStatus(err)
 	}
 
