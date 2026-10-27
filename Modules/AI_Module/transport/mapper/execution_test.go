@@ -297,7 +297,6 @@ func TestExecutionMapperRejectsMetadataThatCannotBecomeStruct(t *testing.T) {
 	}
 }
 
-
 func TestExecutionMapperPreservesNestedMetadata(t *testing.T) {
 	mapper := NewExecutionMapper()
 
