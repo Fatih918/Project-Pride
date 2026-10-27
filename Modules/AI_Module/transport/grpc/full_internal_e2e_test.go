@@ -4,6 +4,8 @@ import (
 	"context"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
+	"net"
 	"testing"
 	"time"
 
@@ -40,7 +42,7 @@ func (r9KeySource) GetKey(context.Context) ([]byte, error) {
 }
 
 type r9TestProvider struct {
-	called bool
+	called atomic.Bool
 }
 
 func (p *r9TestProvider) Execute(
@@ -50,7 +52,7 @@ func (p *r9TestProvider) Execute(
 	if err := ctx.Err(); err != nil {
 		return provider.Response{}, err
 	}
-	p.called = true
+	p.called.Store(true)
 	return provider.Response{
 		Output: request.Input,
 		Metadata: map[string]any{
@@ -231,7 +233,7 @@ func TestFullInternalE2EUsesPersistentStoresResolversAndGRPC(t *testing.T) {
 	if response.GetMetadata().GetFields()["capability"].GetStringValue() != "text.generate" {
 		t.Fatalf("unexpected capability metadata: %v", response.GetMetadata().AsMap())
 	}
-	if !testProvider.called {
+	if !testProvider.called.Load() {
 		t.Fatal("test provider was not reached through the provider resolver and adapter")
 	}
 }
