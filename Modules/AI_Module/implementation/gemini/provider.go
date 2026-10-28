@@ -3,6 +3,7 @@ package gemini
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"google.golang.org/genai"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -27,8 +28,9 @@ type contentGenerator interface {
 }
 
 type RealProvider struct {
-	client contentGenerator
-	model  string
+	client       contentGenerator
+	clientCloser io.Closer
+	model        string
 }
 
 func NewRealProvider(
@@ -72,10 +74,25 @@ func NewRealProvider(
 		)
 	}
 
+	var clientCloser io.Closer
+	if closer, ok := any(client).(io.Closer); ok {
+		clientCloser = closer
+	}
+
 	return &RealProvider{
-		client: client.Models,
-		model:  model,
+		client:       client.Models,
+		clientCloser: clientCloser,
+		model:        model,
 	}, nil
+}
+
+// Close releases the underlying SDK client when the SDK exposes a close
+// operation. It is safe to call more than once if the SDK's Close is idempotent.
+func (p *RealProvider) Close() error {
+	if p == nil || p.clientCloser == nil {
+		return nil
+	}
+	return p.clientCloser.Close()
 }
 
 func (p *RealProvider) Execute(
