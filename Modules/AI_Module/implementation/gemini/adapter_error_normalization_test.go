@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"pride-ai-module/contracts/execution"
@@ -34,12 +35,17 @@ func TestAdapterNormalizesProviderFailureAndPreservesRequestID(t *testing.T) {
 		t.Fatalf("NewAdapter returned error: %v", err)
 	}
 
+	input, marshalErr := anypb.New(wrapperspb.String("test"))
+	if marshalErr != nil {
+		t.Fatalf("marshal test input: %v", marshalErr)
+	}
+
 	_, err = adapter.Execute(
 		context.Background(),
 		execution.AIExecutionRequest{
 			RequestID:  requestID,
 			Capability: CapabilityTextGenerate,
-			Input:      wrapperspb.String("test"),
+			Input:      input,
 		},
 		execution.AIExecutionContext{},
 	)
