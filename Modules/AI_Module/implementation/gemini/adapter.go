@@ -113,8 +113,9 @@ func (a *Adapter) Execute(
 
 	p, release, err := a.resolveProvider(ctx, executionContext)
 	if err != nil {
-		return execution.AIExecutionResult{}, fmt.Errorf(
-			"Gemini provider resolution failed",
+		return execution.AIExecutionResult{}, normalizeResolutionError(
+			err,
+			request.RequestID,
 		)
 	}
 	if release != nil {
@@ -256,5 +257,21 @@ func normalizeExecutionError(
 	return prideerrors.New(
 		prideerrors.CodeRuntimeError,
 		"Gemini provider execution failed",
+	).WithRequestID(requestID).WithCause(err)
+}
+
+
+func normalizeResolutionError(
+	err error,
+	requestID string,
+) error {
+	var prideErr *prideerrors.Error
+	if errors.As(err, &prideErr) {
+		return prideErr.WithRequestID(requestID)
+	}
+
+	return prideerrors.New(
+		prideerrors.CodeConfigurationError,
+		"Gemini provider resolution failed",
 	).WithRequestID(requestID).WithCause(err)
 }
