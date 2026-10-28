@@ -166,10 +166,11 @@ func TestGeminiInvalidCredentialThroughExecutor(t *testing.T) {
 		)
 	}
 
-	if prideErr.RequestID != "" {
+	if prideErr.RequestID != request.RequestID {
 		t.Fatalf(
-			"request ID should not be assigned by provider layer: got %q",
+			"request ID = %q, want %q",
 			prideErr.RequestID,
+			request.RequestID,
 		)
 	}
 
