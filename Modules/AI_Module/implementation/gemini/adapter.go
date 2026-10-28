@@ -20,6 +20,7 @@ type Adapter struct {
 	provider        provider.Provider
 	providerFactory ProviderFactory
 	clientCache     *provider.ClientCache
+	ownsCache       bool
 }
 
 func NewAdapter(p provider.Provider) (*Adapter, error) {
@@ -43,7 +44,13 @@ func NewAdapterWithFactory(factory ProviderFactory) (*Adapter, error) {
 		return nil, fmt.Errorf("create Gemini provider client cache")
 	}
 
-	return NewAdapterWithCache(cache, factory)
+	adapter, err := NewAdapterWithCache(cache, factory)
+	if err != nil {
+		_ = cache.Close()
+		return nil, err
+	}
+	adapter.ownsCache = true
+	return adapter, nil
 }
 
 // NewAdapterWithCache creates an adapter using a caller-owned provider cache.
@@ -75,7 +82,7 @@ func NewAdapterWithCache(
 // For adapters created with NewAdapterWithCache, close the shared cache
 // separately after all users of that cache have stopped.
 func (a *Adapter) Close() error {
-	if a == nil || a.clientCache == nil {
+	if a == nil || a.clientCache == nil || !a.ownsCache {
 		return nil
 	}
 	return a.clientCache.Close()
