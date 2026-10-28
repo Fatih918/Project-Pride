@@ -20,15 +20,9 @@ func (e *Error) Error() string {
 		return ""
 	}
 
-	if e.Cause != nil {
-		return fmt.Sprintf(
-			"%s: %s: %v",
-			e.Code,
-			e.Message,
-			e.Cause,
-		)
-	}
-
+	// Keep internal causes out of the public error string because provider
+	// and infrastructure errors can contain credentials or other secrets.
+	// Callers can still inspect the cause with errors.Is/errors.As via Unwrap.
 	return fmt.Sprintf(
 		"%s: %s",
 		e.Code,
