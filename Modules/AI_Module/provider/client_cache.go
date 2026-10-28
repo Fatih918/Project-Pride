@@ -363,4 +363,3 @@ func isNilProvider(p Provider) bool {
 	}
 }
 
-var _ io.Closer = (*ProviderLease)(nil)
