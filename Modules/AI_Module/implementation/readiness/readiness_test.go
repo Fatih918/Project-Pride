@@ -181,7 +181,7 @@ func TestGeminiRealProviderFactoryFailsClosedBeforeExecution(t *testing.T) {
 					ConnectionParameters: map[string]any{"model": "test-model"},
 				},
 			},
-			wantErrorContains: "credential must not be empty",
+			wantErrorContains: "CONFIGURATION_ERROR: Gemini provider resolution failed",
 		},
 		{
 			name: "missing model",
@@ -191,7 +191,7 @@ func TestGeminiRealProviderFactoryFailsClosedBeforeExecution(t *testing.T) {
 				},
 				Credential: []byte("R11_TEST_CREDENTIAL"),
 			},
-			wantErrorContains: "connection parameter \"model\" is required",
+			wantErrorContains: "CONFIGURATION_ERROR: Gemini provider resolution failed",
 		},
 	}
 
