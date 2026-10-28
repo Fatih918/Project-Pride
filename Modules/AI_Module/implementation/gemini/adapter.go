@@ -85,10 +85,7 @@ func (a *Adapter) Execute(
 	ctx context.Context,
 	request execution.AIExecutionRequest,
 	executionContext execution.AIExecutionContext,
-) (
-	execution.AIExecutionResult,
-	error,
-) {
+) (result execution.AIExecutionResult, err error) {
 	if a == nil {
 		return execution.AIExecutionResult{}, fmt.Errorf(
 			"Gemini adapter must not be nil",
