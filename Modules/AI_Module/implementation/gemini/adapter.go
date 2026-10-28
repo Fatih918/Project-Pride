@@ -2,12 +2,14 @@ package gemini
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"pride-ai-module/contracts/execution"
+	prideerrors "pride-ai-module/errors"
 	"pride-ai-module/provider"
 )
 
@@ -134,9 +136,9 @@ func (a *Adapter) Execute(
 		providerRequest,
 	)
 	if err != nil {
-		return execution.AIExecutionResult{}, fmt.Errorf(
-			"Gemini provider execution failed: %w",
+		return execution.AIExecutionResult{}, normalizeExecutionError(
 			err,
+			request.RequestID,
 		)
 	}
 
@@ -240,4 +242,19 @@ func normalizeOutput(output any) (*anypb.Any, error) {
 	}
 
 	return value, nil
+}
+
+func normalizeExecutionError(
+	err error,
+	requestID string,
+) error {
+	var prideErr *prideerrors.Error
+	if errors.As(err, &prideErr) {
+		return prideErr.WithRequestID(requestID)
+	}
+
+	return prideerrors.New(
+		prideerrors.CodeRuntimeError,
+		"Gemini provider execution failed",
+	).WithRequestID(requestID).WithCause(err)
 }
