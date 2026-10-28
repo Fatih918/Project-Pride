@@ -19,6 +19,7 @@ type ProviderFactory func(
 type Adapter struct {
 	provider        provider.Provider
 	providerFactory ProviderFactory
+	clientCache     *provider.ClientCache
 }
 
 func NewAdapter(p provider.Provider) (*Adapter, error) {
@@ -33,7 +34,30 @@ func NewAdapter(p provider.Provider) (*Adapter, error) {
 	}, nil
 }
 
+// NewAdapterWithFactory creates an adapter whose provider clients are cached
+// by effective configuration and credential identity. The adapter owns the
+// cache and must be closed when it is no longer used.
 func NewAdapterWithFactory(factory ProviderFactory) (*Adapter, error) {
+	cache, err := provider.NewClientCache()
+	if err != nil {
+		return nil, fmt.Errorf("create Gemini provider client cache")
+	}
+
+	return NewAdapterWithCache(cache, factory)
+}
+
+// NewAdapterWithCache creates an adapter using a caller-owned provider cache.
+// The caller remains responsible for closing the cache after all adapters
+// using it have stopped executing.
+func NewAdapterWithCache(
+	cache *provider.ClientCache,
+	factory ProviderFactory,
+) (*Adapter, error) {
+	if cache == nil {
+		return nil, fmt.Errorf(
+			"Gemini provider client cache must not be nil",
+		)
+	}
 	if factory == nil {
 		return nil, fmt.Errorf(
 			"Gemini provider factory must not be nil",
@@ -42,7 +66,19 @@ func NewAdapterWithFactory(factory ProviderFactory) (*Adapter, error) {
 
 	return &Adapter{
 		providerFactory: factory,
+		clientCache:     cache,
 	}, nil
+}
+
+// Close retires clients owned by this adapter. Active executions may finish;
+// their retired clients are closed when their leases are released.
+// For adapters created with NewAdapterWithCache, close the shared cache
+// separately after all users of that cache have stopped.
+func (a *Adapter) Close() error {
+	if a == nil || a.clientCache == nil {
+		return nil
+	}
+	return a.clientCache.Close()
 }
 
 func (a *Adapter) Execute(
@@ -69,12 +105,18 @@ func (a *Adapter) Execute(
 		return execution.AIExecutionResult{}, err
 	}
 
-	p, err := a.resolveProvider(ctx, executionContext)
+	p, release, err := a.resolveProvider(ctx, executionContext)
 	if err != nil {
 		return execution.AIExecutionResult{}, fmt.Errorf(
-			"Gemini provider resolution failed: %w",
-			err,
+			"Gemini provider resolution failed",
 		)
+	}
+	if release != nil {
+		defer func() {
+			if releaseErr := release(); releaseErr != nil && err == nil {
+				err = fmt.Errorf("Gemini provider lease release failed")
+			}
+		}()
 	}
 
 	providerRequest := provider.Request{
@@ -113,29 +155,51 @@ func (a *Adapter) Execute(
 func (a *Adapter) resolveProvider(
 	ctx context.Context,
 	executionContext execution.AIExecutionContext,
-) (provider.Provider, error) {
+) (provider.Provider, func() error, error) {
 	if a.providerFactory != nil {
-		p, err := a.providerFactory(ctx, executionContext)
+		if a.clientCache == nil {
+			p, err := a.providerFactory(ctx, executionContext)
+			if err != nil {
+				return nil, nil, err
+			}
+			if p == nil {
+				return nil, nil, fmt.Errorf("Gemini provider factory returned nil provider")
+			}
+			return p, nil, nil
+		}
+
+		config := executionContext.Configuration
+		key, err := a.clientCache.NewKey(
+			config.Ref,
+			config.ImplementationRef,
+			config.ConnectionParameters,
+			executionContext.Credential,
+		)
 		if err != nil {
-			return nil, err
+			return nil, nil, fmt.Errorf("prepare Gemini provider client cache key: %w", err)
 		}
 
-		if p == nil {
-			return nil, fmt.Errorf(
-				"Gemini provider factory returned nil provider",
-			)
+		lease, err := a.clientCache.Acquire(
+			ctx,
+			key,
+			func(factoryContext context.Context) (provider.Provider, error) {
+				return a.providerFactory(factoryContext, executionContext)
+			},
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("acquire Gemini provider client: %w", err)
 		}
 
-		return p, nil
+		return lease.Provider(), lease.Release, nil
 	}
 
 	if a.provider == nil {
-		return nil, fmt.Errorf(
+		return nil, nil, fmt.Errorf(
 			"Gemini adapter provider must not be nil",
 		)
 	}
 
-	return a.provider, nil
+	return a.provider, nil, nil
 }
 
 func normalizeOutput(output any) (*anypb.Any, error) {
