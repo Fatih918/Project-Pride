@@ -9,11 +9,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"pride-ai-module/proto"
+	aiv1 "pride-ai-module/proto"
 )
 
 func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
@@ -25,7 +24,7 @@ func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
 		newTestConfigurationProvider(),
 		&testImplementation{},
 	)
-	proto.RegisterAIServiceServer(grpcServer, NewServer(executor))
+	aiv1.RegisterAIServiceServer(grpcServer, NewServer(executor))
 
 	serverErr := make(chan error, 1)
 	go func() {
@@ -39,7 +38,8 @@ func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
 			if err != nil && err != grpc.ErrServerStopped {
 				t.Errorf("gRPC server stopped unexpectedly: %v", err)
 			}
-		default:
+		case <-time.After(time.Second):
+			t.Error("gRPC server did not stop promptly")
 		}
 	})
 
@@ -74,13 +74,13 @@ func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
 		t.Fatalf("build metadata: %v", err)
 	}
 
-	request := &proto.ExecuteRequest{
+	request := &aiv1.ExecuteRequest{
 		RequestId:  "req-sdk-module-e2e",
 		Capability: "text.generate",
 		Input:      input,
 		Metadata:   metadata,
 	}
-	response, err := proto.NewAIServiceClient(conn).Execute(ctx, request)
+	response, err := aiv1.NewAIServiceClient(conn).Execute(ctx, request)
 	if err != nil {
 		t.Fatalf("Execute() through gRPC failed: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
 		t.Errorf("response metadata source = %v, want test-implementation", got)
 	}
 
-	var implementationOutput proto.ExecuteResponse
+	var implementationOutput aiv1.ExecuteResponse
 	if err := response.GetOutput().UnmarshalTo(&implementationOutput); err != nil {
 		t.Fatalf("decode fake implementation output: %v", err)
 	}
@@ -113,18 +113,4 @@ func TestGRPCEndToEndExecutionThroughExecutor(t *testing.T) {
 	if implementationOutput.GetCapability() != request.GetCapability() {
 		t.Errorf("implementation output capability = %q, want %q", implementationOutput.GetCapability(), request.GetCapability())
 	}
-	if !proto.Equal(response.GetMetadata(), metadataFromMap(t, map[string]any{"source": "test-implementation"})) {
-		// The server returns implementation metadata, not request metadata.
-		// Keep this comparison explicit to detect accidental response mapping changes.
-		t.Log("response metadata reflects implementation output as expected")
-	}
-}
-
-func metadataFromMap(t *testing.T, values map[string]any) *structpb.Struct {
-	t.Helper()
-	metadata, err := structpb.NewStruct(values)
-	if err != nil {
-		t.Fatalf("build expected metadata: %v", err)
-	}
-	return metadata
 }
