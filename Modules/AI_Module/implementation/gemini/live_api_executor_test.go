@@ -2,6 +2,7 @@ package gemini
 
 import (
 	"context"
+	stderrors "errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	executioncontract "pride-ai-module/contracts/execution"
 	"pride-ai-module/credential"
 	"pride-ai-module/execution"
+	prideerrors "pride-ai-module/errors"
 	"pride-ai-module/implementation"
 	aiv1 "pride-ai-module/proto"
 	"pride-ai-module/selection"
@@ -138,9 +140,16 @@ func TestGeminiLiveAPIThroughExecutor(t *testing.T) {
 
 	result, err := executor.Execute(ctx, request)
 	if err != nil {
-		// The adapter normalizes provider failures; do not include credential
-		// values in diagnostics.
-		t.Fatalf("execute live Gemini request failed (check model, API key, quota, and network): %v", err)
+		// Public errors intentionally hide provider internals. In this opt-in
+		// local integration test, print only the internal cause after redacting
+		// the exact API key so authentication/model/quota/network failures can
+		// be diagnosed without exposing the credential.
+		var prideErr *prideerrors.Error
+		if stderrors.As(err, &prideErr) && prideErr.Cause != nil {
+			diagnostic := strings.ReplaceAll(prideErr.Cause.Error(), apiKey, "[REDACTED]")
+			t.Logf("redacted Gemini provider cause: %s", diagnostic)
+		}
+		t.Fatalf("execute live Gemini request failed (model=%q; API key value omitted): %v", model, err)
 	}
 	if result.RequestID != request.RequestID {
 		t.Fatalf("result request ID = %q, want %q", result.RequestID, request.RequestID)
