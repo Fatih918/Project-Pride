@@ -53,6 +53,10 @@ func (p *geminiIntegrationConfigurationProvider) GetByRef(
 var _ configuration.AIConfigurationProvider = (*geminiIntegrationConfigurationProvider)(nil)
 
 func TestGeminiRealProviderThroughExecutor(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("GEMINI_RUN_EXECUTOR_REAL_API_TEST")) != "1" {
+		t.Skip("set GEMINI_RUN_EXECUTOR_REAL_API_TEST=1 to run the real Gemini API integration test")
+	}
+
 	apiKey := strings.TrimSpace(
 		os.Getenv("GEMINI_API_KEY"),
 	)
