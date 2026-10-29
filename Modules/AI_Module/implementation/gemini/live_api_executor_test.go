@@ -22,10 +22,13 @@ import (
 )
 
 // TestGeminiLiveAPIThroughExecutor is an opt-in integration test. It makes a
-// real request to Google Gemini only when GEMINI_API_KEY and GEMINI_MODEL are
-// configured in the test process. Never print the API key or persist it in
-// source control.
+// real request to Google Gemini only when GEMINI_RUN_LIVE_API_TEST=1,
+// GEMINI_API_KEY, and GEMINI_MODEL are configured. Never print the API key or
+// persist it in source control.
 func TestGeminiLiveAPIThroughExecutor(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("GEMINI_RUN_LIVE_API_TEST")) != "1" {
+		t.Skip("set GEMINI_RUN_LIVE_API_TEST=1 to explicitly run the live Gemini API test")
+	}
 	apiKey := strings.TrimSpace(os.Getenv("GEMINI_API_KEY"))
 	model := strings.TrimSpace(os.Getenv("GEMINI_MODEL"))
 	if apiKey == "" || model == "" {
@@ -138,6 +141,7 @@ func TestGeminiLiveAPIThroughExecutor(t *testing.T) {
 		},
 	}
 
+	t.Logf("Live Gemini API request: model=%s prompt=%q", model, prompt)
 	result, err := executor.Execute(ctx, request)
 	if err != nil {
 		// Public errors intentionally hide provider internals. In this opt-in
@@ -178,5 +182,6 @@ func TestGeminiLiveAPIThroughExecutor(t *testing.T) {
 		t.Fatalf("model metadata = %v, want %q", result.Metadata["model"], model)
 	}
 
+	t.Logf("Live Gemini API response: %q", output.Text)
 	t.Logf("Live Gemini API request succeeded: provider=gemini model=%s response_bytes=%d", model, len(output.Text))
 }
