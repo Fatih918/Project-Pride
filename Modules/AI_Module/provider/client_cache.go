@@ -27,7 +27,7 @@ type ClientFactory func(context.Context) (Provider, error)
 // effective provider client. Its fingerprint never contains the raw credential.
 type ClientKey struct {
 	configurationRef string
-	digest            string
+	digest           string
 }
 
 // ClientCache owns provider clients and defers closing retired clients until
@@ -362,4 +362,3 @@ func isNilProvider(p Provider) bool {
 		return false
 	}
 }
-

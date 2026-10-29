@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	prideerrors "pride-ai-module/errors"
 	"pride-ai-module/configuration"
 	executioncontract "pride-ai-module/contracts/execution"
+	prideerrors "pride-ai-module/errors"
 	"pride-ai-module/execution"
 	"pride-ai-module/implementation"
 	aiv1 "pride-ai-module/proto"
@@ -922,7 +922,6 @@ func (i *captureImplementation) Execute(
 }
 
 var _ implementation.AIImplementation = (*captureImplementation)(nil)
-
 
 // R5.5 — Credentials must not be implicitly propagated into response metadata.
 func TestServerDoesNotPropagateCredentialIntoResponseMetadata(t *testing.T) {

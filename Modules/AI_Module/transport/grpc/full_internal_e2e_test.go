@@ -2,10 +2,10 @@ package grpc_test
 
 import (
 	"context"
+	"net"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
-	"net"
 	"testing"
 	"time"
 
@@ -56,7 +56,7 @@ func (p *r9TestProvider) Execute(
 	return provider.Response{
 		Output: request.Input,
 		Metadata: map[string]any{
-			"provider": "r9-test-provider",
+			"provider":   "r9-test-provider",
 			"capability": request.Capability,
 		},
 	}, nil
@@ -126,12 +126,12 @@ func TestFullInternalE2EUsesPersistentStoresResolversAndGRPC(t *testing.T) {
 	}
 
 	configuration := configuration.AIConfiguration{
-		Ref: r9ConfigurationRef,
-		Name: "R9 internal E2E",
-		Type: "test",
-		ImplementationRef: r9ImplementationRef,
-		CredentialRef: credentialRef,
-		Enabled: false,
+		Ref:                  r9ConfigurationRef,
+		Name:                 "R9 internal E2E",
+		Type:                 "test",
+		ImplementationRef:    r9ImplementationRef,
+		CredentialRef:        credentialRef,
+		Enabled:              false,
 		ConnectionParameters: map[string]any{"model": "r9-test-model"},
 	}
 	if err := configurations.Create(ctx, configuration); err != nil {
@@ -201,7 +201,7 @@ func TestFullInternalE2EUsesPersistentStoresResolversAndGRPC(t *testing.T) {
 		t.Fatalf("encode input: %v", err)
 	}
 	metadata, err := structpb.NewStruct(map[string]any{
-		"trace": map[string]any{"source": "r9-test"},
+		"trace":   map[string]any{"source": "r9-test"},
 		"attempt": float64(1),
 	})
 	if err != nil {
@@ -209,10 +209,10 @@ func TestFullInternalE2EUsesPersistentStoresResolversAndGRPC(t *testing.T) {
 	}
 
 	response, err := aiv1.NewAIServiceClient(connection).Execute(ctx, &aiv1.ExecuteRequest{
-		RequestId: "r9-request",
+		RequestId:  "r9-request",
 		Capability: "text.generate",
-		Input: input,
-		Metadata: metadata,
+		Input:      input,
+		Metadata:   metadata,
 	})
 	if err != nil {
 		t.Fatalf("execute full internal E2E request: %v", err)

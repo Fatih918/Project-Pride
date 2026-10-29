@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-type testProvider struct { name string }
+type testProvider struct{ name string }
 
 func (testProvider) Execute(
 	ctx context.Context,
@@ -136,7 +136,6 @@ func TestResolverResolvesCorrectProvider(t *testing.T) {
 		t.Fatal("expected second reference to resolve to second provider")
 	}
 }
-
 
 func TestResolverConcurrentRegisterAndResolve(t *testing.T) {
 	t.Parallel()

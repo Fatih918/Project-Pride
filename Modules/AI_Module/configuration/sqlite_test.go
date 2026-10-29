@@ -736,7 +736,6 @@ func TestSQLiteStorePersistsAcrossConnections(
 	}
 }
 
-
 func TestSQLiteStoreLifecycleInvariantMatrix(t *testing.T) {
 	ctx := context.Background()
 	store, err := NewSQLiteStore(

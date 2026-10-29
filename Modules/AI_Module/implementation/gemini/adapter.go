@@ -260,7 +260,6 @@ func normalizeExecutionError(
 	).WithRequestID(requestID).WithCause(err)
 }
 
-
 func normalizeResolutionError(
 	err error,
 	requestID string,

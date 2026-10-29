@@ -20,7 +20,7 @@ import (
 )
 
 type readinessProvider struct {
-	called bool
+	called  bool
 	request provider.Request
 }
 
@@ -73,7 +73,7 @@ func TestAdaptersPassReadinessGateWithoutCredential(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 			const (
-				requestID = "r11-readiness-request"
+				requestID  = "r11-readiness-request"
 				capability = "text.generate"
 			)
 

@@ -788,7 +788,6 @@ func TestMemoryStoreDeleteUnknownReference(
 	}
 }
 
-
 // Configuration lifecycle invariant matrix shared by MemoryStore and SQLiteStore.
 type configurationLifecycleStore interface {
 	Create(context.Context, AIConfiguration) error

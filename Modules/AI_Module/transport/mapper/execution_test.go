@@ -362,4 +362,3 @@ func TestExecutionMapperPreservesNestedMetadata(t *testing.T) {
 		t.Fatalf("metadata changed during response mapping: got %#v, want %#v", got, want)
 	}
 }
-

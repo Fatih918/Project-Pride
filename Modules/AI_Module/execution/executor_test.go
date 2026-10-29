@@ -989,7 +989,6 @@ func (i *credentialCapturingImplementation) Execute(
 	}, nil
 }
 
-var _ implementation.AIImplementation =
-	(*credentialCapturingImplementation)(nil)
-	
+var _ implementation.AIImplementation = (*credentialCapturingImplementation)(nil)
+
 var _ executioncontract.CredentialResolver = (*testCredentialResolver)(nil)
