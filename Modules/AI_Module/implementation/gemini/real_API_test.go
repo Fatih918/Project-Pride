@@ -15,6 +15,10 @@ import (
 )
 
 func TestRealGeminiAPI(t *testing.T) {
+	if strings.TrimSpace(os.Getenv("GEMINI_RUN_LEGACY_REAL_API_TEST")) != "1" {
+		t.Skip("set GEMINI_RUN_LEGACY_REAL_API_TEST=1 to explicitly run the legacy direct-adapter live API test")
+	}
+
 	apiKey := strings.TrimSpace(
 		os.Getenv("GEMINI_API_KEY"),
 	)
