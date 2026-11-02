@@ -14,7 +14,12 @@ type DiscoveryPort interface {
 	GetPluginState(context.Context, PluginQuery) (PluginStateInfo, error)
 }
 
-type PluginQuery struct {\n\tPluginID string\n\tMetadata map[string]any\n}\n\ntype ListQuery struct {
+type PluginQuery struct {
+\tPluginID string
+\tMetadata map[string]any
+}
+
+type ListQuery struct {
 	PageSize int32
 	PageToken string
 	Type PluginType
@@ -42,6 +47,7 @@ type Plugin struct {
 	Capabilities []Capability
 	Available bool
 	CompatibilityStatus string
+	ResponseMetadata map[string]any
 }
 
 type Manifest struct {
