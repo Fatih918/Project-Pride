@@ -1,0 +1,48 @@
+name: Plugin SDK Protocol
+
+on:
+  pull_request:
+    paths:
+      - "sdks/plugin/**"
+      - ".github/workflows/plugin-sdk-proto.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "sdks/plugin/**"
+      - ".github/workflows/plugin-sdk-proto.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-protocol:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/plugin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: sdks/plugin/go.mod
+          cache: true
+          cache-dependency-path: sdks/plugin/go.sum
+
+      - name: Set up Buf
+        uses: bufbuild/buf-setup-action@v1
+
+      - name: Lint protocol
+        run: buf lint
+
+      - name: Generate Go bindings
+        run: buf generate
+
+      - name: Verify generated package
+        run: go test ./...
+
+      - name: Vet generated package
+        run: go vet ./...
