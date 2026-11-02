@@ -8,13 +8,13 @@ import "context"
 // The SDK adapter must not access repositories, loaders, runtimes, or storage.
 type DiscoveryPort interface {
 	ListPlugins(context.Context, ListQuery) (PluginPage, error)
-	GetPlugin(context.Context, string) (Plugin, error)
+	GetPlugin(context.Context, PluginQuery) (Plugin, error)
 	FindPluginsByCapability(context.Context, CapabilityQuery) (PluginPage, error)
-	GetPluginMetadata(context.Context, string) (PluginMetadata, error)
-	GetPluginState(context.Context, string) (PluginStateInfo, error)
+	GetPluginMetadata(context.Context, PluginQuery) (PluginMetadata, error)
+	GetPluginState(context.Context, PluginQuery) (PluginStateInfo, error)
 }
 
-type ListQuery struct {
+type PluginQuery struct {\n\tPluginID string\n\tMetadata map[string]any\n}\n\ntype ListQuery struct {
 	PageSize int32
 	PageToken string
 	Type PluginType
