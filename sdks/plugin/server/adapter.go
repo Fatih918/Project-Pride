@@ -134,7 +134,7 @@ func encodeStruct(value map[string]any) (*structpb.Struct, error) {
 	if len(value) == 0 { return nil, nil }
 	return structpb.NewStruct(value)
 }
-func responseMetadata(value map[string]any) (*structpb.Struct, error) { return encodeStruct(value) }\nfunc mustDecodeStruct(value *structpb.Struct) map[string]any { result, _ := decodeStruct(value); return result }
+func responseMetadata(value map[string]any) (*structpb.Struct, error) { return encodeStruct(value) }
 
 func mapPlugins(values []Plugin) ([]*pluginv1.PluginRecord, error) {
 	out := make([]*pluginv1.PluginRecord, 0, len(values))
