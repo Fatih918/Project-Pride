@@ -1,29 +1,48 @@
 # PRIDE Plugin SDK
 
-This module owns the Go bindings and, in subsequent increments, the public Go client and server-side transport adapter for the canonical Plugin SDK protocol.
+This module owns the Go bindings and public Go client for the canonical Plugin SDK protocol.
 
 ## Source of truth
 
 - Protocol schema: `proto/plugin_sdk.proto`
 - Protobuf package: `pride.plugin.v1`
 - Go module: `pride-plugin-sdk`
-- Go package: `pluginv1` in `pride-plugin-sdk/proto`
+- Generated Go package: `pride-plugin-sdk/proto`
+- Public client package: `pride-plugin-sdk/client`
 
 Generated files are derived artifacts. Do not edit generated `*.pb.go` files manually.
 
-## Prerequisites
+## Create a client
 
-- Go version compatible with the `go.mod` directive.
-- Buf CLI.
-- Network access to Buf remote plugins for the first generation or when the remote plugin cache is empty.
+The caller supplies an existing gRPC connection and retains ownership of it:
 
-The generator versions are pinned in `buf.gen.yaml`:
-- `protoc-gen-go`: v1.36.12
-- `protoc-gen-go-grpc`: v1.6.2
+```go
+conn, err := grpc.NewClient(target, grpc.WithTransportCredentials(creds))
+if err != nil {
+    return err
+}
+defer conn.Close()
 
-## Generate bindings
+pluginClient, err := client.New(conn)
+if err != nil {
+    return err
+}
 
-From this directory:
+plugins, err := pluginClient.ListPlugins(ctx, &pluginv1.ListPluginsRequest{
+    RequestId: "request-123",
+    PageSize:  50,
+})
+if err != nil {
+    return err
+}
+_ = plugins
+```
+
+The client forwards the caller's context and optional gRPC call options. It validates required request identifiers and returns transport errors unchanged. Connection setup, credentials, retries, and connection lifecycle remain the caller's responsibility.
+
+## Generate and verify
+
+The Buf configuration files define schema linting and code-generation inputs/outputs. The Makefile provides short aliases for common commands; the underlying commands can also be run directly:
 
 ```sh
 buf lint
@@ -32,25 +51,8 @@ go test ./...
 go vet ./...
 ```
 
-Or use the Makefile:
-
-```sh
-make proto-lint
-make generate
-make verify
-```
-
-Generated files are written beside the source schema under `proto/` because the generator uses `paths=source_relative`.
-
-## Compatibility rules
-
-1. Edit `proto/plugin_sdk.proto`, not generated Go files.
-2. Never reuse published Protobuf field numbers.
-3. Keep the `pride.plugin.v1` package stable for compatible additions.
-4. Introduce a new package version for breaking wire-contract changes.
-5. Regenerate and commit generated bindings whenever the schema changes.
-6. Keep Module domain types independent of generated Protobuf types.
+Run these commands from this module directory. Generated files are written under `proto/` because generation uses source-relative paths.
 
 ## Current scope
 
-The current protocol increment is read-only discovery and defines five RPCs. Lifecycle and execution are intentionally deferred until their contracts are reconciled. This module does not contain a concrete Plugin Module implementation.
+The current protocol increment exposes five read-only discovery RPCs. Lifecycle and execution are intentionally deferred until their contracts are reconciled. The SDK client does not select Plugins, evaluate permissions, orchestrate workflows, or implement Plugin behavior.
