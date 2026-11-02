@@ -6,3 +6,6 @@ modules:
 lint:
   use:
     - STANDARD
+  # Keep the existing flat proto/ layout consistent with the AI SDK.
+  except:
+    - PACKAGE_DIRECTORY_MATCH
