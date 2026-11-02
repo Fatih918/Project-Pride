@@ -91,7 +91,7 @@ The initial service is PluginService in package pride.plugin.v1.
 | GetPluginMetadata | Retrieve standardized descriptive and registry metadata | No |
 | GetPluginState | Retrieve the current state and availability | No |
 
-Discovery methods are read-only. They must not load or execute a Plugin as a side effect.
+Discovery methods are read-only. They must not load or execute a Plugin as a side effect. Every request carries a required request_id and optional standardized metadata. Every successful response returns the originating request_id and optional response metadata. The server must preserve request identity end-to-end.
 
 ---
 
@@ -187,7 +187,7 @@ At minimum:
 * page_size must be non-negative; zero requests the server default.
 * Page tokens are opaque and must not be interpreted by clients.
 
-A valid request must preserve the caller's context, including cancellation and deadline.
+A valid request must include a non-empty request_id, preserve that identifier in the response or structured error, and preserve the caller's context, including cancellation and deadline. Optional request metadata is contextual data only; it must not be used to transfer secrets or bypass domain contracts.
 
 ---
 
@@ -195,7 +195,7 @@ A valid request must preserve the caller's context, including cancellation and d
 
 A failed operation shall use a non-OK gRPC status with a structured PluginError detail.
 
-The PluginError contains request_id, error_code, message, and metadata.
+The PluginError contains request_id, error_code, message, and metadata. The request_id must match the originating request whenever it is available.
 
 Initial error categories are derived from the Plugin SDK Contract:
 
