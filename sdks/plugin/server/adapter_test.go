@@ -21,10 +21,10 @@ type fakeDiscovery struct {
 	err error
 }
 func (f *fakeDiscovery) ListPlugins(ctx context.Context, q ListQuery) (PluginPage,error) { f.ctx=ctx; f.listQuery=q; if f.err!=nil{return PluginPage{},f.err}; return PluginPage{Plugins:[]Plugin{f.plugin},NextPageToken:"next"},nil }
-func (f *fakeDiscovery) GetPlugin(context.Context,string)(Plugin,error){return f.plugin,f.err}
+func (f *fakeDiscovery) GetPlugin(context.Context,PluginQuery)(Plugin,error){return f.plugin,f.err}
 func (f *fakeDiscovery) FindPluginsByCapability(context.Context,CapabilityQuery)(PluginPage,error){return PluginPage{Plugins:[]Plugin{f.plugin}},f.err}
-func (f *fakeDiscovery) GetPluginMetadata(context.Context,string)(PluginMetadata,error){return PluginMetadata{PluginID:f.plugin.Manifest.PluginID,Name:f.plugin.Manifest.Name},f.err}
-func (f *fakeDiscovery) GetPluginState(context.Context,string)(PluginStateInfo,error){return PluginStateInfo{PluginID:f.plugin.Manifest.PluginID,State:f.plugin.State,Available:f.plugin.Available},f.err}
+func (f *fakeDiscovery) GetPluginMetadata(context.Context,PluginQuery)(PluginMetadata,error){return PluginMetadata{PluginID:f.plugin.Manifest.PluginID,Name:f.plugin.Manifest.Name},f.err}
+func (f *fakeDiscovery) GetPluginState(context.Context,PluginQuery)(PluginStateInfo,error){return PluginStateInfo{PluginID:f.plugin.Manifest.PluginID,State:f.plugin.State,Available:f.plugin.Available},f.err}
 
 func TestAdapterListPluginsOverGRPC(t *testing.T) {
 	fake:=&fakeDiscovery{plugin:Plugin{Manifest:Manifest{PluginID:"example",Name:"Example"},Type:PluginTypeActive,State:PluginStateEnabled,Available:true}}
