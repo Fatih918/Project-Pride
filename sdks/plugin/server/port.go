@@ -15,8 +15,8 @@ type DiscoveryPort interface {
 }
 
 type PluginQuery struct {
-\tPluginID string
-\tMetadata map[string]any
+	PluginID string
+	Metadata map[string]any
 }
 
 type ListQuery struct {
