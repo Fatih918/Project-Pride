@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package pride.plugin.v1;
+
+option go_package = "pride-plugin-sdk/proto;pluginv1";
+
+import "google/protobuf/struct.proto";
+
+// Initial read-only discovery boundary. Lifecycle and execution RPCs are
+// introduced in later protocol increments after contract reconciliation.
+service PluginService {
+  rpc ListPlugins(ListPluginsRequest) returns (ListPluginsResponse);
+  rpc GetPlugin(GetPluginRequest) returns (GetPluginResponse);
+  rpc FindPluginsByCapability(FindPluginsByCapabilityRequest) returns (FindPluginsByCapabilityResponse);
+  rpc GetPluginMetadata(GetPluginMetadataRequest) returns (GetPluginMetadataResponse);
+  rpc GetPluginState(GetPluginStateRequest) returns (GetPluginStateResponse);
+}
+
+enum PluginType {
+  PLUGIN_TYPE_UNSPECIFIED = 0;
+  PLUGIN_TYPE_ACTIVE = 1;
+  PLUGIN_TYPE_PASSIVE = 2;
+}
+
+enum PluginState {
+  PLUGIN_STATE_UNSPECIFIED = 0;
+  PLUGIN_STATE_INSTALLED = 1;
+  PLUGIN_STATE_ENABLED = 2;
+  PLUGIN_STATE_DISABLED = 3;
+  PLUGIN_STATE_RUNNING = 4;
+  PLUGIN_STATE_ERROR = 5;
+}
+
+message PluginManifest {
+  string plugin_id = 1;
+  string name = 2;
+  string version = 3;
+  string description = 4;
+  string author = 5;
+  string license = 6;
+  string entry_point = 7;
+  string minimum_pride_version = 8;
+  string homepage = 9;
+  string documentation_url = 10;
+  string repository_url = 11;
+  string issue_tracker_url = 12;
+  repeated string keywords = 13;
+  string category = 14;
+  string icon = 15;
+  string changelog_url = 16;
+}
+
+message PluginCapability {
+  string capability_id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message PluginRecord {
+  PluginManifest manifest = 1;
+  PluginType type = 2;
+  PluginState state = 3;
+  repeated PluginCapability capabilities = 4;
+  bool available = 5;
+  string compatibility_status = 6;
+}
+
+message ListPluginsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  PluginType type_filter = 3;
+  PluginState state_filter = 4;
+}
+
+message ListPluginsResponse {
+  repeated PluginRecord plugins = 1;
+  string next_page_token = 2;
+}
+
+message GetPluginRequest { string plugin_id = 1; }
+message GetPluginResponse { PluginRecord plugin = 1; }
+
+message FindPluginsByCapabilityRequest {
+  string capability_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message FindPluginsByCapabilityResponse {
+  repeated PluginRecord plugins = 1;
+  string next_page_token = 2;
+}
+
+message GetPluginMetadataRequest { string plugin_id = 1; }
+
+message PluginMetadata {
+  string plugin_id = 1;
+  string name = 2;
+  string version = 3;
+  PluginType type = 4;
+  repeated PluginCapability capabilities = 5;
+  repeated string permission_ids = 6;
+  string compatibility_status = 7;
+  google.protobuf.Struct attributes = 8;
+}
+
+message GetPluginMetadataResponse { PluginMetadata metadata = 1; }
+message GetPluginStateRequest { string plugin_id = 1; }
+
+message GetPluginStateResponse {
+  string plugin_id = 1;
+  PluginState state = 2;
+  bool available = 3;
+  string status_message = 4;
+}
+
+// Structured application error detail attached to a non-OK gRPC status.
+message PluginError {
+  string request_id = 1;
+  string error_code = 2;
+  string message = 3;
+  google.protobuf.Struct metadata = 4;
+}
