@@ -41,11 +41,11 @@ func (a *Adapter) GetPlugin(ctx context.Context, req *pluginv1.GetPluginRequest)
 	if req == nil { return nil, invalid("", "request is required") }
 	if err := validateRequestID(req.GetRequestId()); err != nil { return nil, err }
 	if req.GetPluginId() == "" { return nil, invalid(req.GetRequestId(), "plugin_id is required") }
-	plugin, err := a.discovery.GetPlugin(ctx, req.GetPluginId())
+	plugin, err := a.discovery.GetPlugin(ctx, PluginQuery{PluginID:req.GetPluginId(), Metadata:mustDecodeStruct(req.GetMetadata())})
 	if err != nil { return nil, toStatus(req.GetRequestId(), err) }
 	mapped, err := mapPlugin(plugin)
 	if err != nil { return nil, internal(req.GetRequestId(), err) }
-	meta, err := responseMetadata(nil)
+	meta, err := responseMetadata(plugin.ResponseMetadata)
 	if err != nil { return nil, internal(req.GetRequestId(), err) }
 	return &pluginv1.GetPluginResponse{RequestId:req.GetRequestId(), Plugin:mapped, Metadata:meta}, nil
 }
@@ -70,7 +70,7 @@ func (a *Adapter) GetPluginMetadata(ctx context.Context, req *pluginv1.GetPlugin
 	if req == nil { return nil, invalid("", "request is required") }
 	if err := validateRequestID(req.GetRequestId()); err != nil { return nil, err }
 	if req.GetPluginId() == "" { return nil, invalid(req.GetRequestId(), "plugin_id is required") }
-	value, err := a.discovery.GetPluginMetadata(ctx, req.GetPluginId())
+	value, err := a.discovery.GetPluginMetadata(ctx, PluginQuery{PluginID:req.GetPluginId(), Metadata:mustDecodeStruct(req.GetMetadata())})
 	if err != nil { return nil, toStatus(req.GetRequestId(), err) }
 	caps, err := mapCapabilities(value.Capabilities)
 	if err != nil { return nil, internal(req.GetRequestId(), err) }
@@ -85,7 +85,7 @@ func (a *Adapter) GetPluginState(ctx context.Context, req *pluginv1.GetPluginSta
 	if req == nil { return nil, invalid("", "request is required") }
 	if err := validateRequestID(req.GetRequestId()); err != nil { return nil, err }
 	if req.GetPluginId() == "" { return nil, invalid(req.GetRequestId(), "plugin_id is required") }
-	value, err := a.discovery.GetPluginState(ctx, req.GetPluginId())
+	value, err := a.discovery.GetPluginState(ctx, PluginQuery{PluginID:req.GetPluginId(), Metadata:mustDecodeStruct(req.GetMetadata())})
 	if err != nil { return nil, toStatus(req.GetRequestId(), err) }
 	meta, err := encodeStruct(value.ResponseMetadata)
 	if err != nil { return nil, internal(req.GetRequestId(), err) }
@@ -128,7 +128,7 @@ func encodeStruct(value map[string]any) (*structpb.Struct, error) {
 	if len(value) == 0 { return nil, nil }
 	return structpb.NewStruct(value)
 }
-func responseMetadata(value map[string]any) (*structpb.Struct, error) { return encodeStruct(value) }
+func responseMetadata(value map[string]any) (*structpb.Struct, error) { return encodeStruct(value) }\nfunc mustDecodeStruct(value *structpb.Struct) map[string]any { result, _ := decodeStruct(value); return result }
 
 func mapPlugins(values []Plugin) ([]*pluginv1.PluginRecord, error) {
 	out := make([]*pluginv1.PluginRecord, 0, len(values))
