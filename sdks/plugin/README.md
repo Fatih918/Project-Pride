@@ -9,6 +9,7 @@ This module owns the Go bindings and public Go client for the canonical Plugin S
 - Go module: `pride-plugin-sdk`
 - Generated Go package: `pride-plugin-sdk/proto`
 - Public client package: `pride-plugin-sdk/client`
+- gRPC server adapter package: `pride-plugin-sdk/server`
 
 Generated files are derived artifacts. Do not edit generated `*.pb.go` files manually.
 
@@ -39,6 +40,12 @@ _ = plugins
 ```
 
 The client forwards the caller's context and optional gRPC call options. It validates required request identifiers and returns transport errors unchanged. Connection setup, credentials, retries, and connection lifecycle remain the caller's responsibility.
+
+## Server adapter boundary
+
+The `server` package implements the five read-only gRPC discovery methods. Construct it with a `server.DiscoveryPort` implementation supplied by the Plugin Module and register it with a gRPC server using `pluginv1.RegisterPluginServiceServer`. The port uses SDK-independent Go DTOs; it must not expose generated Protobuf types or concrete storage, registry, loader, or runtime implementations. This repository still has no concrete Plugin Module, so adapter tests use a deterministic fake port.
+
+The adapter forwards request context and metadata, maps SDK-neutral records to Protobuf responses, and translates typed `server.DomainError` values into gRPC statuses with `PluginError` details. It does not implement registry semantics, permissions, selection, lifecycle, or execution.
 
 ## Generate and verify
 
