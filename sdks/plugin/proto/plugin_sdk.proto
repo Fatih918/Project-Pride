@@ -66,32 +66,52 @@ message PluginRecord {
 }
 
 message ListPluginsRequest {
-  int32 page_size = 1;
-  string page_token = 2;
-  PluginType type_filter = 3;
-  PluginState state_filter = 4;
+  string request_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  PluginType type_filter = 4;
+  PluginState state_filter = 5;
+  google.protobuf.Struct metadata = 6;
 }
 
 message ListPluginsResponse {
-  repeated PluginRecord plugins = 1;
-  string next_page_token = 2;
+  string request_id = 1;
+  repeated PluginRecord plugins = 2;
+  string next_page_token = 3;
+  google.protobuf.Struct metadata = 4;
 }
 
-message GetPluginRequest { string plugin_id = 1; }
-message GetPluginResponse { PluginRecord plugin = 1; }
+message GetPluginRequest {
+  string request_id = 1;
+  string plugin_id = 2;
+  google.protobuf.Struct metadata = 3;
+}
+message GetPluginResponse {
+  string request_id = 1;
+  PluginRecord plugin = 2;
+  google.protobuf.Struct metadata = 3;
+}
 
 message FindPluginsByCapabilityRequest {
-  string capability_id = 1;
-  int32 page_size = 2;
-  string page_token = 3;
+  string request_id = 1;
+  string capability_id = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+  google.protobuf.Struct metadata = 5;
 }
 
 message FindPluginsByCapabilityResponse {
-  repeated PluginRecord plugins = 1;
-  string next_page_token = 2;
+  string request_id = 1;
+  repeated PluginRecord plugins = 2;
+  string next_page_token = 3;
+  google.protobuf.Struct metadata = 4;
 }
 
-message GetPluginMetadataRequest { string plugin_id = 1; }
+message GetPluginMetadataRequest {
+  string request_id = 1;
+  string plugin_id = 2;
+  google.protobuf.Struct metadata = 3;
+}
 
 message PluginMetadata {
   string plugin_id = 1;
@@ -104,14 +124,24 @@ message PluginMetadata {
   google.protobuf.Struct attributes = 8;
 }
 
-message GetPluginMetadataResponse { PluginMetadata metadata = 1; }
-message GetPluginStateRequest { string plugin_id = 1; }
+message GetPluginMetadataResponse {
+  string request_id = 1;
+  PluginMetadata plugin_metadata = 2;
+  google.protobuf.Struct metadata = 3;
+}
+message GetPluginStateRequest {
+  string request_id = 1;
+  string plugin_id = 2;
+  google.protobuf.Struct metadata = 3;
+}
 
 message GetPluginStateResponse {
-  string plugin_id = 1;
-  PluginState state = 2;
-  bool available = 3;
-  string status_message = 4;
+  string request_id = 1;
+  string plugin_id = 2;
+  PluginState state = 3;
+  bool available = 4;
+  string status_message = 5;
+  google.protobuf.Struct metadata = 6;
 }
 
 // Structured application error detail attached to a non-OK gRPC status.
