@@ -34,11 +34,20 @@ func (a *Adapter) ListPlugins(ctx context.Context, req *pluginv1.ListPluginsRequ
 	if req.GetPageSize() < 0 {
 		return nil, invalid(req.GetRequestId(), "page_size must not be negative")
 	}
+	if err := validatePluginType(req.GetTypeFilter()); err != nil {
+		return nil, invalid(req.GetRequestId(), "type_filter is invalid")
+	}
+	if err := validatePluginState(req.GetStateFilter()); err != nil {
+		return nil, invalid(req.GetRequestId(), "state_filter is invalid")
+	}
 	meta, err := decodeStruct(req.GetMetadata())
 	if err != nil {
 		return nil, invalid(req.GetRequestId(), "metadata is invalid")
 	}
-	page, err := a.discovery.ListPlugins(ctx, ListQuery{PageSize: req.GetPageSize(), PageToken: req.GetPageToken(), Type: fromProtoType(req.GetTypeFilter()), State: fromProtoState(req.GetStateFilter()), Metadata: meta})
+	page, err := a.discovery.ListPlugins(ctx, ListQuery{
+		PageSize: req.GetPageSize(), PageToken: req.GetPageToken(),
+		Type: fromProtoType(req.GetTypeFilter()), State: fromProtoState(req.GetStateFilter()), Metadata: meta,
+	})
 	if err != nil {
 		return nil, toStatus(req.GetRequestId(), err)
 	}
@@ -50,7 +59,10 @@ func (a *Adapter) ListPlugins(ctx context.Context, req *pluginv1.ListPluginsRequ
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
-	return &pluginv1.ListPluginsResponse{RequestId: req.GetRequestId(), Plugins: plugins, NextPageToken: page.NextPageToken, Metadata: responseMeta}, nil
+	return &pluginv1.ListPluginsResponse{
+		RequestId: req.GetRequestId(), Plugins: plugins,
+		NextPageToken: page.NextPageToken, Metadata: responseMeta,
+	}, nil
 }
 
 func (a *Adapter) GetPlugin(ctx context.Context, req *pluginv1.GetPluginRequest) (*pluginv1.GetPluginResponse, error) {
@@ -63,8 +75,8 @@ func (a *Adapter) GetPlugin(ctx context.Context, req *pluginv1.GetPluginRequest)
 	if req.GetPluginId() == "" {
 		return nil, invalid(req.GetRequestId(), "plugin_id is required")
 	}
-	requestMetadata, metaErr := decodeStruct(req.GetMetadata())
-	if metaErr != nil {
+	requestMetadata, err := decodeStruct(req.GetMetadata())
+	if err != nil {
 		return nil, invalid(req.GetRequestId(), "metadata is invalid")
 	}
 	plugin, err := a.discovery.GetPlugin(ctx, PluginQuery{PluginID: req.GetPluginId(), Metadata: requestMetadata})
@@ -75,7 +87,7 @@ func (a *Adapter) GetPlugin(ctx context.Context, req *pluginv1.GetPluginRequest)
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
-	meta, err := responseMetadata(plugin.ResponseMetadata)
+	meta, err := encodeStruct(plugin.ResponseMetadata)
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
@@ -99,7 +111,10 @@ func (a *Adapter) FindPluginsByCapability(ctx context.Context, req *pluginv1.Fin
 	if err != nil {
 		return nil, invalid(req.GetRequestId(), "metadata is invalid")
 	}
-	page, err := a.discovery.FindPluginsByCapability(ctx, CapabilityQuery{CapabilityID: req.GetCapabilityId(), PageSize: req.GetPageSize(), PageToken: req.GetPageToken(), Metadata: meta})
+	page, err := a.discovery.FindPluginsByCapability(ctx, CapabilityQuery{
+		CapabilityID: req.GetCapabilityId(), PageSize: req.GetPageSize(),
+		PageToken: req.GetPageToken(), Metadata: meta,
+	})
 	if err != nil {
 		return nil, toStatus(req.GetRequestId(), err)
 	}
@@ -111,7 +126,10 @@ func (a *Adapter) FindPluginsByCapability(ctx context.Context, req *pluginv1.Fin
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
-	return &pluginv1.FindPluginsByCapabilityResponse{RequestId: req.GetRequestId(), Plugins: plugins, NextPageToken: page.NextPageToken, Metadata: responseMeta}, nil
+	return &pluginv1.FindPluginsByCapabilityResponse{
+		RequestId: req.GetRequestId(), Plugins: plugins,
+		NextPageToken: page.NextPageToken, Metadata: responseMeta,
+	}, nil
 }
 
 func (a *Adapter) GetPluginMetadata(ctx context.Context, req *pluginv1.GetPluginMetadataRequest) (*pluginv1.GetPluginMetadataResponse, error) {
@@ -124,13 +142,16 @@ func (a *Adapter) GetPluginMetadata(ctx context.Context, req *pluginv1.GetPlugin
 	if req.GetPluginId() == "" {
 		return nil, invalid(req.GetRequestId(), "plugin_id is required")
 	}
-	requestMetadata, metaErr := decodeStruct(req.GetMetadata())
-	if metaErr != nil {
+	requestMetadata, err := decodeStruct(req.GetMetadata())
+	if err != nil {
 		return nil, invalid(req.GetRequestId(), "metadata is invalid")
 	}
 	value, err := a.discovery.GetPluginMetadata(ctx, PluginQuery{PluginID: req.GetPluginId(), Metadata: requestMetadata})
 	if err != nil {
 		return nil, toStatus(req.GetRequestId(), err)
+	}
+	if err := validatePluginType(pluginv1.PluginType(value.Type)); err != nil {
+		return nil, internal(req.GetRequestId(), fmt.Errorf("module returned invalid plugin type"))
 	}
 	caps, err := mapCapabilities(value.Capabilities)
 	if err != nil {
@@ -144,7 +165,16 @@ func (a *Adapter) GetPluginMetadata(ctx context.Context, req *pluginv1.GetPlugin
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
-	return &pluginv1.GetPluginMetadataResponse{RequestId: req.GetRequestId(), PluginMetadata: &pluginv1.PluginMetadata{PluginId: value.PluginID, Name: value.Name, Version: value.Version, Type: toProtoType(value.Type), Capabilities: caps, PermissionIds: append([]string(nil), value.PermissionIDs...), CompatibilityStatus: value.CompatibilityStatus, Attributes: attrs}, Metadata: meta}, nil
+	return &pluginv1.GetPluginMetadataResponse{
+		RequestId: req.GetRequestId(),
+		PluginMetadata: &pluginv1.PluginMetadata{
+			PluginId: value.PluginID, Name: value.Name, Version: value.Version,
+			Type: toProtoType(value.Type), Capabilities: caps,
+			PermissionIds: append([]string(nil), value.PermissionIDs...),
+			CompatibilityStatus: value.CompatibilityStatus, Attributes: attrs,
+		},
+		Metadata: meta,
+	}, nil
 }
 
 func (a *Adapter) GetPluginState(ctx context.Context, req *pluginv1.GetPluginStateRequest) (*pluginv1.GetPluginStateResponse, error) {
@@ -157,19 +187,26 @@ func (a *Adapter) GetPluginState(ctx context.Context, req *pluginv1.GetPluginSta
 	if req.GetPluginId() == "" {
 		return nil, invalid(req.GetRequestId(), "plugin_id is required")
 	}
-	requestMetadata, metaErr := decodeStruct(req.GetMetadata())
-	if metaErr != nil {
+	requestMetadata, err := decodeStruct(req.GetMetadata())
+	if err != nil {
 		return nil, invalid(req.GetRequestId(), "metadata is invalid")
 	}
 	value, err := a.discovery.GetPluginState(ctx, PluginQuery{PluginID: req.GetPluginId(), Metadata: requestMetadata})
 	if err != nil {
 		return nil, toStatus(req.GetRequestId(), err)
 	}
+	if err := validatePluginState(pluginv1.PluginState(value.State)); err != nil {
+		return nil, internal(req.GetRequestId(), fmt.Errorf("module returned invalid plugin state"))
+	}
 	meta, err := encodeStruct(value.ResponseMetadata)
 	if err != nil {
 		return nil, internal(req.GetRequestId(), err)
 	}
-	return &pluginv1.GetPluginStateResponse{RequestId: req.GetRequestId(), PluginId: value.PluginID, State: toProtoState(value.State), Available: value.Available, StatusMessage: value.StatusMessage, Metadata: meta}, nil
+	return &pluginv1.GetPluginStateResponse{
+		RequestId: req.GetRequestId(), PluginId: value.PluginID,
+		State: toProtoState(value.State), Available: value.Available,
+		StatusMessage: value.StatusMessage, Metadata: meta,
+	}, nil
 }
 
 func validateRequestID(id string) error {
@@ -178,38 +215,68 @@ func validateRequestID(id string) error {
 	}
 	return nil
 }
+
+func validatePluginType(value pluginv1.PluginType) error {
+	if value < pluginv1.PluginType_PLUGIN_TYPE_UNSPECIFIED || value > pluginv1.PluginType_PLUGIN_TYPE_PASSIVE {
+		return fmt.Errorf("unknown plugin type value %d", value)
+	}
+	return nil
+}
+
+func validatePluginState(value pluginv1.PluginState) error {
+	if value < pluginv1.PluginState_PLUGIN_STATE_UNSPECIFIED || value > pluginv1.PluginState_PLUGIN_STATE_ERROR {
+		return fmt.Errorf("unknown plugin state value %d", value)
+	}
+	return nil
+}
+
 func invalid(id, message string) error {
 	return buildStatus(codes.InvalidArgument, id, string(CodeInvalidRequest), message)
 }
+
 func internal(id string, err error) error {
 	return buildStatus(codes.Internal, id, string(CodeInternal), "Plugin discovery failed")
 }
+
 func toStatus(id string, err error) error {
 	var domain *DomainError
-	if !errors.As(err, &domain) {
-		return internal(id, err)
+	if errors.As(err, &domain) {
+		code := codes.Internal
+		switch domain.Code {
+		case CodeInvalidRequest, CodeInvalidInput:
+			code = codes.InvalidArgument
+		case CodePluginNotFound, CodeCapabilityNotFound:
+			code = codes.NotFound
+		case CodePluginUnavailable, CodePluginNotReady:
+			code = codes.Unavailable
+		case CodePluginDisabled:
+			code = codes.FailedPrecondition
+		case CodePermissionDenied:
+			code = codes.PermissionDenied
+		case CodeIncompatiblePlugin:
+			code = codes.FailedPrecondition
+		case CodeTimeout:
+			code = codes.DeadlineExceeded
+		case CodeInternal, CodeLifecycleError, CodeExecutionError, CodeUnknown:
+			code = codes.Internal
+		default:
+			return internal(id, err)
+		}
+		message := domain.Message
+		if message == "" {
+			message = "Plugin discovery failed"
+		}
+		return buildStatus(code, id, string(domain.Code), message)
 	}
-	code := codes.Internal
-	switch domain.Code {
-	case CodeInvalidRequest, CodeInvalidInput:
-		code = codes.InvalidArgument
-	case CodePluginNotFound, CodeCapabilityNotFound:
-		code = codes.NotFound
-	case CodePluginUnavailable:
-		code = codes.Unavailable
-	case CodePermissionDenied:
-		code = codes.PermissionDenied
-	case CodeInternal:
-		code = codes.Internal
-	default:
-		return internal(id, err)
+	if errors.Is(err, context.Canceled) {
+		return buildStatus(codes.Canceled, id, string(CodeUnknown), "Plugin discovery was canceled")
 	}
-	message := domain.Message
-	if message == "" {
-		message = "Plugin discovery failed"
+	if errors.Is(err, context.DeadlineExceeded) {
+		return buildStatus(codes.DeadlineExceeded, id, string(CodeTimeout), "Plugin discovery timed out")
 	}
-	return buildStatus(code, id, string(domain.Code), message)
+	return internal(id, err)
 }
+
 func buildStatus(code codes.Code, id, errorCode, message string) error {
 	detail := &pluginv1.PluginError{RequestId: id, ErrorCode: errorCode, Message: message}
 	st, err := status.New(code, message).WithDetails(detail)
@@ -218,19 +285,20 @@ func buildStatus(code codes.Code, id, errorCode, message string) error {
 	}
 	return st.Err()
 }
+
 func decodeStruct(value *structpb.Struct) (map[string]any, error) {
 	if value == nil {
 		return nil, nil
 	}
 	return value.AsMap(), nil
 }
+
 func encodeStruct(value map[string]any) (*structpb.Struct, error) {
 	if len(value) == 0 {
 		return nil, nil
 	}
 	return structpb.NewStruct(value)
 }
-func responseMetadata(value map[string]any) (*structpb.Struct, error) { return encodeStruct(value) }
 
 func mapPlugins(values []Plugin) ([]*pluginv1.PluginRecord, error) {
 	out := make([]*pluginv1.PluginRecord, 0, len(values))
@@ -243,37 +311,50 @@ func mapPlugins(values []Plugin) ([]*pluginv1.PluginRecord, error) {
 	}
 	return out, nil
 }
+
 func mapPlugin(value Plugin) (*pluginv1.PluginRecord, error) {
+	if err := validatePluginType(pluginv1.PluginType(value.Type)); err != nil {
+		return nil, fmt.Errorf("module returned invalid plugin type")
+	}
+	if err := validatePluginState(pluginv1.PluginState(value.State)); err != nil {
+		return nil, fmt.Errorf("module returned invalid plugin state")
+	}
 	caps, err := mapCapabilities(value.Capabilities)
 	if err != nil {
 		return nil, err
 	}
-	return &pluginv1.PluginRecord{Manifest: mapManifest(value.Manifest), Type: toProtoType(value.Type), State: toProtoState(value.State), Capabilities: caps, Available: value.Available, CompatibilityStatus: value.CompatibilityStatus}, nil
+	return &pluginv1.PluginRecord{
+		Manifest: mapManifest(value.Manifest), Type: toProtoType(value.Type),
+		State: toProtoState(value.State), Capabilities: caps,
+		Available: value.Available, CompatibilityStatus: value.CompatibilityStatus,
+	}, nil
 }
+
 func mapManifest(value Manifest) *pluginv1.PluginManifest {
-	return &pluginv1.PluginManifest{PluginId: value.PluginID, Name: value.Name, Version: value.Version, Description: value.Description, Author: value.Author, License: value.License, EntryPoint: value.EntryPoint, MinimumPrideVersion: value.MinimumPRIDEVersion, Homepage: value.Homepage, DocumentationUrl: value.DocumentationURL, RepositoryUrl: value.RepositoryURL, IssueTrackerUrl: value.IssueTrackerURL, Keywords: append([]string(nil), value.Keywords...), Category: value.Category, Icon: value.Icon, ChangelogUrl: value.ChangelogURL}
+	return &pluginv1.PluginManifest{
+		PluginId: value.PluginID, Name: value.Name, Version: value.Version,
+		Description: value.Description, Author: value.Author, License: value.License,
+		EntryPoint: value.EntryPoint, MinimumPrideVersion: value.MinimumPRIDEVersion,
+		Homepage: value.Homepage, DocumentationUrl: value.DocumentationURL,
+		RepositoryUrl: value.RepositoryURL, IssueTrackerUrl: value.IssueTrackerURL,
+		Keywords: append([]string(nil), value.Keywords...), Category: value.Category,
+		Icon: value.Icon, ChangelogUrl: value.ChangelogURL,
+	}
 }
+
 func mapCapabilities(values []Capability) ([]*pluginv1.PluginCapability, error) {
 	out := make([]*pluginv1.PluginCapability, 0, len(values))
 	for _, value := range values {
-		out = append(out, &pluginv1.PluginCapability{CapabilityId: value.ID, Name: value.Name, Description: value.Description})
+		out = append(out, &pluginv1.PluginCapability{
+			CapabilityId: value.ID, Name: value.Name, Description: value.Description,
+		})
 	}
 	return out, nil
 }
+
 func fromProtoType(value pluginv1.PluginType) PluginType { return PluginType(value) }
-func toProtoType(value PluginType) pluginv1.PluginType {
-	if value < PluginTypeUnspecified || value > PluginTypePassive {
-		return pluginv1.PluginType_PLUGIN_TYPE_UNSPECIFIED
-	}
-	return pluginv1.PluginType(value)
-}
+func toProtoType(value PluginType) pluginv1.PluginType { return pluginv1.PluginType(value) }
 func fromProtoState(value pluginv1.PluginState) PluginState { return PluginState(value) }
-func toProtoState(value PluginState) pluginv1.PluginState {
-	if value < PluginStateUnspecified || value > PluginStateError {
-		return pluginv1.PluginState_PLUGIN_STATE_UNSPECIFIED
-	}
-	return pluginv1.PluginState(value)
-}
+func toProtoState(value PluginState) pluginv1.PluginState { return pluginv1.PluginState(value) }
 
 var _ pluginv1.PluginServiceServer = (*Adapter)(nil)
-var _ = context.Canceled
