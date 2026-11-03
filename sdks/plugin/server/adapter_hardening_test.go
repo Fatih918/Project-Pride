@@ -42,6 +42,14 @@ func TestListPluginsRejectsUnknownEnumFiltersBeforeCallingPort(t *testing.T) {
 	}
 }
 
+type invalidMetadataDiscovery struct {
+	*fakeDiscovery
+}
+
+func (d *invalidMetadataDiscovery) GetPluginMetadata(context.Context, PluginQuery) (PluginMetadata, error) {
+	return PluginMetadata{PluginID: "example", Type: PluginType(99)}, nil
+}
+
 func TestAdapterRejectsInvalidModuleEnums(t *testing.T) {
 	tests := []struct {
 		name string
@@ -85,7 +93,11 @@ func TestAdapterRejectsInvalidModuleEnums(t *testing.T) {
 					State: PluginState(99),
 				},
 			}
-			adapter, err := New(fake)
+			var discovery DiscoveryPort = fake
+			if tt.name == "metadata type" {
+				discovery = &invalidMetadataDiscovery{fakeDiscovery: fake}
+			}
+			adapter, err := New(discovery)
 			if err != nil {
 				t.Fatal(err)
 			}
