@@ -6,13 +6,20 @@ import "errors"
 type ErrorCode string
 
 const (
-	CodeInvalidRequest     ErrorCode = "INVALID_REQUEST"
-	CodeInvalidInput       ErrorCode = "INVALID_INPUT"
-	CodePluginNotFound     ErrorCode = "PLUGIN_NOT_FOUND"
-	CodeCapabilityNotFound ErrorCode = "CAPABILITY_NOT_FOUND"
-	CodePluginUnavailable  ErrorCode = "PLUGIN_UNAVAILABLE"
-	CodePermissionDenied   ErrorCode = "PERMISSION_DENIED"
-	CodeInternal           ErrorCode = "INTERNAL_ERROR"
+	CodeInvalidRequest      ErrorCode = "INVALID_REQUEST"
+	CodeInvalidInput        ErrorCode = "INVALID_INPUT"
+	CodePluginNotFound      ErrorCode = "PLUGIN_NOT_FOUND"
+	CodePluginUnavailable   ErrorCode = "PLUGIN_UNAVAILABLE"
+	CodePluginDisabled      ErrorCode = "PLUGIN_DISABLED"
+	CodePluginNotReady      ErrorCode = "PLUGIN_NOT_READY"
+	CodeIncompatiblePlugin  ErrorCode = "INCOMPATIBLE_PLUGIN"
+	CodeCapabilityNotFound  ErrorCode = "CAPABILITY_NOT_FOUND"
+	CodePermissionDenied    ErrorCode = "PERMISSION_DENIED"
+	CodeLifecycleError      ErrorCode = "LIFECYCLE_ERROR"
+	CodeExecutionError      ErrorCode = "EXECUTION_ERROR"
+	CodeTimeout             ErrorCode = "TIMEOUT"
+	CodeInternal            ErrorCode = "INTERNAL_ERROR"
+	CodeUnknown             ErrorCode = "UNKNOWN_ERROR"
 )
 
 // DomainError lets a Module-facing implementation report a stable category
