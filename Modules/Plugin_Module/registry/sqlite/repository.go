@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -28,8 +29,15 @@ func New(ctx context.Context, databasePath string) (*Repository, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := filepath.IsAbs(databasePath); !err {
+	if !filepath.IsAbs(databasePath) {
 		return nil, fmt.Errorf("SQLite database path must be absolute")
+	}
+	if info, err := os.Lstat(databasePath); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return nil, fmt.Errorf("SQLite database path must not be a symbolic link")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("inspect plugin registry database path: %w", err)
 	}
 
 	db, err := sql.Open("sqlite", databasePath)
@@ -44,6 +52,10 @@ func New(ctx context.Context, databasePath string) (*Repository, error) {
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect plugin registry database: %w", err)
+	}
+	if err := os.Chmod(databasePath, 0o600); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("secure plugin registry database permissions: %w", err)
 	}
 	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout = 5000"); err != nil {
 		_ = db.Close()
