@@ -5,12 +5,12 @@ import (
 	"net"
 	"testing"
 
+	"pride-plugin-module-sdkadapter"
 	"pride-plugin-module/discovery"
 	"pride-plugin-module/domain"
 	"pride-plugin-module/registry"
 	pluginv1 "pride-plugin-sdk/proto"
 	pluginserver "pride-plugin-sdk/server"
-	"pride-plugin-module-sdkadapter"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -196,7 +196,6 @@ func newTestClient(t *testing.T) pluginv1.PluginServiceClient {
 		_ = listener.Close()
 	})
 
-	ctx := context.Background()
 	connection, err := grpc.NewClient(
 		"passthrough:///bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
@@ -211,6 +210,5 @@ func newTestClient(t *testing.T) pluginv1.PluginServiceClient {
 		_ = connection.Close()
 	})
 
-	_ = ctx
 	return pluginv1.NewPluginServiceClient(connection)
 }
