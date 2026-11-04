@@ -11,4 +11,5 @@ import (
 type Repository interface {
 	Create(context.Context, domain.Plugin) error
 	Get(context.Context, domain.PluginID) (domain.Plugin, error)
+	List(context.Context) ([]domain.Plugin, error)
 }
