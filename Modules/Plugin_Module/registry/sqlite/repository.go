@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"pride-plugin-module/domain"
@@ -53,9 +54,11 @@ func New(ctx context.Context, databasePath string) (*Repository, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("connect plugin registry database: %w", err)
 	}
-	if err := os.Chmod(databasePath, 0o600); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("secure plugin registry database permissions: %w", err)
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(databasePath, 0o600); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("secure plugin registry database permissions: %w", err)
+		}
 	}
 	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout = 5000"); err != nil {
 		_ = db.Close()
