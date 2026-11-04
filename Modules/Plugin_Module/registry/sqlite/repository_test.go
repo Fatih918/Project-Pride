@@ -48,6 +48,8 @@ func openTestRepository(t *testing.T) (*Repository, string) {
 func TestRepositoryCreateGetAndReopen(t *testing.T) {
 	repository, path := openTestRepository(t)
 	want := testPlugin("plugin.example")
+	want.CreatedAt = want.CreatedAt.UTC()
+	want.UpdatedAt = want.UpdatedAt.UTC()
 	if err := repository.Create(context.Background(), want); err != nil { t.Fatal(err) }
 	got, err := repository.Get(context.Background(), want.ID)
 	if err != nil { t.Fatal(err) }
