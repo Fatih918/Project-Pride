@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sort"
+	"strings"
 
 	"pride-plugin-module/domain"
 	"pride-plugin-module/registry"
