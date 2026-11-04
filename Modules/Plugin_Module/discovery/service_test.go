@@ -3,7 +3,6 @@ package discovery
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"pride-plugin-module/domain"
@@ -239,18 +238,24 @@ func TestDiscoveryPropagatesContextCancellation(t *testing.T) {
 	}
 }
 
-func TestPageSizeIsBounded(t *testing.T) {
-	size, err := normalizePageSize(1000)
+func TestPageSizeDefaultsAndIsBounded(t *testing.T) {
+	defaultSize, err := normalizePageSize(0)
 	if err != nil {
-		t.Fatalf("normalizePageSize() error = %v", err)
+		t.Fatalf("normalizePageSize(0) error = %v", err)
 	}
-	if size != int(maximumPageSize) {
-		t.Fatalf("page size = %d, want %d", size, maximumPageSize)
+	if defaultSize != 50 {
+		t.Fatalf("default page size = %d, want 50", defaultSize)
 	}
+
+	maximumSize, err := normalizePageSize(1000)
+	if err != nil {
+		t.Fatalf("normalizePageSize(1000) error = %v", err)
+	}
+	if maximumSize != 100 {
+		t.Fatalf("maximum page size = %d, want 100", maximumSize)
+	}
+
 	if _, err := normalizePageSize(-1); !errors.Is(err, ErrInvalidQuery) {
-		t.Fatalf("negative page size error = %v", err)
-	}
-	if got := fmt.Sprint(defaultPageSize); got != "50" {
-		t.Fatalf("default page size = %s", got)
+		t.Fatalf("negative page size error = %v, want ErrInvalidQuery", err)
 	}
 }
