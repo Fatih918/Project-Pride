@@ -38,11 +38,11 @@ func (a *Adapter) ListPlugins(ctx context.Context, query server.ListQuery) (serv
 	}
 
 	page, err := a.service.ListPlugins(ctx, discovery.ListQuery{
-		PageSize: query.PageSize,
+		PageSize:  query.PageSize,
 		PageToken: query.PageToken,
-		Type: pluginType,
-		State: pluginState,
-		Metadata: query.Metadata,
+		Type:      pluginType,
+		State:     pluginState,
+		Metadata:  query.Metadata,
 	})
 	if err != nil {
 		return server.PluginPage{}, mapError(err)
@@ -53,8 +53,8 @@ func (a *Adapter) ListPlugins(ctx context.Context, query server.ListQuery) (serv
 		return server.PluginPage{}, mapError(err)
 	}
 	return server.PluginPage{
-		Plugins: plugins,
-		NextPageToken: page.NextPageToken,
+		Plugins:          plugins,
+		NextPageToken:    page.NextPageToken,
 		ResponseMetadata: page.ResponseMetadata,
 	}, nil
 }
@@ -77,9 +77,9 @@ func (a *Adapter) GetPlugin(ctx context.Context, query server.PluginQuery) (serv
 func (a *Adapter) FindPluginsByCapability(ctx context.Context, query server.CapabilityQuery) (server.PluginPage, error) {
 	page, err := a.service.FindPluginsByCapability(ctx, discovery.CapabilityQuery{
 		CapabilityID: query.CapabilityID,
-		PageSize: query.PageSize,
-		PageToken: query.PageToken,
-		Metadata: query.Metadata,
+		PageSize:     query.PageSize,
+		PageToken:    query.PageToken,
+		Metadata:     query.Metadata,
 	})
 	if err != nil {
 		return server.PluginPage{}, mapError(err)
@@ -90,8 +90,8 @@ func (a *Adapter) FindPluginsByCapability(ctx context.Context, query server.Capa
 		return server.PluginPage{}, mapError(err)
 	}
 	return server.PluginPage{
-		Plugins: plugins,
-		NextPageToken: page.NextPageToken,
+		Plugins:          plugins,
+		NextPageToken:    page.NextPageToken,
 		ResponseMetadata: page.ResponseMetadata,
 	}, nil
 }
@@ -110,15 +110,15 @@ func (a *Adapter) GetPluginMetadata(ctx context.Context, query server.PluginQuer
 		return server.PluginMetadata{}, mapError(err)
 	}
 	return server.PluginMetadata{
-		PluginID: value.PluginID,
-		Name: value.Name,
-		Version: value.Version,
-		Type: pluginType,
-		Capabilities: mapCapabilities(value.Capabilities),
-		PermissionIDs: append([]string(nil), value.PermissionIDs...),
+		PluginID:            value.PluginID,
+		Name:                value.Name,
+		Version:             value.Version,
+		Type:                pluginType,
+		Capabilities:        mapCapabilities(value.Capabilities),
+		PermissionIDs:       append([]string(nil), value.PermissionIDs...),
 		CompatibilityStatus: value.CompatibilityStatus,
-		Attributes: value.Attributes,
-		ResponseMetadata: value.ResponseMetadata,
+		Attributes:          value.Attributes,
+		ResponseMetadata:    value.ResponseMetadata,
 	}, nil
 }
 
@@ -136,10 +136,10 @@ func (a *Adapter) GetPluginState(ctx context.Context, query server.PluginQuery) 
 		return server.PluginStateInfo{}, mapError(err)
 	}
 	return server.PluginStateInfo{
-		PluginID: value.PluginID,
-		State: state,
-		Available: value.Available,
-		StatusMessage: value.StatusMessage,
+		PluginID:         value.PluginID,
+		State:            state,
+		Available:        value.Available,
+		StatusMessage:    value.StatusMessage,
 		ResponseMetadata: value.ResponseMetadata,
 	}, nil
 }
@@ -167,27 +167,27 @@ func mapPluginRecord(value discovery.PluginRecord) (server.Plugin, error) {
 	}
 	return server.Plugin{
 		Manifest: server.Manifest{
-			PluginID: string(value.Manifest.PluginID),
-			Name: value.Manifest.Name,
-			Version: value.Manifest.Version,
-			Description: value.Manifest.Description,
-			Author: value.Manifest.Author,
-			License: value.Manifest.License,
-			EntryPoint: value.Manifest.EntryPoint,
+			PluginID:            string(value.Manifest.PluginID),
+			Name:                value.Manifest.Name,
+			Version:             value.Manifest.Version,
+			Description:         value.Manifest.Description,
+			Author:              value.Manifest.Author,
+			License:             value.Manifest.License,
+			EntryPoint:          value.Manifest.EntryPoint,
 			MinimumPRIDEVersion: value.Manifest.MinimumPRIDEVersion,
-			Homepage: value.Manifest.Homepage,
-			DocumentationURL: value.Manifest.DocumentationURL,
-			RepositoryURL: value.Manifest.RepositoryURL,
-			IssueTrackerURL: value.Manifest.IssueTrackerURL,
-			Keywords: append([]string(nil), value.Manifest.Keywords...),
-			Category: value.Manifest.Category,
-			Icon: value.Manifest.Icon,
-			ChangelogURL: value.Manifest.ChangelogURL,
+			Homepage:            value.Manifest.Homepage,
+			DocumentationURL:    value.Manifest.DocumentationURL,
+			RepositoryURL:       value.Manifest.RepositoryURL,
+			IssueTrackerURL:     value.Manifest.IssueTrackerURL,
+			Keywords:            append([]string(nil), value.Manifest.Keywords...),
+			Category:            value.Manifest.Category,
+			Icon:                value.Manifest.Icon,
+			ChangelogURL:        value.Manifest.ChangelogURL,
 		},
-		Type: pluginType,
-		State: state,
-		Capabilities: mapCapabilities(value.Capabilities),
-		Available: value.Available,
+		Type:                pluginType,
+		State:               state,
+		Capabilities:        mapCapabilities(value.Capabilities),
+		Available:           value.Available,
 		CompatibilityStatus: value.CompatibilityStatus,
 	}, nil
 }
@@ -196,8 +196,8 @@ func mapCapabilities(values []domain.Capability) []server.Capability {
 	capabilities := make([]server.Capability, 0, len(values))
 	for _, value := range values {
 		capabilities = append(capabilities, server.Capability{
-			ID: value.ID,
-			Name: value.Name,
+			ID:          value.ID,
+			Name:        value.Name,
 			Description: value.Description,
 		})
 	}
@@ -279,21 +279,21 @@ func mapError(err error) error {
 	switch {
 	case errors.Is(err, discovery.ErrInvalidQuery):
 		return &server.DomainError{
-			Code: server.CodeInvalidInput,
+			Code:    server.CodeInvalidInput,
 			Message: "Plugin discovery query is invalid",
-			Cause: err,
+			Cause:   err,
 		}
 	case errors.Is(err, discovery.ErrPluginNotFound), errors.Is(err, registry.ErrNotFound):
 		return &server.DomainError{
-			Code: server.CodePluginNotFound,
+			Code:    server.CodePluginNotFound,
 			Message: "Plugin was not found",
-			Cause: err,
+			Cause:   err,
 		}
 	default:
 		return &server.DomainError{
-			Code: server.CodeInternal,
+			Code:    server.CodeInternal,
 			Message: "Plugin discovery failed",
-			Cause: err,
+			Cause:   err,
 		}
 	}
 }
