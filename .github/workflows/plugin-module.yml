@@ -4,12 +4,20 @@ on:
   pull_request:
     paths:
       - "Modules/Plugin_Module/**"
+      - "sdks/plugin/server/**"
+      - "sdks/plugin/proto/**"
+      - "sdks/plugin/go.mod"
+      - "sdks/plugin/go.sum"
       - ".github/workflows/plugin-module.yml"
   push:
     branches:
       - main
     paths:
       - "Modules/Plugin_Module/**"
+      - "sdks/plugin/server/**"
+      - "sdks/plugin/proto/**"
+      - "sdks/plugin/go.mod"
+      - "sdks/plugin/go.sum"
       - ".github/workflows/plugin-module.yml"
 
 permissions:
@@ -31,10 +39,45 @@ jobs:
           go-version-file: Modules/Plugin_Module/go.mod
           cache: true
 
+      - name: Show formatting differences
+        run: gofmt -d .
+
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
 
       - name: Run tests
+        run: go test ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+  verify-sdk-adapter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Modules/Plugin_Module/sdkadapter
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: Modules/Plugin_Module/sdkadapter/go.mod
+          cache: true
+          cache-dependency-path: |
+            Modules/Plugin_Module/sdkadapter/go.mod
+            Modules/Plugin_Module/go.mod
+            sdks/plugin/go.mod
+            sdks/plugin/go.sum
+
+      - name: Show formatting differences
+        run: gofmt -d .
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run integration tests
         run: go test ./...
 
       - name: Run vet
