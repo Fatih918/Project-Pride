@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sort"
 
 	"pride-plugin-module/domain"
 	"pride-plugin-module/registry"
@@ -47,6 +48,7 @@ func (s *Service) ListPlugins(ctx context.Context, query ListQuery) (PluginPage,
 		}
 		filtered = append(filtered, plugin)
 	}
+	sort.Slice(filtered, func(i, j int) bool { return filtered[i].ID < filtered[j].ID })
 	return buildPage(filtered, pageSize, query.PageToken, fmt.Sprintf("list:%d:%d", query.Type, query.State))
 }
 
@@ -80,6 +82,7 @@ func (s *Service) FindPluginsByCapability(ctx context.Context, query CapabilityQ
 			}
 		}
 	}
+	sort.Slice(matches, func(i, j int) bool { return matches[i].ID < matches[j].ID })
 	return buildPage(matches, pageSize, query.PageToken, "capability:"+query.CapabilityID)
 }
 
