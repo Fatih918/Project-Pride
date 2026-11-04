@@ -17,6 +17,8 @@ The Module's `domain`, `registry`, and `discovery` packages remain independent o
 
 The integration test creates a deterministic in-memory Plugin Registry, composes the Module discovery service with the SDK server adapter, and exercises all five RPCs over gRPC `bufconn`.
 
+The module maintains its own `go.sum` because checksum state belongs to each Go module. When SDK dependencies change, run `go mod tidy` here and review the resulting `go.mod` and `go.sum` changes.
+
 Run from this directory:
 
 ```sh
