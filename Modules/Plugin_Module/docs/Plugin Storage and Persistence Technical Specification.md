@@ -1,7 +1,7 @@
 # Plugin Storage and Persistence Technical Specification
 
 **Version:** 0.1.0  
-**Status:** Draft  
+**Status:** Accepted  
 **Category:** Module Technical Specification  
 **Document ID:** PTS-0001  
 **Related ADR:** ADR-012 — Local-First Plugin Storage and Persistence  
