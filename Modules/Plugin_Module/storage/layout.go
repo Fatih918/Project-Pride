@@ -143,7 +143,7 @@ func (l *Layout) safePath(parts ...string) (string, error) {
 		}
 		candidate = filepath.Join(candidate, part)
 	}
-	if err := l.verifyContained(root, candidate); err != nil {
+	if err := l.verifyContained(l.root, candidate); err != nil {
 		return "", err
 	}
 	return candidate, nil
