@@ -13,11 +13,17 @@ func testPlugin() domain.Plugin {
 	return domain.Plugin{
 		ID: id,
 		Manifest: domain.Manifest{
-			PluginID: id, Name: "Notes", Version: "1.0.0",
-			Description: "Example notes plugin", Author: "PRIDE",
-			License: "MIT", EntryPoint: "main.go", MinimumPRIDEVersion: "1.0.0",
+			PluginID:            id,
+			Name:                "Notes",
+			Version:             "1.0.0",
+			Description:         "Example notes plugin",
+			Author:              "PRIDE",
+			License:              "MIT",
+			EntryPoint:           "main.go",
+			MinimumPRIDEVersion: "1.0.0",
 		},
-		Type: domain.PluginTypeActive, State: domain.PluginStateInstalled,
+		Type:  domain.PluginTypeActive,
+		State: domain.PluginStateInstalled,
 	}
 }
 
