@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"testing"
 	"time"
 
@@ -167,5 +169,40 @@ func TestRepositoryRejectsFutureSchemaVersion(t *testing.T) {
 	if err == nil {
 		repository.Close()
 		t.Fatal("expected unsupported future schema error")
+	}
+}
+
+func TestRepositoryDatabaseFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX file permission semantics do not apply on Windows")
+	}
+	repository, path := openTestRepository(t)
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("database permissions = %o, want 600", info.Mode().Perm())
+	}
+	if err := repository.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRepositoryRejectsSymlinkDatabasePath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires platform-specific privileges")
+	}
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.sqlite")
+	link := filepath.Join(dir, "registry.sqlite")
+	if err := os.WriteFile(target, []byte("not a database"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(context.Background(), link); err == nil {
+		t.Fatal("expected symlink database path rejection")
 	}
 }
