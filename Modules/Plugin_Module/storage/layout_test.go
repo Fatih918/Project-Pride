@@ -109,3 +109,24 @@ func TestPluginPathRejectsSymlinkEscape(t *testing.T) {
 		t.Fatalf("expected symlink escape rejection, got %v", err)
 	}
 }
+
+func TestPluginStorageRootRejectsSymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires platform-specific privileges")
+	}
+	base := t.TempDir()
+	layout, err := NewLayout(Config{RootOverride: filepath.Join(base, "pride")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(layout.Root(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, layout.PluginStorageRoot()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := layout.InstalledVersionDirectory("plugin.good", "1.0.0"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected Plugin_Storage root symlink escape rejection, got %v", err)
+	}
+}
