@@ -39,6 +39,9 @@ jobs:
           go-version-file: Modules/Plugin_Module/go.mod
           cache: true
 
+      - name: Show formatting differences
+        run: gofmt -d .
+
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
 
@@ -67,6 +70,9 @@ jobs:
             Modules/Plugin_Module/go.mod
             sdks/plugin/go.mod
             sdks/plugin/go.sum
+
+      - name: Show formatting differences
+        run: gofmt -d .
 
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
