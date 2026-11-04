@@ -125,6 +125,7 @@ func (l *Layout) safePath(parts ...string) (string, error) {
 
 func (l *Layout) ensureDirectory(path string) error {
 	if err := os.MkdirAll(path, 0o700); err != nil { return fmt.Errorf("create PRIDE directory: %w", err) }
+	if err := l.verifyContained(l.root, path); err != nil { return err }
 	if err := os.Chmod(path, 0o700); err != nil && runtime.GOOS != "windows" {
 		return fmt.Errorf("secure PRIDE directory permissions: %w", err)
 	}
