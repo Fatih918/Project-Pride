@@ -1,6 +1,6 @@
 # ADR-012 — Local-First Plugin Storage and Persistence
 
-**Status:** Draft
+**Status:** Review
 
 **Date:** 2026-11-04
 
