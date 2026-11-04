@@ -98,6 +98,9 @@ func TestPluginPathRejectsSymlinkEscape(t *testing.T) {
 	if err := layout.EnsurePluginStorage(); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.Remove(filepath.Join(layout.PluginStorageRoot(), "installed")); err != nil {
+		t.Fatal(err)
+	}
 	outside := t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(layout.PluginStorageRoot(), "installed")); err != nil {
 		t.Fatal(err)
