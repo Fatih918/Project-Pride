@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Foundation design approved for implementation planning; implementation not yet started.
+**Status:** Foundation design proposed; implementation not yet started.
 
 The Plugin Module is the platform domain responsible for installed Plugin records, registry state, loading, lifecycle, and Active Plugin runtime execution.
 
