@@ -1,8 +1,8 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 3 — SDK Discovery Adapter Integration.
+**Status:** Increment 5 — Local Storage and SQLite Registry Persistence.
 
-This Go module owns SDK-neutral installed Plugin records and read-only discovery queries over the local Plugin Registry. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
+The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
 ## Implemented
 
@@ -14,35 +14,47 @@ This Go module owns SDK-neutral installed Plugin records and read-only discovery
 
 ### Discovery application service
 - Five read-only queries: list, get, find by exact capability ID, get metadata, and get operational state.
-- Type and state filters; unspecified filters do not restrict results.
-- Deterministic ordering by Plugin ID.
-- Opaque, versioned pagination tokens with a snapshot digest. Malformed or stale tokens are rejected.
-- Default page size of 50 and maximum page size of 100; negative sizes are invalid and larger values are capped.
-- Empty capability matches return an empty page; discovery does not rank or select candidates.
-- Availability is returned from the stored domain field and is not inferred from Plugin state.
-- Context cancellation and repository errors are propagated.
+- Type and state filters, deterministic Plugin ID ordering, opaque versioned pagination tokens, and context/error propagation.
 
-### SDK discovery adapter integration
+### SDK discovery integration
 - A separate `sdkadapter` Go module implements `pride-plugin-sdk/server.DiscoveryPort`.
 - All five SDK discovery operations delegate to the Module discovery application service.
-- Explicit mapping between Module domain types and SDK-neutral server DTOs; enum values are mapped explicitly rather than relying on numeric equivalence.
-- Module discovery errors are translated to stable `server.DomainError` categories; cancellation and deadlines are preserved.
-- A gRPC `bufconn` integration test exercises all five RPCs and verifies structured not-found error mapping.
+- Explicit mapping between Module domain types and SDK-neutral server DTOs.
+- Stable domain-error mapping; cancellation and deadlines are preserved.
+- gRPC `bufconn` integration tests cover all five RPCs.
 
-## Boundaries
+### Local storage and SQLite persistence
+- Platform-aware PRIDE user-data root resolution, including `PRIDE_USER_DATA_DIR` override.
+- Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
+- Validated path helpers with traversal and symlink-containment checks.
+- SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
+- Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
+- Storage and SQLite repository tests.
 
-- The domain, registry, and discovery application packages do not depend on Protobuf-generated types or the Plugin SDK.
-- The SDK integration dependency is isolated in `sdkadapter/go.mod`; it does not leak into the Plugin Module's domain or application packages.
-- The adapter contains translation logic only. It does not access repositories directly or implement authorization, capability selection, lifecycle, loading, or execution.
+## Architectural boundaries
+
+- Domain, registry, and discovery packages do not depend on generated Protobuf types or the Plugin SDK.
+- SDK integration dependency is isolated in `sdkadapter/go.mod`.
+- The SDK adapter contains translation logic only; it does not access repositories directly or implement authorization, capability selection, lifecycle, loading, or execution.
 - Manifest identity/descriptive fields remain separate from platform/Marketplace-owned capability and permission metadata.
 - Permission IDs are metadata only; authorization remains outside this module.
 - Core owns capability matching and candidate selection.
-- The in-memory repository is not a production persistence decision.
-- SQLite persistence, Plugin_Storage filesystem access, package installation, loader, lifecycle, and runtime remain deferred.
+- SQLite stores structured metadata; Plugin package files belong in local `Plugin_Storage`.
 
-See:
-- [ADR-011 — Plugin Module Foundation Design](../../01-Architecture/ADR/ADR-011%20%E2%80%94%20Plugin%20Module%20Foundation%20Design.md)
-- [ADR-012 — Local-First Plugin Storage and Persistence](../../01-Architecture/ADR/ADR-012%20%E2%80%94%20Local-First%20Plugin%20Storage%20and%20Persistence.md)
+## Not implemented yet
+
+- Registry artifact-source resolution and package download.
+- Archive inspection and extraction.
+- Artifact digest/signature verification and trust-root policy.
+- Installation-version records and durable operation journal.
+- Install/update coordinator, atomic promotion, and startup recovery.
+- Uninstall and destructive cleanup.
+- Plugin Loader, lifecycle transitions, Runtime, and execution.
+- Permission authorization.
+
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 defines the draft installation/recovery design. PDR-0001 records the decisions that must be approved before production installation work proceeds.
+
+## Checks
 
 Run Module checks from this directory:
 
