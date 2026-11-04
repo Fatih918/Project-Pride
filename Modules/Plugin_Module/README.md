@@ -1,8 +1,8 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 2 — Discovery Application Service.
+**Status:** Increment 3 — SDK Discovery Adapter Integration.
 
-This Go module owns SDK-neutral installed Plugin records and read-only discovery queries over the local Plugin Registry.
+This Go module owns SDK-neutral installed Plugin records and read-only discovery queries over the local Plugin Registry. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
 ## Implemented
 
@@ -22,19 +22,37 @@ This Go module owns SDK-neutral installed Plugin records and read-only discovery
 - Availability is returned from the stored domain field and is not inferred from Plugin state.
 - Context cancellation and repository errors are propagated.
 
+### SDK discovery adapter integration
+- A separate `sdkadapter` Go module implements `pride-plugin-sdk/server.DiscoveryPort`.
+- All five SDK discovery operations delegate to the Module discovery application service.
+- Explicit mapping between Module domain types and SDK-neutral server DTOs; enum values are mapped explicitly rather than relying on numeric equivalence.
+- Module discovery errors are translated to stable `server.DomainError` categories; cancellation and deadlines are preserved.
+- A gRPC `bufconn` integration test exercises all five RPCs and verifies structured not-found error mapping.
+
 ## Boundaries
 
 - The domain, registry, and discovery application packages do not depend on Protobuf-generated types or the Plugin SDK.
-- The SDK server.DiscoveryPort adapter and gRPC composition are the next integration increment.
+- The SDK integration dependency is isolated in `sdkadapter/go.mod`; it does not leak into the Plugin Module's domain or application packages.
+- The adapter contains translation logic only. It does not access repositories directly or implement authorization, capability selection, lifecycle, loading, or execution.
 - Manifest identity/descriptive fields remain separate from platform/Marketplace-owned capability and permission metadata.
 - Permission IDs are metadata only; authorization remains outside this module.
 - Core owns capability matching and candidate selection.
 - The in-memory repository is not a production persistence decision.
-- Persistent storage, package installation, loader, lifecycle, and runtime remain deferred.
+- SQLite persistence, Plugin_Storage filesystem access, package installation, loader, lifecycle, and runtime remain deferred.
 
-See [ADR-011 — Plugin Module Foundation Design](../../01-Architecture/ADR/ADR-011%20%E2%80%94%20Plugin%20Module%20Foundation%20Design.md) for the staged implementation plan.
+See:
+- [ADR-011 — Plugin Module Foundation Design](../../01-Architecture/ADR/ADR-011%20%E2%80%94%20Plugin%20Module%20Foundation%20Design.md)
+- [ADR-012 — Local-First Plugin Storage and Persistence](../../01-Architecture/ADR/ADR-012%20%E2%80%94%20Local-First%20Plugin%20Storage%20and%20Persistence.md)
 
-Run checks from this directory:
+Run Module checks from this directory:
+
+```sh
+gofmt -w .
+go test ./...
+go vet ./...
+```
+
+Run SDK adapter integration checks from `sdkadapter/`:
 
 ```sh
 gofmt -w .
