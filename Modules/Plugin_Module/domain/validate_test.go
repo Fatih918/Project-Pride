@@ -10,13 +10,19 @@ func validPlugin() Plugin {
 	return Plugin{
 		ID: id,
 		Manifest: Manifest{
-			PluginID: id, Name: "Notes", Version: "1.0.0",
-			Description: "Example notes plugin", Author: "PRIDE",
-			License: "MIT", EntryPoint: "main.go", MinimumPRIDEVersion: "1.0.0",
+			PluginID:            id,
+			Name:                "Notes",
+			Version:             "1.0.0",
+			Description:         "Example notes plugin",
+			Author:              "PRIDE",
+			License:             "MIT",
+			EntryPoint:          "main.go",
+			MinimumPRIDEVersion: "1.0.0",
 		},
-		Type: PluginTypeActive, State: PluginStateInstalled,
+		Type:  PluginTypeActive,
+		State: PluginStateInstalled,
 		Protected: ProtectedMetadata{
-			Capabilities: []Capability{{ID: "notes.read", Name: "Read notes"}},
+			Capabilities:  []Capability{{ID: "notes.read", Name: "Read notes"}},
 			PermissionIDs: []string{"notes.read"},
 		},
 	}
