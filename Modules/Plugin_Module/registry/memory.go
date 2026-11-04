@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"pride-plugin-module/domain"
@@ -53,4 +54,25 @@ func (r *MemoryRepository) Get(ctx context.Context, id domain.PluginID) (domain.
 		return domain.Plugin{}, fmt.Errorf("%w: %s", ErrNotFound, id)
 	}
 	return plugin.Clone(), nil
+}
+
+func (r *MemoryRepository) List(ctx context.Context) ([]domain.Plugin, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	plugins := make([]domain.Plugin, 0, len(r.plugins))
+	for _, plugin := range r.plugins {
+		plugins = append(plugins, plugin.Clone())
+	}
+	sort.Slice(plugins, func(i, j int) bool {
+		return plugins[i].ID < plugins[j].ID
+	})
+	return plugins, nil
 }
