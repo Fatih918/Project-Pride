@@ -62,19 +62,18 @@ type ProtectedMetadata struct {
 }
 
 type Plugin struct {
-	ID                  PluginID
-	Manifest            Manifest
-	Type                PluginType
-	State               PluginState
-	Protected           ProtectedMetadata
-	Available           bool
-	StatusMessage       string
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	ID            PluginID
+	Manifest      Manifest
+	Type          PluginType
+	State         PluginState
+	Protected     ProtectedMetadata
+	Available     bool
+	StatusMessage string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
-// Clone returns a defensive copy so repository callers cannot mutate stored
-// slices or maps through a returned Plugin value.
+// Clone returns a defensive deep copy so callers cannot mutate stored records.
 func (p Plugin) Clone() Plugin {
 	p.Manifest.Keywords = append([]string(nil), p.Manifest.Keywords...)
 	p.Protected.Capabilities = append([]Capability(nil), p.Protected.Capabilities...)
@@ -89,7 +88,24 @@ func cloneMap(input map[string]any) map[string]any {
 	}
 	output := make(map[string]any, len(input))
 	for key, value := range input {
-		output[key] = value
+		output[key] = cloneValue(value)
 	}
 	return output
+}
+
+func cloneValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneMap(typed)
+	case []any:
+		output := make([]any, len(typed))
+		for i, item := range typed {
+			output[i] = cloneValue(item)
+		}
+		return output
+	case []string:
+		return append([]string(nil), typed...)
+	default:
+		return value
+	}
 }
