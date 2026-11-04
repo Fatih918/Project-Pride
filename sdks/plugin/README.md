@@ -47,6 +47,8 @@ The `server` package implements the five read-only gRPC discovery methods. Const
 
 The adapter forwards request context and metadata, maps SDK-neutral records to Protobuf responses, and translates typed `server.DomainError` values into gRPC statuses with `PluginError` details. It does not implement registry semantics, permissions, selection, lifecycle, or execution.
 
+For end-to-end integration responsibilities and code examples, see the [PRIDE Plugin SDK Discovery Integration Guide](../DOCS/SDK%20Spesification/SDK%20Plugin/PRIDE%20Plugin%20SDK%20Discovery%20Integration%20Guide.md).
+
 ## Generate and verify
 
 The Buf configuration files define schema linting and code-generation inputs/outputs. The Makefile provides short aliases for common commands; the underlying commands can also be run directly:
