@@ -83,7 +83,8 @@ func (r *Repository) RecordPromoted(ctx context.Context, id installation.Operati
 		return fmt.Errorf("%w: begin promotion record", installation.ErrPersistence)
 	}
 	defer func() { _ = tx.Rollback() }()
-	var phase, expected string
+	var phase string
+	var expected sql.NullString
 	err = tx.QueryRowContext(ctx, "SELECT phase, final_artifact_path FROM plugin_installation_operations WHERE operation_id = ?", string(id)).Scan(&phase, &expected)
 	if errors.Is(err, sql.ErrNoRows) {
 		return installation.ErrOperationNotFound
@@ -94,7 +95,7 @@ func (r *Repository) RecordPromoted(ctx context.Context, id installation.Operati
 	if installation.Phase(phase) != installation.PhaseVerified {
 		return installation.ErrInvalidTransition
 	}
-	if expected != finalPath {
+	if !expected.Valid || expected.String != finalPath {
 		return installation.ErrRecordMismatch
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE plugin_installation_operations SET phase = ?, updated_at = ?
@@ -129,7 +130,8 @@ func (r *Repository) transition(ctx context.Context, id installation.OperationID
 	if installation.Phase(phase) != from {
 		return fmt.Errorf("%w: expected %s, found %s", installation.ErrInvalidTransition, from, phase)
 	}
-	query := "UPDATE plugin_installation_operations SET " + assignments + " WHERE operation_id = ? AND phase = ?"
+	query := "UPDATE plugin_installation_operations SET phase = ?, " + assignments + " WHERE operation_id = ? AND phase = ?"
+	args = append([]any{string(to)}, args...)
 	args = append(args, string(id), string(from))
 	result, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
