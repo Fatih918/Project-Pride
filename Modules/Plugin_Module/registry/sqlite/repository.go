@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 1
+const schemaVersion = 2
 
 type Repository struct {
 	db *sql.DB
@@ -111,9 +111,55 @@ func (r *Repository) migrate(ctx context.Context) error {
 		if _, err := tx.ExecContext(ctx, createSchema); err != nil {
 			return fmt.Errorf("create plugin registry schema: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
-			return fmt.Errorf("advance plugin registry schema version: %w", err)
+		version = 1
+	}
+	if version < 2 {
+		statements := []string{
+			`CREATE TABLE installed_plugin_versions (
+				plugin_id TEXT NOT NULL,
+				version TEXT NOT NULL,
+				artifact_path TEXT NOT NULL,
+				source_reference TEXT NOT NULL,
+				digest_algorithm TEXT NOT NULL,
+				digest_value TEXT NOT NULL,
+				verification_policy TEXT NOT NULL,
+				verification_evidence_ref TEXT,
+				manifest_json TEXT NOT NULL,
+				installed_at TEXT NOT NULL,
+				selected INTEGER NOT NULL CHECK (selected IN (0, 1)),
+				PRIMARY KEY (plugin_id, version)
+			)`,
+			`CREATE UNIQUE INDEX one_selected_version_per_plugin
+				ON installed_plugin_versions(plugin_id) WHERE selected = 1`,
+			`CREATE TABLE plugin_installation_operations (
+				operation_id TEXT PRIMARY KEY NOT NULL,
+				plugin_id TEXT NOT NULL,
+				target_version TEXT NOT NULL,
+				operation_kind TEXT NOT NULL CHECK (operation_kind IN ('INSTALL', 'UPDATE')),
+				phase TEXT NOT NULL CHECK (phase IN ('PREPARING', 'STAGED', 'VERIFIED', 'PROMOTED', 'COMMITTED', 'ROLLED_BACK', 'FAILED')),
+				staging_path TEXT,
+				final_artifact_path TEXT,
+				source_reference TEXT NOT NULL,
+				digest_algorithm TEXT,
+				digest_value TEXT,
+				verification_policy TEXT,
+				manifest_json TEXT,
+				failure_code TEXT,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			`CREATE UNIQUE INDEX one_active_installation_per_plugin
+				ON plugin_installation_operations(plugin_id)
+				WHERE phase IN ('PREPARING', 'STAGED', 'VERIFIED', 'PROMOTED')`,
 		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("create plugin installation schema: %w", err)
+			}
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 2"); err != nil {
+		return fmt.Errorf("advance plugin registry schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit plugin registry migration: %w", err)
