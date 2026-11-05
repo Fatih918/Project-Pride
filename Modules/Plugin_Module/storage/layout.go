@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrInvalidPath = errors.New("invalid plugin storage path")
+	ErrInvalidPath               = errors.New("invalid plugin storage path")
 	ErrOperationDirectoryExists = errors.New("plugin operation directory already exists")
 )
 
