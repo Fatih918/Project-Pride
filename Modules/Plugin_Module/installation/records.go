@@ -18,45 +18,45 @@ const (
 	KindInstall Kind = "INSTALL"
 	KindUpdate  Kind = "UPDATE"
 
-	PhasePreparing Phase = "PREPARING"
-	PhaseStaged    Phase = "STAGED"
-	PhaseVerified  Phase = "VERIFIED"
-	PhasePromoted  Phase = "PROMOTED"
-	PhaseCommitted Phase = "COMMITTED"
+	PhasePreparing  Phase = "PREPARING"
+	PhaseStaged     Phase = "STAGED"
+	PhaseVerified   Phase = "VERIFIED"
+	PhasePromoted   Phase = "PROMOTED"
+	PhaseCommitted  Phase = "COMMITTED"
 	PhaseRolledBack Phase = "ROLLED_BACK"
-	PhaseFailed    Phase = "FAILED"
+	PhaseFailed     Phase = "FAILED"
 )
 
 type InstalledVersion struct {
-	PluginID               domain.PluginID
-	Version                string
-	ArtifactPath           string
-	SourceReference        string
-	DigestAlgorithm        string
-	DigestValue            string
-	VerificationPolicy     string
+	PluginID                domain.PluginID
+	Version                 string
+	ArtifactPath            string
+	SourceReference         string
+	DigestAlgorithm         string
+	DigestValue             string
+	VerificationPolicy      string
 	VerificationEvidenceRef string
-	ManifestJSON           string
-	InstalledAt            time.Time
-	Selected               bool
+	ManifestJSON            string
+	InstalledAt             time.Time
+	Selected                bool
 }
 
 type InstallationOperation struct {
-	OperationID       OperationID
-	PluginID          domain.PluginID
-	TargetVersion     string
-	Kind              Kind
-	Phase             Phase
-	StagingPath       string
-	FinalArtifactPath string
-	SourceReference   string
-	DigestAlgorithm   string
-	DigestValue       string
+	OperationID        OperationID
+	PluginID           domain.PluginID
+	TargetVersion      string
+	Kind               Kind
+	Phase              Phase
+	StagingPath        string
+	FinalArtifactPath  string
+	SourceReference    string
+	DigestAlgorithm    string
+	DigestValue        string
 	VerificationPolicy string
-	ManifestJSON      string
-	FailureCode       string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ManifestJSON       string
+	FailureCode        string
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type StagedArtifact struct {
