@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"path/filepath"
@@ -234,35 +235,76 @@ func TestInstallationIncompleteOperationsAreOrdered(t *testing.T) {
 
 func TestInstallationSchemaMigrationPreservesExistingPlugins(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "legacy.sqlite")
-	repository, err := New(context.Background(), path)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE plugins (
+		plugin_id TEXT PRIMARY KEY NOT NULL,
+		manifest_json TEXT NOT NULL,
+		plugin_type TEXT NOT NULL,
+		plugin_state TEXT NOT NULL,
+		protected_metadata_json TEXT NOT NULL,
+		available INTEGER NOT NULL CHECK (available IN (0, 1)),
+		status_message TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	plugin := testPlugin("plugin.migration")
-	if err := repository.Create(context.Background(), plugin); err != nil {
-		t.Fatal(err)
-	}
-	if err := repository.Close(); err != nil {
-		t.Fatal(err)
-	}
-	reopened, err := New(context.Background(), path)
+	manifestJSON, err := json.Marshal(plugin.Manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer reopened.Close()
-	got, err := reopened.Get(context.Background(), plugin.ID)
+	protectedJSON, err := json.Marshal(plugin.Protected)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Manifest.Name != plugin.Manifest.Name {
-		t.Fatal("existing Plugin row was not preserved")
+	_, err = db.Exec(`INSERT INTO plugins (
+		plugin_id, manifest_json, plugin_type, plugin_state, protected_metadata_json,
+		available, status_message, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		string(plugin.ID), string(manifestJSON), pluginTypeName(plugin.Type), pluginStateName(plugin.State),
+		string(protectedJSON), boolToInt(plugin.Available), plugin.StatusMessage,
+		formatTime(plugin.CreatedAt), formatTime(plugin.UpdatedAt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	repository, err := New(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+	got, err := repository.Get(context.Background(), plugin.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Manifest.Name != plugin.Manifest.Name || got.Manifest.Version != plugin.Manifest.Version {
+		t.Fatal("existing Plugin row was not preserved during v1 to v2 migration")
 	}
 	var version int
-	if err := reopened.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+	if err := repository.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
 	if version != 2 {
 		t.Fatalf("schema version = %d, want 2", version)
+	}
+	var tableCount int
+	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master
+		WHERE type = 'table' AND name IN ('installed_plugin_versions', 'plugin_installation_operations')`).Scan(&tableCount); err != nil {
+		t.Fatal(err)
+	}
+	if tableCount != 2 {
+		t.Fatalf("installation table count = %d, want 2", tableCount)
 	}
 }
 
