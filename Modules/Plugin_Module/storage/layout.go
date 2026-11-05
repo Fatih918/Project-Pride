@@ -10,7 +10,10 @@ import (
 	"strings"
 )
 
-var ErrInvalidPath = errors.New("invalid plugin storage path")
+var (
+	ErrInvalidPath = errors.New("invalid plugin storage path")
+	ErrOperationDirectoryExists = errors.New("plugin operation directory already exists")
+)
 
 type Config struct {
 	RootOverride string
@@ -117,6 +120,62 @@ func (l *Layout) InstalledVersionDirectory(pluginID, version string) (string, er
 		return "", fmt.Errorf("plugin version: %w", err)
 	}
 	return l.safePath("installed", pluginID, version)
+}
+
+// TemporaryOperationDirectory resolves the isolated staging directory for an
+// operation. The returned path is absolute and remains inside Plugin_Storage.
+func (l *Layout) TemporaryOperationDirectory(operationID string) (string, error) {
+	if err := validateComponent(operationID); err != nil {
+		return "", fmt.Errorf("operation ID: %w", err)
+	}
+	return l.safePath("temporary", operationID)
+}
+
+// QuarantineOperationDirectory resolves the operation-scoped quarantine
+// directory. This helper does not move or delete files and makes no retention
+// policy decisions.
+func (l *Layout) QuarantineOperationDirectory(operationID string) (string, error) {
+	if err := validateComponent(operationID); err != nil {
+		return "", fmt.Errorf("operation ID: %w", err)
+	}
+	return l.safePath("quarantine", operationID)
+}
+
+// CreateTemporaryOperationDirectory creates a fresh private staging directory.
+// Existing paths are never reused, including paths left by interrupted runs.
+func (l *Layout) CreateTemporaryOperationDirectory(operationID string) (string, error) {
+	path, err := l.TemporaryOperationDirectory(operationID)
+	if err != nil {
+		return "", err
+	}
+	if err := l.ensureDirectory(filepath.Join(l.PluginStorageRoot(), "temporary")); err != nil {
+		return "", err
+	}
+	if err := l.verifyContained(l.root, path); err != nil {
+		return "", err
+	}
+	if err := os.Mkdir(path, 0o700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", ErrOperationDirectoryExists
+		}
+		return "", fmt.Errorf("create Plugin operation staging directory: %w", err)
+	}
+	if err := l.verifyContained(l.root, path); err != nil {
+		return "", err
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(path, 0o700); err != nil {
+			return "", fmt.Errorf("secure Plugin operation staging directory: %w", err)
+		}
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", fmt.Errorf("inspect Plugin operation staging directory: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", ErrInvalidPath
+	}
+	return path, nil
 }
 
 func (l *Layout) PluginDataDirectory(pluginID string) (string, error) {
