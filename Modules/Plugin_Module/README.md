@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 5 — Local Storage and SQLite Registry Persistence.
+**Status:** Increment 6 — Installation Application Service foundation.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -46,13 +46,14 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Registry artifact-source resolution and package download.
 - Archive inspection and extraction.
 - Artifact digest/signature verification and trust-root policy.
-- Installation-version records and durable operation journal.
-- Install/update coordinator, atomic promotion, and startup recovery.
+- Registry artifact-source resolution and package download.
+- Archive inspection/extraction and artifact verification adapters.
+- Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 defines the draft installation/recovery design. PDR-0001 records the decisions that must be approved before production installation work proceeds.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 and PDR-0001 remain decision-gated for package format, Registry artifact descriptors, trust policy, and Manifest wire format. The application service coordinates injected ports only; it does not choose those contracts.
 
 ## Checks
 
