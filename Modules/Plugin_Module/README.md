@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 5 — Local Storage and SQLite Registry Persistence.
+**Status:** Increment 6 — Installation Application Service foundation.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -31,28 +31,34 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
 - Storage and SQLite repository tests.
 
+### Installation application service
+- SDK-neutral orchestration of artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
+- Install/update preconditions and Plugin identity/version validation.
+- Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
+- Unit tests for successful installation, pre-promotion failure, update preconditions, and recoverable commit failure.
+
 ## Architectural boundaries
 
-- Domain, registry, and discovery packages do not depend on generated Protobuf types or the Plugin SDK.
+- Domain, registry, discovery, and installation application packages do not depend on generated Protobuf types or the Plugin SDK.
 - SDK integration dependency is isolated in `sdkadapter/go.mod`.
 - The SDK adapter contains translation logic only; it does not access repositories directly or implement authorization, capability selection, lifecycle, loading, or execution.
 - Manifest identity/descriptive fields remain separate from platform/Marketplace-owned capability and permission metadata.
 - Permission IDs are metadata only; authorization remains outside this module.
 - Core owns capability matching and candidate selection.
 - SQLite stores structured metadata; Plugin package files belong in local `Plugin_Storage`.
+- The application service treats Registry source references and package/verification formats as opaque adapter contracts; it does not invent unresolved wire formats or trust policy.
 
 ## Not implemented yet
 
 - Registry artifact-source resolution and package download.
-- Archive inspection and extraction.
-- Artifact digest/signature verification and trust-root policy.
-- Installation-version records and durable operation journal.
-- Install/update coordinator, atomic promotion, and startup recovery.
+- ZIP/package extraction and concrete artifact verification adapters.
+- Finalized digest/signature trust-root policy and Manifest wire schema.
+- Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 defines the draft installation/recovery design. PDR-0001 records the decisions that must be approved before production installation work proceeds.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 and PDR-0001 remain decision-gated for Registry artifact descriptors, trust policy, and Manifest wire format. The application service coordinates injected ports only and does not choose those contracts.
 
 ## Checks
 
