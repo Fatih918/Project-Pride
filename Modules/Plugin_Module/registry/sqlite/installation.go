@@ -83,13 +83,16 @@ func (r *Repository) RecordPromoted(ctx context.Context, id installation.Operati
 		return fmt.Errorf("%w: begin promotion record", installation.ErrPersistence)
 	}
 	defer func() { _ = tx.Rollback() }()
-	var expected string
-	err = tx.QueryRowContext(ctx, "SELECT final_artifact_path FROM plugin_installation_operations WHERE operation_id = ?", string(id)).Scan(&expected)
+	var phase, expected string
+	err = tx.QueryRowContext(ctx, "SELECT phase, final_artifact_path FROM plugin_installation_operations WHERE operation_id = ?", string(id)).Scan(&phase, &expected)
 	if errors.Is(err, sql.ErrNoRows) {
 		return installation.ErrOperationNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("%w: read promotion target", installation.ErrPersistence)
+	}
+	if installation.Phase(phase) != installation.PhaseVerified {
+		return installation.ErrInvalidTransition
 	}
 	if expected != finalPath {
 		return installation.ErrRecordMismatch
@@ -150,6 +153,9 @@ func (r *Repository) CommitInstallation(ctx context.Context, id installation.Ope
 	}
 	if err := version.Validate(); err != nil {
 		return err
+	}
+	if !version.Selected {
+		return fmt.Errorf("%w: committed installed version must be selected", installation.ErrInvalidRecord)
 	}
 	if plugin.ID != version.PluginID || plugin.Manifest.Version != version.Version {
 		return installation.ErrRecordMismatch
