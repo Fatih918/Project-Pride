@@ -130,3 +130,61 @@ func TestPluginStorageRootRejectsSymlinkEscape(t *testing.T) {
 		t.Fatalf("expected Plugin_Storage root symlink escape rejection, got %v", err)
 	}
 }
+
+func TestOperationDirectoriesAreScopedAndValidated(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := layout.EnsurePluginStorage(); err != nil {
+		t.Fatal(err)
+	}
+
+	staging, err := layout.TemporaryOperationDirectory("operation-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quarantine, err := layout.QuarantineOperationDirectory("operation-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if staging != filepath.Join(layout.PluginStorageRoot(), "temporary", "operation-123") {
+		t.Fatalf("unexpected staging path: %q", staging)
+	}
+	if quarantine != filepath.Join(layout.PluginStorageRoot(), "quarantine", "operation-123") {
+		t.Fatalf("unexpected quarantine path: %q", quarantine)
+	}
+
+	for _, operationID := range []string{"", ".", "..", "../escape", "/absolute", `a\b`, "a/b", "C:drive"} {
+		if _, err := layout.TemporaryOperationDirectory(operationID); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("temporary operation ID %q: got %v", operationID, err)
+		}
+		if _, err := layout.QuarantineOperationDirectory(operationID); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("quarantine operation ID %q: got %v", operationID, err)
+		}
+	}
+}
+
+func TestCreateTemporaryOperationDirectoryIsExclusiveAndPrivate(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := layout.CreateTemporaryOperationDirectory("operation-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("staging path is not a real directory: %v", info.Mode())
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o700 {
+		t.Fatalf("staging permissions = %o, want 700", info.Mode().Perm())
+	}
+	if _, err := layout.CreateTemporaryOperationDirectory("operation-123"); !errors.Is(err, ErrOperationDirectoryExists) {
+		t.Fatalf("expected duplicate operation directory error, got %v", err)
+	}
+}

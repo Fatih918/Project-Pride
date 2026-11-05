@@ -27,6 +27,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Platform-aware PRIDE user-data root resolution, including `PRIDE_USER_DATA_DIR` override.
 - Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
 - Validated path helpers with traversal and symlink-containment checks.
+- Operation-scoped temporary and quarantine path resolution, plus exclusive private staging-directory creation.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
 - Storage and SQLite repository tests.
