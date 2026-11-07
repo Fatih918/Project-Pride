@@ -28,6 +28,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
 - Validated path helpers with traversal and symlink-containment checks.
 - Operation-scoped temporary and quarantine path resolution, plus exclusive private staging-directory creation.
+- Root-confined filesystem adapter for operation workspaces and exclusive `artifact.zip` creation/read access.
 - Canonical `Plugin_Storage`-relative path generation and safe resolution to absolute OS paths; persisted paths never depend on the process working directory.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
@@ -54,8 +55,9 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ## Not implemented yet
 
 - Registry artifact-source resolution and package download.
-- ZIP/package extraction and concrete artifact verification adapters.
-- Production Marketplace signing, remote trust-configuration service, Registry source-resolution, ZIP extraction, and concrete artifact verification adapters.
+- Registry artifact-source resolution and package download.
+- ZIP extraction, concrete artifact verification, and atomic filesystem promotion adapters.
+- Production Marketplace signing and remote trust-configuration service.
 - Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
