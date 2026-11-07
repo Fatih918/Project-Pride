@@ -266,7 +266,6 @@ func (l *Layout) verifyContained(root, target string) error {
 	return nil
 }
 
-
 // RelativeInstalledVersionPath returns a canonical path relative to Plugin_Storage.
 // Persist this value; never persist the absolute result of InstalledVersionDirectory.
 func (l *Layout) RelativeInstalledVersionPath(pluginID, version string) (string, error) {

@@ -71,7 +71,7 @@ SHA-256 detects byte changes relative to a signed expected digest; it does not e
 
 1. A PRIDE distribution embeds one or more public bootstrap trust keys. These are public keys, never private signing material.
 2. The client obtains a remote trust configuration.
-3. The trust configuration MUST be authenticated by an embedded bootstrap key or by a key authorized by a previously accepted configuration under a separately versioned transition rule.
+3. Every remote trust configuration MUST be authenticated directly by an embedded bootstrap key. Marketplace descriptor keys are rotated inside that authenticated configuration; they cannot replace the embedded bootstrap root.
 4. Only keys listed as active and valid in an accepted trust configuration may verify Marketplace descriptors.
 5. A remote configuration cannot make a new root trusted merely by declaring it trusted.
 

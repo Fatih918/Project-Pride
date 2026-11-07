@@ -95,13 +95,11 @@
     "screenshots": {
       "type": "array",
       "items": {
-        "type": "string",
-        "format": "uri"
+        "type": "string"
       }
     },
     "icon": {
-      "type": "string",
-      "format": "uri"
+      "type": "string"
     },
     "changelog_url": {
       "type": "string",

@@ -189,7 +189,6 @@ func TestCreateTemporaryOperationDirectoryIsExclusiveAndPrivate(t *testing.T) {
 	}
 }
 
-
 func TestRelativeStoragePathsResolveOnlyInsidePluginStorage(t *testing.T) {
 	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
 	if err != nil {
@@ -247,7 +246,6 @@ func TestCreateTemporaryOperationDirectoryRelativeReturnsPersistablePath(t *test
 		t.Fatalf("staging directory not created safely: info=%v err=%v", info, err)
 	}
 }
-
 
 func TestResolvePluginStoragePathAllowsPortableNamesAndRejectsSymlinkEscape(t *testing.T) {
 	if runtime.GOOS == "windows" {
