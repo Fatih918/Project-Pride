@@ -56,7 +56,36 @@ func (a *Adapter) CreateTemporaryOperationDirectory(ctx context.Context, operati
 	if a == nil || a.layout == nil || a.root == nil {
 		return "", ErrInvalidPath
 	}
-	return a.layout.CreateTemporaryOperationDirectoryRelative(operationID)
+	relativePath, err := a.layout.RelativeTemporaryOperationPath(operationID)
+	if err != nil {
+		return "", err
+	}
+	parentInfo, err := a.root.Lstat("temporary")
+	if err != nil {
+		return "", fmt.Errorf("inspect temporary storage directory: %w", err)
+	}
+	if !parentInfo.IsDir() || parentInfo.Mode()&fs.ModeSymlink != 0 {
+		return "", ErrInvalidPath
+	}
+	if err := a.root.Mkdir(filepath.FromSlash(relativePath), 0o700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return "", ErrOperationDirectoryExists
+		}
+		return "", fmt.Errorf("create operation workspace: %w", err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := a.root.Chmod(filepath.FromSlash(relativePath), 0o700); err != nil {
+			return "", fmt.Errorf("secure operation workspace: %w", err)
+		}
+	}
+	info, err := a.root.Lstat(filepath.FromSlash(relativePath))
+	if err != nil {
+		return "", fmt.Errorf("inspect created operation workspace: %w", err)
+	}
+	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
+		return "", ErrInvalidOperationWorkspace
+	}
+	return relativePath, nil
 }
 
 // CreateArtifactFile creates the single acquired ZIP artifact inside an

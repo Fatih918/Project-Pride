@@ -129,3 +129,51 @@ func TestAdapterHonorsCanceledContext(t *testing.T) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
 }
+
+
+func TestAdapterCreatesOperationDirectoryExclusively(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter, err := NewAdapter(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer adapter.Close()
+
+	if _, err := adapter.CreateTemporaryOperationDirectory(context.Background(), "op-exclusive"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.CreateTemporaryOperationDirectory(context.Background(), "op-exclusive"); !errors.Is(err, ErrOperationDirectoryExists) {
+		t.Fatalf("expected exclusive operation directory error, got %v", err)
+	}
+}
+
+func TestAdapterRejectsSymlinkedTemporaryParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires platform-specific privileges")
+	}
+	base := t.TempDir()
+	layout, err := NewLayout(Config{RootOverride: filepath.Join(base, "pride")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter, err := NewAdapter(layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer adapter.Close()
+
+	temporary := filepath.Join(layout.PluginStorageRoot(), "temporary")
+	if err := os.Remove(temporary); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, temporary); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := adapter.CreateTemporaryOperationDirectory(context.Background(), "op-escape"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected symlinked parent rejection, got %v", err)
+	}
+}
