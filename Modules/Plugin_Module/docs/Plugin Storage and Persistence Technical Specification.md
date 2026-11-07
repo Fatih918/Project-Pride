@@ -309,3 +309,18 @@ The storage adapter MUST:
 - Create operation staging directories exclusively and with private permissions before acquisition begins.
 
 Canonical examples are temporary/<operation-id> and installed/<plugin-id>/<version>. The application service requests staging creation through its OperationStorage port; the returned relative path is persisted in the operation journal. Filesystem-facing acquisition and promotion adapters must resolve paths through the storage adapter rather than joining them to the current working directory.
+
+
+## Operation workspace file contract
+
+An operation workspace is a directory at `temporary/<operation-id>`. The acquired ZIP is stored at the fixed relative path `temporary/<operation-id>/artifact.zip`.
+
+- The operation ID is a single validated path component.
+- The workspace directory is created exclusively before acquisition.
+- The artifact file is created exclusively with owner-only permissions (0600 on POSIX).
+- The storage adapter exposes the workspace only through canonical Plugin_Storage-relative paths.
+- Filesystem access uses a root-confined directory handle; callers must not concatenate absolute paths or resolve paths against the process working directory.
+- The staged artifact is opened read-only for inspection and verification.
+- The storage adapter rejects non-regular artifact files and symlinked operation workspaces.
+
+The workspace contract does not define extraction output layout or promotion behavior. ZIP extraction remains blocked on the versioned numeric installation policy required by PTS-0004.

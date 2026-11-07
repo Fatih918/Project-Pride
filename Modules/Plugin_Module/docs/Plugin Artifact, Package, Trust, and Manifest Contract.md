@@ -79,7 +79,9 @@ The bootstrap public key is provisioned through the PRIDE release/build process.
 
 ### 5.2 Trust configuration
 
-The trust-configuration signature is detached. Its signed payload is the RFC 8785 JCS canonicalization of the trust configuration with the signature property omitted. The verifier MUST reconstruct these exact bytes before verification.\n\nA trust configuration MUST contain $schema, schema_version, monotonically increasing sequence, issued_at, expires_at, unique key_id records, algorithm, public key, validity interval, status, and a detached signature envelope. Its schema is `Modules/Plugin_Module/schemas/trust-configuration.schema.json`. Version 1 accepts Ed25519 Marketplace descriptor keys only. Public keys are base64-encoded raw Ed25519 public keys (32 bytes). Private keys MUST never be distributed in trust configuration or stored by Plugin Module.
+The trust-configuration signature is detached. Its signed payload is the RFC 8785 JCS canonicalization of the trust configuration with the signature property omitted. The verifier MUST reconstruct these exact bytes before verification.
+
+A trust configuration MUST contain $schema, schema_version, monotonically increasing sequence, issued_at, expires_at, unique key_id records, algorithm, public key, validity interval, status, and a detached signature envelope. Its schema is `Modules/Plugin_Module/schemas/trust-configuration.schema.json`. Version 1 accepts Ed25519 Marketplace descriptor keys only. Public keys are base64-encoded raw Ed25519 public keys (32 bytes). Private keys MUST never be distributed in trust configuration or stored by Plugin Module.
 
 The client MUST persist the highest accepted sequence and reject lower values. Invalid signatures and expired configurations MUST be rejected. Revoked keys MUST NOT verify new installations. Rotation MUST be represented by a higher-sequence configuration authenticated directly by an embedded bootstrap key. Replacing a compromised embedded bootstrap key requires a PRIDE application/distribution update or separately reviewed recovery mechanism; remote metadata cannot silently replace the embedded root.
 

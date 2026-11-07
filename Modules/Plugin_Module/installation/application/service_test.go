@@ -76,7 +76,7 @@ func (testIDs) NewOperationID(context.Context) (installation.OperationID, error)
 
 type testOperationStorage struct{ err error }
 
-func (s testOperationStorage) CreateTemporaryOperationDirectory(_ context.Context, id installation.OperationID) (string, error) {
+func (s testOperationStorage) CreateTemporaryOperationDirectory(_ context.Context, id string) (string, error) {
 	if s.err != nil {
 		return "", s.err
 	}

@@ -40,7 +40,7 @@ type IDGenerator interface {
 // OperationStorage creates the durable operation-scoped staging directory.
 // It returns a canonical path relative to Plugin_Storage, never an OS path.
 type OperationStorage interface {
-	CreateTemporaryOperationDirectory(context.Context, installation.OperationID) (string, error)
+	CreateTemporaryOperationDirectory(context.Context, string) (string, error)
 }
 
 type ArtifactAcquirer interface {
@@ -165,7 +165,7 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 		return fmt.Errorf("%s: %w", stage, cause)
 	}
 
-	createdStagingPath, err := s.storage.CreateTemporaryOperationDirectory(ctx, id)
+	createdStagingPath, err := s.storage.CreateTemporaryOperationDirectory(ctx, string(id))
 	if err != nil {
 		return fail("create Plugin staging directory", err)
 	}
