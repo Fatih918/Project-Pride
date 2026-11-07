@@ -188,3 +188,89 @@ func TestCreateTemporaryOperationDirectoryIsExclusiveAndPrivate(t *testing.T) {
 		t.Fatalf("expected duplicate operation directory error, got %v", err)
 	}
 }
+
+func TestRelativeStoragePathsResolveOnlyInsidePluginStorage(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := layout.EnsurePluginStorage(); err != nil {
+		t.Fatal(err)
+	}
+	relative, err := layout.RelativeTemporaryOperationPath("operation-123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if relative != "temporary/operation-123" {
+		t.Fatalf("relative path = %q", relative)
+	}
+	resolved, err := layout.ResolvePluginStoragePath(relative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved != filepath.Join(layout.PluginStorageRoot(), "temporary", "operation-123") {
+		t.Fatalf("resolved path = %q", resolved)
+	}
+	installed, err := layout.RelativeInstalledVersionPath("example.plugin", "1.2.3")
+	if err != nil || installed != "installed/example.plugin/1.2.3" {
+		t.Fatalf("installed relative path = %q, err = %v", installed, err)
+	}
+	for _, invalid := range []string{
+		"", ".", "../escape", "/absolute", "temporary/../escape",
+		"temporary\\operation-123", "unknown/op", "temporary", "installed//plugin",
+	} {
+		if _, err := layout.ResolvePluginStoragePath(invalid); !errors.Is(err, ErrInvalidPath) {
+			t.Errorf("path %q: expected ErrInvalidPath, got %v", invalid, err)
+		}
+	}
+}
+
+func TestCreateTemporaryOperationDirectoryRelativeReturnsPersistablePath(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	relative, err := layout.CreateTemporaryOperationDirectoryRelative("operation-456")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if relative != "temporary/operation-456" {
+		t.Fatalf("relative path = %q", relative)
+	}
+	resolved, err := layout.ResolvePluginStoragePath(relative)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(resolved)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("staging directory not created safely: info=%v err=%v", info, err)
+	}
+}
+
+func TestResolvePluginStoragePathAllowsPortableNamesAndRejectsSymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires platform-specific privileges")
+	}
+	base := t.TempDir()
+	layout, err := NewLayout(Config{RootOverride: filepath.Join(base, "pride")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := layout.EnsurePluginStorage(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := layout.ResolvePluginStoragePath("temporary/op-1/sub folder/readme.txt"); err != nil {
+		t.Fatalf("portable relative path rejected: %v", err)
+	}
+
+	if err := os.Remove(filepath.Join(layout.PluginStorageRoot(), "installed")); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(layout.PluginStorageRoot(), "installed")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := layout.ResolvePluginStoragePath("installed/example.plugin/1.0.0/package/main.go"); !errors.Is(err, ErrInvalidPath) {
+		t.Fatalf("expected symlink escape rejection, got %v", err)
+	}
+}

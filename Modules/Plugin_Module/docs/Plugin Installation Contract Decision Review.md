@@ -1,7 +1,7 @@
 # Plugin Installation Contract Decision Review
 
 **Version:** 0.1.0  
-**Status:** Draft — Decision Review  
+**Status:** Superseded — Decisions accepted in DCR-0001  
 **Category:** Architecture / Module Design Review  
 **Document ID:** PDR-0001  
 **Related ADR:** ADR-008 — Marketplace + Registry Architecture; ADR-012 — Local-First Plugin Storage and Persistence  
@@ -303,3 +303,8 @@ This review does not approve or implement:
 - [ ] D5 — Separate installed-version and operation-journal persistence
 - [ ] D6 — Typed lifecycle RPCs after Module semantics are stable
 - [ ] D7 — Journal-driven recovery and bounded quarantine retention
+
+
+## 10. Decision status
+
+The recommendations in this review were resolved by the user-confirmed decisions recorded in DCR-0001. PTS-0004 is the accepted normative contract for D1–D4. This review remains as decision history and must not be used in place of DCR-0001 or PTS-0004.

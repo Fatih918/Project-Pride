@@ -34,7 +34,15 @@ type IDGenerator interface {
 }
 
 // ArtifactAcquirer obtains the artifact into the supplied operation staging
-// directory. Network and Registry-specific behavior belongs in its adapter.
+// directory. stagingPath is canonical and relative to Plugin_Storage; the
+// adapter must resolve it through the storage adapter, never via the cwd.
+// Network and Registry-specific behavior belongs in its adapter.
+// OperationStorage creates the durable operation-scoped staging directory.
+// It returns a canonical path relative to Plugin_Storage, never an OS path.
+type OperationStorage interface {
+	CreateTemporaryOperationDirectory(context.Context, installation.OperationID) (string, error)
+}
+
 type ArtifactAcquirer interface {
 	Acquire(context.Context, string, string) (installation.StagedArtifact, error)
 }
@@ -53,7 +61,9 @@ type ArtifactVerifier interface {
 }
 
 // ArtifactPromoter atomically promotes a verified staging directory to its
-// immutable final path. It must not overwrite an existing version directory.
+// immutable final path. Both paths are canonical Plugin_Storage-relative
+// values and must be resolved through the storage adapter. It must not
+// overwrite an existing version directory.
 type ArtifactPromoter interface {
 	Promote(context.Context, string, string) error
 }
@@ -61,6 +71,7 @@ type ArtifactPromoter interface {
 type Service struct {
 	repository installation.Repository
 	ids        IDGenerator
+	storage    OperationStorage
 	acquirer   ArtifactAcquirer
 	inspector  PackageInspector
 	verifier   ArtifactVerifier
@@ -71,17 +82,19 @@ type Service struct {
 func NewService(
 	repository installation.Repository,
 	ids IDGenerator,
+	storage OperationStorage,
 	acquirer ArtifactAcquirer,
 	inspector PackageInspector,
 	verifier ArtifactVerifier,
 	promoter ArtifactPromoter,
 ) (*Service, error) {
-	if repository == nil || ids == nil || acquirer == nil || inspector == nil || verifier == nil || promoter == nil {
+	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || verifier == nil || promoter == nil {
 		return nil, ErrMissingPort
 	}
 	return &Service{
 		repository: repository,
 		ids:        ids,
+		storage:    storage,
 		acquirer:   acquirer,
 		inspector:  inspector,
 		verifier:   verifier,
@@ -150,6 +163,14 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 			return errors.Join(fmt.Errorf("%s: %w", stage, cause), fmt.Errorf("persist failed operation: %w", markErr))
 		}
 		return fmt.Errorf("%s: %w", stage, cause)
+	}
+
+	createdStagingPath, err := s.storage.CreateTemporaryOperationDirectory(ctx, id)
+	if err != nil {
+		return fail("create Plugin staging directory", err)
+	}
+	if createdStagingPath != stagingPath {
+		return fail("validate staging location", installation.ErrRecordMismatch)
 	}
 
 	staged, err := s.acquirer.Acquire(ctx, request.SourceReference, stagingPath)

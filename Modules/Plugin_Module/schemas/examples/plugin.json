@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:pride:plugin-manifest:1",
+  "schema_version": "1.0.0",
+  "plugin_id": "example.plugin",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "description": "An example PRIDE Plugin.",
+  "author": "Example Developer",
+  "license": "MIT",
+  "entry_point": "main",
+  "minimum_pride_version": "1.0.0",
+  "repository_url": "https://example.com/example/plugin"
+}

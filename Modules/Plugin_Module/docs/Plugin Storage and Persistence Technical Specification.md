@@ -295,3 +295,17 @@ This specification is ready for implementation only when:
 - [ADR-011 — Plugin Module Foundation Design](../../../01-Architecture/ADR/ADR-011%20%E2%80%94%20Plugin%20Module%20Foundation%20Design.md)
 - [PRIDE Plugin Module Specification](../../../04-Platform%20Specification%20Standard/Module%20Specification/PRIDE%20Plugin%20Module%20Specification.md)
 - [PSS-0001 — PRIDE Specification Writing Standard](../../../03-Standards/PSS-0001%20%E2%80%94%20PRIDE%20Specification%20Writing%20Standard.md)
+
+
+## Accepted relative path boundary (DCR-0001)
+
+All artifact paths persisted in installation records are canonical slash-separated paths relative to Plugin_Storage, never absolute OS paths. Application/domain packages exchange these relative values only. The storage adapter is the sole owner of resolving them against the configured Plugin_Storage root.
+
+The storage adapter MUST:
+- Allow only the managed namespaces installed, data, cache, temporary, and quarantine.
+- Reject absolute paths, backslashes, empty segments, dot segments, parent traversal, drive-qualified segments, and non-canonical paths.
+- Verify lexical and symlink containment before returning an absolute path.
+- Never resolve persisted paths relative to the process working directory.
+- Create operation staging directories exclusively and with private permissions before acquisition begins.
+
+Canonical examples are temporary/<operation-id> and installed/<plugin-id>/<version>. The application service requests staging creation through its OperationStorage port; the returned relative path is persisted in the operation journal. Filesystem-facing acquisition and promotion adapters must resolve paths through the storage adapter rather than joining them to the current working directory.

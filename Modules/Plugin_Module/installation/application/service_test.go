@@ -74,6 +74,15 @@ func (testIDs) NewOperationID(context.Context) (installation.OperationID, error)
 	return "op-test-1", nil
 }
 
+type testOperationStorage struct{ err error }
+
+func (s testOperationStorage) CreateTemporaryOperationDirectory(_ context.Context, id installation.OperationID) (string, error) {
+	if s.err != nil {
+		return "", s.err
+	}
+	return "temporary/" + string(id), nil
+}
+
 type testAcquirer struct {
 	err  error
 	path string
@@ -125,7 +134,7 @@ func validPlugin() domain.Plugin {
 
 func newTestService(t *testing.T, repo *testRepository, acquirer ArtifactAcquirer, inspector PackageInspector, verifier ArtifactVerifier, promoter ArtifactPromoter) *Service {
 	t.Helper()
-	service, err := NewService(repo, testIDs{}, acquirer, inspector, verifier, promoter)
+	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, verifier, promoter)
 	if err != nil {
 		t.Fatal(err)
 	}

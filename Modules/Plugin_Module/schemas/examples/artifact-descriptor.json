@@ -1,0 +1,19 @@
+{
+  "$schema": "urn:pride:registry-artifact-descriptor:1",
+  "schema_version": "1.0.0",
+  "plugin_id": "example.plugin",
+  "version": "1.0.0",
+  "release_id": "marketplace-release-01JEXAMPLE",
+  "download_uri": "https://downloads.example.invalid/plugins/example.plugin/1.0.0/plugin.zip",
+  "media_type": "application/vnd.pride.plugin+zip",
+  "size_bytes": 123456,
+  "digest": {
+    "algorithm": "sha-256",
+    "value": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "signature": {
+    "algorithm": "Ed25519",
+    "key_id": "marketplace-ed25519-2026-01",
+    "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  }
+}
