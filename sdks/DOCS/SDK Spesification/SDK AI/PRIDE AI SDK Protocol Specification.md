@@ -1,6 +1,6 @@
 # PRIDE AI SDK Protocol Specification
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Draft
 **Category:** Protocol Specification
 **Document ID:** PRIDE-AI-SDK-PROTOCOL
@@ -23,39 +23,51 @@ The protocol provides a language-independent representation of:
 * Request metadata.
 * Execution metadata.
 
-The protocol is derived from the PRIDE AI SDK Contract.
+The protocol realizes the public semantic boundary defined by the PRIDE AI SDK Contract and must conform to the Stable PRIDE AI SDK and AI Module Specifications.
 
 It does not define AI provider implementations or AI provider-specific request formats.
 
 ---
 
+
 # 2. Protocol Architecture
 
-The protocol establishes the following communication model:
+The protocol defines the standardized request/response communication used by AI SDK clients and server-side AI execution boundaries.
+
+The logical responsibility flow is:
 
 ```text
-PRIDE Plugin
-(Python / Go / Rust / C# / JavaScript / ...)
-        │
-        ▼
-AI SDK Client
-        │
-        │ gRPC
-        ▼
-AI SDK Server
-        │
-        ▼
-Active AI Configuration
-        │
-        ▼
-AI Execution
+PRIDE Caller / AI Capability
+          │
+          ▼
+      AI SDK Client
+          │
+          │ gRPC / Protocol Buffers
+          ▼
+       AI SDK Server
+  (request validation and forwarding)
+          │
+          │ AI Module client boundary
+          ▼
+        AI Module
+  (configuration and execution owner)
+          │
+          ├── Active AI Configuration
+          ├── Credential Reference Resolution
+          └── AI Implementation Resolution
+                    │
+                    ▼
+             AI Implementation
+                    │
+                    ▼
+             External AI System
 ```
 
-The AI SDK Client is a thin protocol client.
+The deployed topology may place the SDK-facing service and the AI Module behind separate processes or service endpoints. The protocol does not collapse their logical ownership into one component.
 
-The AI SDK Server is the canonical server-side implementation of the AI SDK boundary.
+The AI SDK Server may accept a request, validate its envelope, map it to an internal execution DTO, forward it to the AI Module, and map the returned result or error. It does not load configuration, resolve credentials, select implementations, or execute provider/runtime operations.
 
----
+The AI Module owns those execution responsibilities according to the Stable AI SDK and AI Module Specifications.
 
 # 3. Protocol Principles
 
@@ -72,7 +84,7 @@ The protocol follows these principles:
 9. The protocol does not contain AI reasoning logic.
 10. The protocol does not contain AI Configuration internals.
 11. Client implementations remain thin.
-12. Server implementations remain responsible for execution.
+12. SDK server components validate and forward requests; the AI Module owns configuration resolution and execution orchestration.
 
 ---
 
@@ -264,11 +276,10 @@ Provider-specific internal metadata shall remain internal unless explicitly prom
 
 ---
 
+
 # 8. Error Protocol
 
-Errors shall use a standardized protocol representation.
-
-Conceptual structure:
+Errors use the existing standardized protocol representation:
 
 ```text
 AIError
@@ -279,34 +290,35 @@ AIError
 └── metadata
 ```
 
-The AI SDK Server is responsible for translating internal execution failures into standardized AI SDK errors.
+The AI Module is responsible for classifying configuration, credential, capability-compatibility, and implementation execution failures. It may return the structured `AIError` as a gRPC status detail.
 
----
+The AI SDK Server and client adapter are responsible for preserving structured error details and mapping transport failures when structured details are absent. Transport status and PRIDE semantic error code are related but distinct.
+
+When structured `AIError` details are present, they take precedence over fallback mapping based on the gRPC status code.
+
 
 # 9. Error Codes
 
-The initial protocol error categories are:
+The protocol carries semantic error codes as strings through the existing `AIError.error_code` field. The currently established categories are:
 
 ```text
 INVALID_REQUEST
-INVALID_INPUT
-CAPABILITY_NOT_FOUND
+CONFIGURATION_ERROR
+AUTHENTICATION_ERROR
+PERMISSION_ERROR
+CONNECTION_ERROR
+TIMEOUT_ERROR
 CAPABILITY_UNSUPPORTED
-CONFIGURATION_NOT_FOUND
-CONFIGURATION_INVALID
-AI_UNAVAILABLE
-EXECUTION_ERROR
-TIMEOUT
-PERMISSION_DENIED
-INTERNAL_ERROR
+RATE_LIMIT
+RUNTIME_ERROR
 UNKNOWN_ERROR
 ```
 
-The error taxonomy may evolve through compatible protocol versions.
+These values align the protocol documentation with the public AI SDK Contract and the current SDK adapter fallback mapping.
 
-Provider-specific errors shall be normalized into the applicable AI SDK error category.
+The AI Module may provide a more specific standardized semantic code in structured `AIError` details. The SDK adapter must preserve that code rather than replacing it with a generic transport fallback.
 
----
+This list documents string values carried by the existing schema. It does not introduce a Protobuf enum, change the type or field number of `error_code`, or otherwise modify the wire schema.
 
 # 10. Error Message
 
@@ -325,11 +337,12 @@ The server shall not expose unnecessary:
 
 ---
 
+
 # 11. AI Configuration Boundary
 
 The protocol does not expose the internal structure of AI Configuration.
 
-The Client does not select a provider by sending provider-specific configuration.
+The client does not select a provider by sending provider-specific configuration. The SDK Server does not load or resolve the active AI Configuration.
 
 The execution model is:
 
@@ -341,25 +354,32 @@ Execute Request
       │
       ▼
 AI SDK Server
+(validate and forward)
       │
       ▼
-Active AI Configuration
+AI Module
+      │
+      ├── Resolve active AI Configuration
+      ├── Resolve credential reference
+      ├── Resolve AI Implementation
+      └── Dispatch capability execution
       │
       ▼
-AI Execution
+AI Implementation
+      │
+      ▼
+External AI System
 ```
 
-The AI SDK Server resolves and uses the active AI Configuration.
-
-The Client therefore remains unaware of:
-
+The client and SDK transport boundary remain unaware of:
 * Which provider is active.
-* Which model is active.
-* Which runtime is active.
+* Which model or runtime is active.
 * Which endpoint is used.
 * Which authentication mechanism is used.
+* Which credential reference or secret is associated with the configuration.
 
----
+Configuration and credential state remain behind the AI Module boundary.
+
 
 # 12. Provider Independence
 
@@ -375,7 +395,7 @@ AIRequest
 └── ollama_request
 ```
 
-The required architecture is:
+The required architecture remains:
 
 ```text
 AIRequest
@@ -385,9 +405,9 @@ AIRequest
 └── metadata
 ```
 
-The server resolves the appropriate AI execution mechanism through the active AI Configuration.
+The AI Module resolves the appropriate AI Configuration and execution mechanism. The AI Implementation translates the standardized request into provider/runtime-specific operations.
 
----
+The SDK Server and clients do not select or resolve providers, models, runtimes, credentials, or implementations.
 
 # 13. Client SDK Responsibilities
 
@@ -414,22 +434,29 @@ AI SDK Clients are not responsible for:
 
 ---
 
+
 # 14. AI SDK Server Responsibilities
 
 The AI SDK Server is responsible for:
+* Accepting protocol requests.
+* Validating required request-envelope fields.
+* Preserving request and capability identity.
+* Mapping protocol messages to the internal execution DTO.
+* Forwarding the request through the AI Module client boundary.
+* Propagating context cancellation and deadlines.
+* Mapping standardized responses to protocol responses.
+* Preserving structured AI Module errors and mapping transport failures when structured details are absent.
 
-* Accepting gRPC requests.
-* Validating protocol requests.
+The AI SDK Server is not responsible for:
 * Resolving the active AI Configuration.
-* Executing the requested AI capability.
-* Translating the execution into the configured AI system.
-* Normalizing responses.
-* Normalizing errors.
-* Returning standardized protocol responses.
+* Loading AI Configuration records.
+* Resolving credential references or raw credentials.
+* Resolving or selecting AI Implementations.
+* Validating implementation capability support using Module-owned state.
+* Constructing provider-specific requests.
+* Executing remote providers or local runtimes.
 
-The server shall remain independent from the client language.
-
----
+These execution responsibilities belong to the AI Module and AI Implementations. The SDK Server remains independent from the client language.
 
 # 15. Serialization
 
@@ -592,76 +619,72 @@ Additional dependencies shall not be introduced merely for convenience.
 
 ---
 
+
 # 23. Security Boundary
 
-The protocol shall not transmit raw provider credentials unless explicitly required by a future security contract.
+The protocol shall not transmit raw provider credentials or expose internal AI Configuration records.
 
-AI Configuration remains responsible for managing provider-specific authentication information.
-
-Clients should not need direct access to provider credentials.
+AI Configuration and credential resolution remain within the AI Module and platform credential boundary.
 
 Conceptually:
 
 ```text
-Plugin
-   │
-   │ AI Request
-   ▼
+Plugin / Caller
+      │
+      │ Standardized AI Request
+      ▼
+AI SDK Client
+      │
+      ▼
 AI SDK Server
-   │
-   │ Active Configuration
-   ▼
-AI Provider
+      │
+      │ Forward standardized request
+      ▼
+AI Module
+      │
+      │ Resolve credential reference securely
+      ▼
+AI Implementation
+      │
+      ▼
+External AI System
 ```
 
-The provider credential remains behind the AI SDK Server boundary.
+Clients and SDK transport adapters must not require direct access to provider credentials. Sensitive configuration and secret material must not be placed in ordinary request metadata.
 
----
 
 # 24. Protocol Conformance
 
 An implementation conforms to the PRIDE AI SDK Protocol when it:
-
 1. Implements the canonical `.proto` service definition.
 2. Accepts valid protocol requests.
-3. Produces valid protocol responses.
-4. Produces standardized protocol errors.
-5. Preserves request IDs.
-6. Preserves capability semantics.
-7. Does not expose provider-specific structures.
-8. Respects protocol versioning rules.
-9. Maintains Protocol Buffers compatibility.
-10. Maintains the AI SDK Contract boundary.
+3. Preserves request IDs and capability identity.
+4. Produces valid protocol responses.
+5. Preserves structured AI Module errors when supplied.
+6. Uses the documented semantic error-code values.
+7. Does not expose provider-specific structures or secrets.
+8. Respects protocol versioning and Protobuf compatibility rules.
+9. Keeps SDK transport responsibilities separate from AI Module execution ownership.
+10. Maintains the public AI SDK Contract boundary.
 
----
+Conformance to this protocol does not authorize the SDK Server to resolve configuration or execute provider/runtime operations.
 
-# 25. Protocol Source of Truth
 
-The protocol hierarchy is:
+# 25. Document Authority and Protocol Source of Truth
 
-```text
-PRIDE AI SDK Contract
-          │
-          ▼
-AI SDK Protocol Specification
-          │
-          ▼
-       ai_sdk.proto
-          │
-          ▼
- Generated Client / Server Code
-          │
-          ▼
- Implementation
-```
+The following authority layers have distinct scopes:
 
-Each lower layer must conform to the layer above it.
+1. The Stable PRIDE AI SDK Specification defines architectural ownership and the AI SDK boundary.
+2. The Stable PRIDE AI Module Specification defines configuration, credential-reference, implementation-resolution, and execution ownership.
+3. The PRIDE AI SDK Contract defines the public semantic request, response, and error contract.
+4. This Protocol Specification defines the transport representation and protocol conformance rules.
+5. The versioned `.proto` file is the source of truth for Protobuf messages, field types, field numbers, and service declarations.
+6. Generated language-specific code is derived from the `.proto` source.
+7. Runtime implementation must conform to all applicable layers and may not redefine them.
 
-Generated code shall not redefine the contract.
+The hierarchy is therefore not a single chain in which a Draft document can override a Stable architectural specification. Architectural authority and wire-schema authority are separate.
 
-Implementation code shall not redefine the protocol.
-
----
+A documentation revision does not by itself authorize a wire-schema or runtime behavior change.
 
 # 26. Implementation Boundary
 
@@ -681,14 +704,15 @@ Those concerns belong to implementation-specific documentation.
 
 ---
 
+
 # 27. Initial Protocol Model
 
-The initial protocol can therefore be summarized as:
+The initial protocol can be summarized as:
 
 ```text
 ┌──────────────────────────────┐
-│            Plugin            │
-│      Any Supported Language  │
+│            Caller            │
+│       AI Capability          │
 └──────────────┬───────────────┘
                │
                ▼
@@ -697,46 +721,65 @@ The initial protocol can therefore be summarized as:
 │          Thin Client         │
 └──────────────┬───────────────┘
                │
-               │ gRPC
-               │ Protocol Buffers
+               │ gRPC / Protocol Buffers
                ▼
 ┌──────────────────────────────┐
 │        AI SDK Server         │
-│             Go               │
 │                              │
 │ Request Validation           │
-│ Configuration Resolution     │
-│ Capability Execution         │
-│ Response Normalization       │
-│ Error Normalization          │
+│ Protocol / DTO Mapping       │
+│ Request Forwarding           │
+│ Response / Error Mapping     │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
-│      Active AI Configuration │
+│           AI Module          │
+│                              │
+│ Active Configuration         │
+│ Credential Reference         │
+│ Implementation Resolution    │
+│ Capability Validation        │
+│ Execution Dispatch           │
 └──────────────┬───────────────┘
                │
                ▼
 ┌──────────────────────────────┐
-│          AI System           │
-│      Remote / Local / etc.   │
+│       AI Implementation      │
+│    Remote / Local Runtime    │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│       External AI System     │
 └──────────────────────────────┘
 ```
 
----
+The diagram expresses logical ownership and does not require a change to the existing service definition, message fields, field numbers, or deployment topology.
 
 # 28. Final Protocol Principle
 
 The PRIDE AI SDK Protocol follows one fundamental rule:
 
-> **Define communication once, generate clients for many languages, and keep AI execution behind the server boundary.**
+> **Define communication once, generate clients for many languages, and keep configuration resolution and AI execution inside the AI Module boundary.**
 
 The `.proto` schema is the canonical communication definition.
 
 The AI SDK Clients remain thin.
 
-The AI SDK Server remains the canonical execution boundary.
+The AI SDK Server remains the canonical protocol ingress/forwarding boundary. The AI Module remains the configuration and execution owner.
 
 AI Configuration determines the active AI execution environment.
 
 Provider-specific implementation details remain outside the protocol.
+
+
+---
+
+# 29. Related Specifications
+
+* PRIDE AI SDK Specification v2.1.0.
+* PRIDE AI Module Specification v1.0.0.
+* PRIDE AI SDK Contract v1.1.0.
+* PRIDE AI SDK Boundary Design.
+* `sdks/ai/proto/ai_sdk.proto` (wire-schema source of truth).

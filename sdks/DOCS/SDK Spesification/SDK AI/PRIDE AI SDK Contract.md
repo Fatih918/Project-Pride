@@ -1,10 +1,10 @@
 # PRIDE AI SDK Contract
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Status:** Draft
 **Category:** SDK Contract
 **Document ID:** PRIDE-AI-SDK-CONTRACT
-**Related Specification:** PRIDE SDK Specification
+**Related Specification:** PRIDE AI SDK Specification v2.1.0; PRIDE AI Module Specification v1.0.0
 **Related Standard:** PRIDE SDK Code Standard
 
 ---
@@ -28,36 +28,41 @@ The contract is independent from:
 
 ---
 
+
 # 2. Contract Boundary
 
-The AI SDK contract exists between:
+The public AI SDK contract defines how a caller requests a standardized AI Capability and receives a standardized result or error.
+
+The logical ownership boundary is:
 
 ```text
-Executable Task
-       │
-       ▼
-   AI SDK Contract
-       │
-       ▼
- AI SDK Implementation
-       │
-       ▼
- AI Configuration
-       │
-       ▼
- AI Implementation
-       │
-       ▼
-External AI System
+Executable Task / Core Executor
+          │
+          ▼
+     AI Capability
+          │
+          ▼
+       AI SDK
+  (public request/response contract)
+          │
+          ▼
+       AI Module
+  (configuration and execution owner)
+          │
+          ▼
+   AI Implementation
+          │
+          ▼
+   External AI System
 ```
 
-The executable task only interacts with the public AI SDK contract.
+The AI SDK defines communication and the standardized request/response contract. It does not own AI Configuration state, credential resolution, implementation resolution, or provider execution.
 
-Implementation-specific behavior shall not cross the contract boundary.
+The AI Module resolves the active user-selected AI Configuration, resolves its credential reference and implementation reference, validates implementation capability support, and dispatches execution.
 
-The AI SDK is the canonical programming interface between executable tasks and AI Modules.
+The public contract does not expose internal configuration records, credential references, raw credentials, provider endpoints, or implementation-specific request structures.
 
----
+The AI SDK may validate the request envelope and forward the request. Such validation and forwarding do not transfer execution ownership from the AI Module to the SDK.
 
 # 3. Contract Principles
 
@@ -65,7 +70,7 @@ The AI SDK Contract follows these principles:
 
 1. Capability-oriented requests.
 2. Implementation independence.
-3. Explicit configuration selection.
+3. User-controlled active configuration with AI Module-owned resolution.
 4. Standardized responses.
 5. Standardized errors.
 6. Stateless SDK execution.
@@ -280,13 +285,15 @@ AIError
 
 ---
 
+
 # 7. Standard Error Categories
 
-The AI SDK shall provide a unified error model.
+The public contract uses standardized semantic error codes. The AI Module is responsible for classifying configuration, credential, capability-compatibility, and implementation execution failures. The SDK transport boundary may produce request-validation or transport-fallback errors.
 
-The following categories are established by the existing AI architecture:
+The currently established semantic categories are:
 
 ```text
+INVALID_REQUEST
 CONFIGURATION_ERROR
 AUTHENTICATION_ERROR
 PERMISSION_ERROR
@@ -298,65 +305,49 @@ RUNTIME_ERROR
 UNKNOWN_ERROR
 ```
 
-These categories are intended to normalize implementation-specific failures before they reach executable tasks.
+These are string-valued semantic codes carried by the existing `AIError.error_code` field. This section does not define a Protobuf enum or require a wire-schema change.
 
----
+## 7.1 INVALID_REQUEST
 
-## 7.1 CONFIGURATION_ERROR
+Returned when the request envelope is malformed or required request fields are absent. The SDK boundary may reject such a request before forwarding it.
 
-Returned when the selected AI Configuration is invalid, unavailable, disabled, or otherwise unsuitable for execution.
+## 7.2 CONFIGURATION_ERROR
 
----
+Returned when the AI Module cannot use the active AI Configuration because it is missing, invalid, disabled, unavailable, or otherwise unsuitable for execution.
 
-## 7.2 AUTHENTICATION_ERROR
+## 7.3 AUTHENTICATION_ERROR
 
-Returned when the selected implementation cannot authenticate using the credentials associated with the active AI Configuration.
+Returned when the AI Module or selected implementation cannot authenticate using the credential material resolved through the platform credential boundary.
 
----
+## 7.4 PERMISSION_ERROR
 
-## 7.3 PERMISSION_ERROR
+Returned when platform policy or the selected AI system does not permit the requested execution.
 
-Returned when execution is not permitted by the applicable AI system or platform rules.
+## 7.5 CONNECTION_ERROR
 
----
+Returned when the selected implementation cannot establish or maintain the required connection.
 
-## 7.4 CONNECTION_ERROR
+## 7.6 TIMEOUT_ERROR
 
-Returned when the selected implementation cannot establish the required connection.
+Returned when execution exceeds the applicable deadline or timeout policy.
 
----
+## 7.7 CAPABILITY_UNSUPPORTED
 
-## 7.5 TIMEOUT_ERROR
+Returned when the resolved implementation does not support the requested capability. Capability compatibility is determined within the AI Module execution domain, not by the generic SDK transport adapter.
 
-Returned when execution exceeds the permitted execution time.
+## 7.8 RATE_LIMIT
 
----
+Returned when an applicable platform or implementation usage limit prevents execution.
 
-## 7.6 CAPABILITY_UNSUPPORTED
+## 7.9 RUNTIME_ERROR
 
-Returned when the active AI implementation does not support the requested capability.
+Returned when the AI Module or implementation encounters an execution failure that cannot be represented by a more specific standardized category.
 
-AI implementations declare their supported capabilities, while executable tasks request standardized capabilities through the AI SDK.
+## 7.10 UNKNOWN_ERROR
 
----
+Returned when a failure cannot be classified reliably.
 
-## 7.7 RATE_LIMIT
-
-Returned when the selected AI implementation refuses execution because an applicable usage limit has been reached.
-
----
-
-## 7.8 RUNTIME_ERROR
-
-Returned when the AI implementation encounters an execution failure that cannot be represented by a more specific standardized category.
-
----
-
-## 7.9 UNKNOWN_ERROR
-
-Returned when the failure cannot be reliably classified.
-
----
+The AI Module may attach these semantic errors as structured `AIError` details to a gRPC status. If structured details are absent, the SDK adapter may map the gRPC transport status to a fallback semantic code. The transport status and semantic error are related but distinct: structured AIError details take precedence when present.
 
 # 8. Error Message
 
@@ -374,59 +365,64 @@ Consumers shall use `error_code` for programmatic error handling.
 
 ---
 
+
 # 9. AI Configuration Resolution
 
-The AI SDK shall execute requests using the currently active AI Configuration.
+The AI Module resolves and uses the currently active AI Configuration when processing an AI SDK execution request.
 
-The AI SDK shall not automatically select another configuration.
+The AI SDK shall not load, select, or resolve AI Configuration records. It shall not resolve CredentialRef values or AI Implementation references.
 
 The logical execution sequence is:
 
 ```text
 AI Request
     ↓
-Validate Request
+AI SDK: Validate Request Envelope
     ↓
-Load Active AI Configuration
+AI SDK: Forward Standardized Request
     ↓
-Resolve Referenced Implementation
+AI Module: Resolve Active AI Configuration
     ↓
-Execute Capability
+AI Module: Resolve Credential Reference
     ↓
-Normalize Result
+AI Module: Resolve Referenced AI Implementation
     ↓
-Return AI Response
+AI Module: Validate Capability Support
+    ↓
+AI Implementation: Execute Capability
+    ↓
+AI Module: Normalize Result / Execution Error
+    ↓
+AI SDK: Map and Return Standardized Response
 ```
 
-This follows the established AI execution lifecycle.
+The AI SDK may preserve request identity, validate required envelope fields, map protocol messages, propagate context cancellation/deadlines, and normalize transport failures. These responsibilities do not constitute configuration or implementation resolution.
 
----
 
 # 10. Configuration Boundary
 
-The AI SDK consumes the active AI Configuration.
+AI Configuration is user-owned platform state managed by the AI Module domain.
 
-The AI SDK does not own configuration creation or configuration ownership.
+The AI Module shall:
+* Resolve the currently active AI Configuration according to platform state.
+* Load the selected configuration through its configuration boundary.
+* Resolve the credential reference associated with that configuration.
+* Resolve the AI Implementation referenced by that configuration.
+* Provide the implementation with only the execution information it requires.
 
-An AI Configuration is user-owned and identifies the implementation and execution parameters required for one AI connection.
+The AI SDK shall:
+* Treat configuration as opaque platform state.
+* Forward the standardized capability request without provider/model routing fields.
+* Return standardized results and errors without exposing configuration internals.
 
-The SDK shall therefore:
+The AI SDK shall not:
+* Read or load AI Configuration records.
+* Resolve configuration or implementation references.
+* Resolve credentials or access raw secret material.
+* Create, replace, or modify user configurations.
+* Automatically switch to another configuration or implementation.
 
-* Read the active configuration.
-* Use its implementation reference.
-* Use its required execution information.
-* Execute through the referenced implementation.
-
-The SDK shall not:
-
-* Create hidden configurations.
-* Replace configurations.
-* Modify user configurations.
-* Automatically switch configurations.
-
-These rules preserve user control.
-
----
+These rules preserve user control and keep security-sensitive execution state behind the AI Module boundary.
 
 # 11. Capability Resolution
 
@@ -567,31 +563,40 @@ This follows the existing capability architecture, which is designed to add futu
 
 ---
 
+
 # 18. Validation Rules
 
-The SDK shall reject a request when:
+Validation is divided according to ownership.
 
-* `request_id` is missing.
-* `capability` is missing.
-* Required capability input is invalid.
-* The active AI Configuration is unavailable.
-* The requested capability is unsupported.
+## 18.1 AI SDK Request Validation
 
-Invalid requests shall be rejected before AI execution.
+The SDK boundary shall reject a request envelope when:
+* `request_id` is missing or empty.
+* `capability` is missing or empty.
+* `input` is absent when required by the protocol envelope.
+* Metadata cannot be represented by the declared protocol type.
 
-The SDK shall not silently repair an invalid request in a way that changes its intended meaning.
+The SDK may perform capability-specific structural validation only when that validation is explicitly part of a public capability contract and does not require access to configuration or implementation state.
 
----
+## 18.2 AI Module Execution Validation
+
+The AI Module shall validate execution conditions that depend on platform or implementation state, including:
+* Availability and validity of the active AI Configuration.
+* Availability and resolution of the associated credential reference.
+* Availability of the referenced AI Implementation.
+* Whether the resolved implementation supports the requested capability.
+* Whether execution is permitted by platform and implementation policy.
+
+A request that passes SDK envelope validation may still fail AI Module execution validation. The SDK shall forward the resulting standardized error rather than attempting to repair configuration state or select another implementation.
+
 
 # 19. Fail-Fast Behavior
 
-When a request cannot be safely completed, the SDK shall terminate the request and return a standardized error.
+When a request cannot be safely completed, the responsible boundary shall terminate execution and return a standardized error.
 
-The SDK shall not silently substitute another AI implementation.
+The AI SDK shall not silently substitute another AI Configuration, provider, model, runtime, or implementation.
 
-Automatic fallback to another implementation is outside this contract unless explicitly established by another platform specification.
-
----
+The AI Module shall not silently modify the active user-selected configuration. Any future fallback behavior requires an explicit platform specification and must not be inferred from this contract.
 
 # 20. Execution Consistency
 
@@ -612,41 +617,42 @@ This preserves one programming model across different AI technologies.
 
 ---
 
+
 # 21. Security Contract
 
-The AI SDK shall not permanently own or store user credentials.
+The AI SDK does not own, store, resolve, or expose user credentials.
 
-Authentication information belongs to the AI Configuration and is handled by the relevant implementation.
+Authentication information belongs to AI Configuration and is handled behind the AI Module and platform credential boundaries.
 
-The SDK shall not permanently store:
+The AI Module is responsible for resolving credential references and supplying required secret material to the selected implementation through the approved secure path.
 
-* API keys.
-* Access tokens.
-* Vendor credentials.
-* Runtime authentication secrets.
+The SDK boundary shall not:
+* Permanently store API keys, access tokens, vendor credentials, or runtime secrets.
+* Accept raw provider credentials as ordinary request metadata.
+* Expose credential references or raw secrets to executable tasks.
+* Log credentials or sensitive configuration data.
 
-The SDK may access required configuration information temporarily during request execution.
+The SDK may carry standardized non-secret request metadata required for correlation and execution. This does not transfer credential or configuration ownership to the SDK.
 
-Executable tasks shall never receive implementation credentials.
-
----
 
 # 22. Conformance
 
-An AI implementation conforms to this contract when it:
+Conformance is evaluated across the caller, SDK boundary, AI Module, and AI Implementation according to their respective responsibilities.
 
-1. Accepts standardized AI SDK requests.
-2. Supports one or more standardized capabilities.
-3. Produces standardized responses.
-4. Produces standardized errors.
-5. Respects the active AI Configuration.
-6. Hides implementation-specific behavior.
-7. Does not require executable tasks to understand its implementation.
-8. Preserves the public AI SDK contract.
+An AI SDK integration conforms to this contract when it:
+1. Accepts and emits the standardized request/response envelope.
+2. Preserves request identity and capability identity.
+3. Validates the generic request envelope.
+4. Forwards execution through the AI Module boundary.
+5. Does not resolve configuration, credentials, or implementations inside the SDK.
+6. Does not expose provider-specific data or secrets through the public contract.
+7. Propagates cancellation and deadlines across the execution boundary.
+8. Returns standardized errors without leaking sensitive internals.
+9. Does not silently switch configuration or implementation.
 
-These requirements align with the existing AI SDK conformance model.
+The AI Module conforms to its execution responsibilities when it resolves the active configuration, credential reference, and implementation, validates capability support, and dispatches execution according to the AI Module Specification.
 
----
+AI Implementations conform to their implementation responsibilities when they translate standardized execution requests into provider/runtime-specific operations and normalize results and failures behind the AI Module boundary.
 
 # 23. Compatibility
 
@@ -662,42 +668,54 @@ An implementation may evolve internally without requiring consumers to change wh
 
 ---
 
+
 # 24. Contract Boundary Summary
 
 ```text
 ┌──────────────────────────────────────┐
-│          Executable Task             │
+│       Executable Task / Core         │
 └──────────────────┬───────────────────┘
                    │
-                   │ AIRequest
                    ▼
 ┌──────────────────────────────────────┐
-│              AI SDK                  │
-│                                      │
-│  Request Validation                  │
-│  Configuration Resolution            │
-│  Capability Invocation               │
-│  Response Normalization              │
-│  Error Normalization                 │
+│            AI Capability             │
+│  Capability semantics and input      │
 └──────────────────┬───────────────────┘
                    │
-                   │ Standardized Contract
                    ▼
 ┌──────────────────────────────────────┐
-│         AI Implementation            │
-│                                      │
-│  Provider / Runtime / Model          │
-│  Transport                           │
-│  Authentication                      │
-│  Internal Processing                 │
+│               AI SDK                 │
+│  Request envelope validation         │
+│  Protocol / DTO mapping              │
+│  Request correlation                 │
+│  Transport and error mapping         │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────┐
+│             AI MODULE                │
+│  Active configuration resolution     │
+│  Credential reference resolution     │
+│  Implementation resolution           │
+│  Capability support validation       │
+│  Execution dispatch                  │
+│  Result / execution error mapping     │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────┐
+│         AI IMPLEMENTATION            │
+│  Provider / Runtime translation      │
+│  Authentication and execution        │
+└──────────────────┬───────────────────┘
+                   │
+                   ▼
+┌──────────────────────────────────────┐
+│         External AI System           │
 └──────────────────────────────────────┘
 ```
 
-Everything below the SDK boundary is implementation-defined.
-
-Everything above the boundary depends only on the contract.
-
----
+The AI SDK and AI Module are separate responsibility boundaries. The AI SDK transports the standardized contract; the AI Module owns configuration resolution and execution orchestration.
 
 # 25. Contract Principle
 
@@ -714,3 +732,24 @@ The implementation determines how the capability is executed.
 The AI SDK determines how the request, response, and error are represented.
 
 This separation allows Artificial Intelligence implementations to evolve without requiring executable tasks to change.
+
+
+---
+
+# 26. Document Authority and Related Specifications
+
+This contract defines the public semantic request, response, and error boundary. It must be interpreted consistently with the following authority rules:
+
+1. The stable PRIDE AI SDK Specification defines the architectural responsibilities and AI SDK boundary.
+2. The stable PRIDE AI Module Specification defines AI Module ownership and execution responsibilities.
+3. This contract defines the public semantic execution contract within those architectural boundaries.
+4. The PRIDE AI SDK Protocol Specification defines how the contract is represented over the selected transport.
+5. The versioned `.proto` file is the source of truth for the Protobuf wire schema and field numbers.
+
+A Draft contract revision does not override a Stable platform specification or authorize a wire-schema or runtime behavior change.
+
+Related documents:
+* PRIDE AI SDK Specification v2.1.0.
+* PRIDE AI Module Specification v1.0.0.
+* PRIDE AI SDK Protocol Specification.
+* PRIDE AI SDK Boundary Design.

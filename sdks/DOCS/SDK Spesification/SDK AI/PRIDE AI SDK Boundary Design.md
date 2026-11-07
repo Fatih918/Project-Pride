@@ -309,20 +309,24 @@ An AI SDK integration conforms to this boundary when it:
 11. Does not silently switch configuration or implementation.
 12. Preserves Protobuf compatibility and versioning rules.
 
-## 12. Known Documentation / Contract Alignment Items
+#
+# 12. Documentation / Contract Alignment Record
 
-The repository contains earlier draft material whose wording does not fully match the stable SDK specification and current code. These differences must be resolved deliberately in a separate contract/specification change; this boundary document does not silently rewrite those documents.
+The earlier draft conflicts identified during the initial boundary review have been addressed by the documentation reconciliation:
 
-| Existing material | Difference | Current boundary used by this document |
-|---|---|---|
-| Draft `PRIDE AI SDK Contract.md` sections 9–10 and 24 | Some passages describe configuration resolution as SDK work and show configuration/implementation directly below the SDK | Stable SDK Specification v2.1.0 and Module Specification assign active configuration, credential, and implementation resolution to the AI Module |
-| Draft contract error taxonomy | Uses categories such as `CONFIGURATION_ERROR` and `CAPABILITY_UNSUPPORTED` | The current gRPC adapter also maps transport statuses to fallback codes such as `INVALID_REQUEST`; protocol and implementation error vocabularies need a canonical reconciliation |
-| Protocol Specification | Describes the SDK Server as resolving configuration and executing the capability | The current server implementation delegates through an internal AI client to the separate AI Module; the stable boundary assigns resolution/execution ownership to that Module |
-| Current server bootstrap | Uses insecure gRPC credentials and a minimal composition root | Development bootstrap only; production transport/security requirements must be supplied by deployment integration |
+| Existing material | Reconciliation |
+|---|---|
+| Draft `PRIDE AI SDK Contract.md` sections 9–10 and 24 | Revised in Contract v1.1.0 Draft. Configuration, credential-reference, and implementation resolution are assigned to the AI Module. |
+| Draft contract error taxonomy | Contract v1.1.0 and Protocol Specification v1.1.0 document the same semantic error-code set and distinguish structured AI errors from transport fallback mapping. |
+| Draft Protocol Specification | Revised in Protocol v1.1.0 Draft. SDK Server responsibilities are limited to request validation, mapping, forwarding, and response/error mapping. |
+| Stable SDK and Module specifications | Remain the architectural authorities and are not changed by this documentation PR. |
+| Current server bootstrap | Development-only insecure transport remains a separate deployment/security concern and is not changed by this documentation PR. |
 
-Recommended follow-up is to reconcile the Draft Contract and Protocol Specification with the stable SDK Specification, then update their status/versioning. Do not treat this usage/boundary documentation as permission to change the wire schema or runtime behavior.
+This document remains a boundary reference. It does not replace the Contract, Protocol Specification, Stable SDK Specification, or Stable AI Module Specification.
 
-## 13. Related Specifications
+The reconciliation is documentation-only. It does not authorize changes to the Protobuf wire schema, generated code, runtime behavior, or deployment security configuration.
+
+# 13. Related Specifications
 
 - [PRIDE AI SDK Specification](../../../04-Platform%20Specification%20Standard/SDK%20Specification/PRIDE%20AI%20SDK%20Specification.md)
 - [PRIDE AI SDK Contract](PRIDE%20AI%20SDK%20Contract.md)
