@@ -34,7 +34,9 @@ type IDGenerator interface {
 }
 
 // ArtifactAcquirer obtains the artifact into the supplied operation staging
-// directory. Network and Registry-specific behavior belongs in its adapter.
+// directory. stagingPath is canonical and relative to Plugin_Storage; the
+// adapter must resolve it through the storage adapter, never via the cwd.
+// Network and Registry-specific behavior belongs in its adapter.
 type ArtifactAcquirer interface {
 	Acquire(context.Context, string, string) (installation.StagedArtifact, error)
 }
@@ -53,7 +55,9 @@ type ArtifactVerifier interface {
 }
 
 // ArtifactPromoter atomically promotes a verified staging directory to its
-// immutable final path. It must not overwrite an existing version directory.
+// immutable final path. Both paths are canonical Plugin_Storage-relative
+// values and must be resolved through the storage adapter. It must not
+// overwrite an existing version directory.
 type ArtifactPromoter interface {
 	Promote(context.Context, string, string) error
 }

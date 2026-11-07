@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:pride:plugin-manifest:1",
+  "title": "PRIDE Plugin Manifest",
+  "description": "Developer-owned identity and descriptive metadata for a PRIDE Plugin.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schema_version",
+    "plugin_id",
+    "name",
+    "version",
+    "description",
+    "author",
+    "license",
+    "entry_point",
+    "minimum_pride_version"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "urn:pride:plugin-manifest:1"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "plugin_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "entry_point": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "minimum_pride_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri"
+    },
+    "documentation_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "repository_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "issue_tracker_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "screenshots": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "icon": {
+      "type": "string",
+      "format": "uri"
+    },
+    "changelog_url": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "additionalProperties": true
+}

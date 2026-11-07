@@ -1,7 +1,7 @@
 # Plugin Installation and Recovery Technical Specification
 
 **Version:** 0.1.0  
-**Status:** Draft  
+**Status:** Draft — D1–D4 contracts accepted by PTS-0004  
 **Category:** Module Technical Specification  
 **Document ID:** PTS-0002  
 **Related ADR:** ADR-008 — Marketplace + Registry Architecture; ADR-012 — Local-First Plugin Storage and Persistence  
@@ -418,3 +418,17 @@ This specification is ready for implementation only when:
 - PRIDE Registry Format Specification
 - PRIDE Plugin Module Specification
 - PRIDE Plugin SDK Specification
+
+
+## 12. Accepted D1–D4 contract baseline
+
+D1–D4 are no longer open design choices. They are finalized by the accepted Plugin Installation Contract Decision Record (DCR-0001) and the normative Plugin Artifact, Package, Trust, and Manifest Contract (PTS-0004).
+
+The accepted baseline is:
+- Provider-neutral versioned Marketplace artifact descriptor with immutable release identifier and external HTTPS artifact URI.
+- ZIP package format and the root plugin.json plus package/ payload layout.
+- SHA-256 digest plus Marketplace Ed25519 signature.
+- Embedded bootstrap public key plus authenticated remote trust configuration, including sequence rollback protection, expiry, rotation, and revocation.
+- snake_case Manifest JSON with both schema_version and $schema; unknown Manifest properties are forward-compatible but confer no platform authority.
+
+PTS-0004 is normative for these contracts. PTS-0002 remains Draft for installation/recovery orchestration details not settled by D1–D4. Numeric ZIP resource limits must be published in a versioned installation policy before a production extractor is enabled.

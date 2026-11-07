@@ -28,12 +28,14 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
 - Validated path helpers with traversal and symlink-containment checks.
 - Operation-scoped temporary and quarantine path resolution, plus exclusive private staging-directory creation.
+- Canonical `Plugin_Storage`-relative path generation and safe resolution to absolute OS paths; persisted paths never depend on the process working directory.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
 - Storage and SQLite repository tests.
 
 ### Installation application service
-- SDK-neutral orchestration of artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
+- SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
+- Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
 - Install/update preconditions and Plugin identity/version validation.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
 - Unit tests for successful installation, pre-promotion failure, update preconditions, and recoverable commit failure.
@@ -53,13 +55,14 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 - Registry artifact-source resolution and package download.
 - ZIP/package extraction and concrete artifact verification adapters.
-- Finalized digest/signature trust-root policy and Manifest wire schema.
+- Production Marketplace signing, remote trust-configuration service, Registry source-resolution, ZIP extraction, and concrete artifact verification adapters.
+- Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0002 and PDR-0001 remain decision-gated for Registry artifact descriptors, trust policy, and Manifest wire format. The application service coordinates injected ports only and does not choose those contracts.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only; production network, extraction, signing, and trust adapters remain separate work.
 
 ## Checks
 

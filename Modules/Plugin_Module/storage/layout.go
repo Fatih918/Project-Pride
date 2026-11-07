@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -263,4 +264,89 @@ func (l *Layout) verifyContained(root, target string) error {
 		}
 	}
 	return nil
+}
+
+
+// RelativeInstalledVersionPath returns a canonical path relative to Plugin_Storage.
+// Persist this value; never persist the absolute result of InstalledVersionDirectory.
+func (l *Layout) RelativeInstalledVersionPath(pluginID, version string) (string, error) {
+	if err := validateComponent(pluginID); err != nil {
+		return "", fmt.Errorf("plugin ID: %w", err)
+	}
+	if err := validateComponent(version); err != nil {
+		return "", fmt.Errorf("plugin version: %w", err)
+	}
+	return path.Join("installed", pluginID, version), nil
+}
+
+// RelativeTemporaryOperationPath returns the canonical operation staging path
+// relative to Plugin_Storage.
+func (l *Layout) RelativeTemporaryOperationPath(operationID string) (string, error) {
+	if err := validateComponent(operationID); err != nil {
+		return "", fmt.Errorf("operation ID: %w", err)
+	}
+	return path.Join("temporary", operationID), nil
+}
+
+// ResolvePluginStoragePath resolves a canonical Plugin_Storage-relative path.
+// It rejects paths outside the managed storage namespaces and checks symlink
+// containment before returning an absolute OS path. Callers must not resolve
+// these paths relative to the process working directory.
+func (l *Layout) ResolvePluginStoragePath(relativePath string) (string, error) {
+	if relativePath == "" || strings.Contains(relativePath, "\\") ||
+		strings.HasPrefix(relativePath, "/") || path.Clean(relativePath) != relativePath {
+		return "", ErrInvalidPath
+	}
+	parts := strings.Split(relativePath, "/")
+	if len(parts) < 2 {
+		return "", ErrInvalidPath
+	}
+	switch parts[0] {
+	case "installed", "data", "cache", "temporary", "quarantine":
+	default:
+		return "", ErrInvalidPath
+	}
+	for _, part := range parts {
+		if err := validateStorageSegment(part); err != nil {
+			return "", err
+		}
+	}
+	candidate := l.PluginStorageRoot()
+	for _, part := range parts {
+		candidate = filepath.Join(candidate, part)
+	}
+	if err := l.verifyContained(l.root, candidate); err != nil {
+		return "", err
+	}
+	return candidate, nil
+}
+
+func validateStorageSegment(value string) error {
+	if value == "" || value == "." || value == ".." ||
+		strings.ContainsAny(value, `/\\:<>:"|?*`) || strings.ContainsRune(value, 0) ||
+		strings.HasSuffix(value, ".") || strings.HasSuffix(value, " ") {
+		return ErrInvalidPath
+	}
+	base := strings.ToUpper(strings.SplitN(value, ".", 2)[0])
+	switch base {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return ErrInvalidPath
+	}
+	return nil
+}
+
+// CreateTemporaryOperationDirectoryRelative creates a fresh private staging
+// directory and returns its canonical Plugin_Storage-relative path for
+// persistence and application-layer coordination.
+func (l *Layout) CreateTemporaryOperationDirectoryRelative(operationID string) (string, error) {
+	relativePath, err := l.RelativeTemporaryOperationPath(operationID)
+	if err != nil {
+		return "", err
+	}
+	if _, err := l.CreateTemporaryOperationDirectory(operationID); err != nil {
+		return "", err
+	}
+	return relativePath, nil
 }
