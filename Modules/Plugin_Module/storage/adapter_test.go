@@ -130,7 +130,6 @@ func TestAdapterHonorsCanceledContext(t *testing.T) {
 	}
 }
 
-
 func TestAdapterCreatesOperationDirectoryExclusively(t *testing.T) {
 	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
 	if err != nil {
