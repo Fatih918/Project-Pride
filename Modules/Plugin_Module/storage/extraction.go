@@ -60,7 +60,7 @@ func (a *Adapter) CreateExtractionFile(ctx context.Context, workspace, relativeP
 	if err := a.validateOperationWorkspace(workspace); err != nil { return nil, err }
 	if err := validateExtractionRelativePath(relativePath); err != nil { return nil, err }
 	parent := path.Dir(relativePath)
-	if parent != "." {
+	if parent != "." && parent != "package" {
 		if err := a.CreateExtractionDirectory(ctx, workspace, parent); err != nil { return nil, err }
 	}
 	target := path.Join(workspace, relativePath)
