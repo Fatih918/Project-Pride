@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 9 — bounded ZIP inspection and confined ZIP extraction implemented.
+**Status:** Increment 10 — bounded ZIP inspection/extraction and signed artifact verification primitives implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -37,7 +37,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ### Installation application service
 - Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
 - Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
-- Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
+- Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.\n- Artifact verifier validates the versioned Registry descriptor, checks Plugin/version/media type/HTTPS locator, verifies Ed25519 signatures over RFC 8785 JCS canonical payloads, and hashes the exact staged ZIP with SHA-256.\n- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to an atomic persistence port.\n- Installation orchestration verifies before extraction and verifies again after extraction before recording VERIFIED, reducing the chance that a changed staged archive is promoted.\n- Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths.
 - Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
 - Inspection and extraction remain separate components: inspection validates the complete package; the extractor then streams payload files into the same operation staging workspace.
 - A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
@@ -60,16 +60,16 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 ## Not implemented yet
 
-- Registry artifact-source resolution and package download.
-- ZIP installation policy v1.0.0, bounded ZIP inspection, and confined ZIP extraction are implemented; concrete artifact verification and atomic filesystem promotion adapters remain unimplemented.
-- Production Marketplace signing and remote trust-configuration service.
+- Registry artifact-source resolution and package download, including production population of `StagedArtifact.DescriptorJSON`.
+- ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, persistent trust-sequence storage, composition wiring, and atomic filesystem promotion remain unimplemented.
+- Production Marketplace signing and remote trust-configuration service.\n- Persistent SQLite implementation of the trust sequence/equivocation store, production trust-configuration transport, and distribution bootstrap-key provisioning.\n- Production composition-root wiring for the artifact verifier, trust resolver, and final-path adapter.
 - Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only; production network, extraction, signing, and trust adapters remain separate work.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification primitives are available, but production installation remains disabled until the Registry acquisition adapter supplies signed descriptors, the trust sequence store and bootstrap-key provisioning are wired, and filesystem promotion/recovery are implemented.
 
 ## Checks
 
