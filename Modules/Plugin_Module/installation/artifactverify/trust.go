@@ -64,7 +64,6 @@ type TrustResolver struct {
 	sequences     TrustSequenceStore
 	bootstrap     BootstrapKeys
 	canonicalizer Canonicalizer
-	now           func() time.Time
 }
 
 func NewTrustResolver(source TrustConfigurationSource, sequences TrustSequenceStore, bootstrap BootstrapKeys, canonicalizer Canonicalizer) (*TrustResolver, error) {
@@ -83,7 +82,6 @@ func NewTrustResolver(source TrustConfigurationSource, sequences TrustSequenceSt
 		sequences:     sequences,
 		bootstrap:     keys,
 		canonicalizer: canonicalizer,
-		now:           func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
