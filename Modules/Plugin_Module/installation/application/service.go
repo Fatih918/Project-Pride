@@ -69,7 +69,7 @@ type PlatformMetadataResolver interface {
 // ArtifactVerifier verifies integrity and authenticity under an explicitly
 // configured policy. The service does not choose algorithms or trust roots.
 type ArtifactVerifier interface {
-	Verify(context.Context, installation.StagedArtifact, domain.Plugin) (installation.VerifiedArtifact, error)
+	Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error)
 }
 
 // ArtifactPromoter atomically promotes a verified staging directory to its
@@ -227,7 +227,7 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	}
 	// Verify the exact staged ZIP and signed descriptor before extracting
 	// developer-controlled payload into the operation workspace.
-	verified, err := s.verifier.Verify(ctx, staged, plugin.Clone())
+	verified, err := s.verifier.Verify(ctx, staged, inspected, plugin.Clone())
 	if err != nil {
 		return fail("verify Plugin artifact", err)
 	}
