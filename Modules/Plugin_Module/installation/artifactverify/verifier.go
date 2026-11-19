@@ -21,16 +21,16 @@ import (
 )
 
 const (
-	descriptorSchema = "urn:pride:registry-artifact-descriptor:1"
+	descriptorSchema    = "urn:pride:registry-artifact-descriptor:1"
 	descriptorMediaType = "application/vnd.pride.plugin+zip"
-	maxDescriptorBytes = 1 << 20
+	maxDescriptorBytes  = 1 << 20
 )
 
 var (
 	ErrInvalidDescriptor = errors.New("invalid Registry artifact descriptor")
-	ErrUntrustedKey = errors.New("Marketplace signing key is not trusted")
-	ErrDigestMismatch = errors.New("artifact SHA-256 digest mismatch")
-	ErrSignatureInvalid = errors.New("artifact descriptor signature is invalid")
+	ErrUntrustedKey      = errors.New("Marketplace signing key is not trusted")
+	ErrDigestMismatch    = errors.New("artifact SHA-256 digest mismatch")
+	ErrSignatureInvalid  = errors.New("artifact descriptor signature is invalid")
 )
 
 // Canonicalizer must implement RFC 8785 JSON Canonicalization Scheme exactly.
@@ -48,10 +48,10 @@ type TrustedKeyResolver interface {
 }
 
 type TrustedKey struct {
-	PublicKey ed25519.PublicKey
-	ValidFrom time.Time
+	PublicKey  ed25519.PublicKey
+	ValidFrom  time.Time
 	ValidUntil time.Time
-	Revoked bool
+	Revoked    bool
 }
 
 // ArtifactSource opens the exact staged ZIP through the confined storage adapter.
@@ -66,11 +66,11 @@ type FinalPathResolver interface {
 }
 
 type Verifier struct {
-	source ArtifactSource
-	keys TrustedKeyResolver
+	source        ArtifactSource
+	keys          TrustedKeyResolver
 	canonicalizer Canonicalizer
-	paths FinalPathResolver
-	now func() time.Time
+	paths         FinalPathResolver
+	now           func() time.Time
 }
 
 func New(source ArtifactSource, keys TrustedKeyResolver, canonicalizer Canonicalizer, paths FinalPathResolver) (*Verifier, error) {
@@ -81,22 +81,22 @@ func New(source ArtifactSource, keys TrustedKeyResolver, canonicalizer Canonical
 }
 
 type descriptor struct {
-	Schema string `json:"$schema"`
+	Schema        string `json:"$schema"`
 	SchemaVersion string `json:"schema_version"`
-	PluginID string `json:"plugin_id"`
-	Version string `json:"version"`
-	ReleaseID string `json:"release_id"`
-	DownloadURI string `json:"download_uri"`
-	MediaType string `json:"media_type"`
-	SizeBytes uint64 `json:"size_bytes"`
-	Digest struct {
+	PluginID      string `json:"plugin_id"`
+	Version       string `json:"version"`
+	ReleaseID     string `json:"release_id"`
+	DownloadURI   string `json:"download_uri"`
+	MediaType     string `json:"media_type"`
+	SizeBytes     uint64 `json:"size_bytes"`
+	Digest        struct {
 		Algorithm string `json:"algorithm"`
-		Value string `json:"value"`
+		Value     string `json:"value"`
 	} `json:"digest"`
 	Signature struct {
 		Algorithm string `json:"algorithm"`
-		KeyID string `json:"key_id"`
-		Value string `json:"value"`
+		KeyID     string `json:"key_id"`
+		Value     string `json:"value"`
 	} `json:"signature"`
 }
 
@@ -171,12 +171,12 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 		return installation.VerifiedArtifact{}, installation.ErrRecordMismatch
 	}
 	return installation.VerifiedArtifact{
-		FinalArtifactPath: finalPath,
-		DigestAlgorithm: "sha-256",
-		DigestValue: actualDigest,
-		VerificationPolicy: "registry-artifact-descriptor-v1+sha256+ed25519",
+		FinalArtifactPath:       finalPath,
+		DigestAlgorithm:         "sha-256",
+		DigestValue:             actualDigest,
+		VerificationPolicy:      "registry-artifact-descriptor-v1+sha256+ed25519",
 		VerificationEvidenceRef: "marketplace-key:" + d.Signature.KeyID,
-		ManifestJSON: string(append([]byte(nil), inspected.ManifestJSON...)),
+		ManifestJSON:            string(append([]byte(nil), inspected.ManifestJSON...)),
 	}, nil
 }
 
@@ -213,7 +213,7 @@ func descriptorSigningPayload(raw []byte) ([]byte, error) {
 }
 
 type contextReader struct {
-	ctx context.Context
+	ctx    context.Context
 	reader io.Reader
 }
 
