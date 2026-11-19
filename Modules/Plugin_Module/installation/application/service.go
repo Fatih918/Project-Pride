@@ -33,10 +33,10 @@ type IDGenerator interface {
 	NewOperationID(context.Context) (installation.OperationID, error)
 }
 
-// ArtifactAcquirer obtains the artifact into the supplied operation staging
-// directory. stagingPath is canonical and relative to Plugin_Storage; the
-// adapter must resolve it through the storage adapter, never via the cwd.
-// Network and Registry-specific behavior belongs in its adapter.
+// ArtifactAcquirer obtains the immutable release ZIP and its signed Registry
+// descriptor into the supplied operation workspace. It must populate
+// StagedArtifact.DescriptorJSON from the exact descriptor selected by the
+// Registry; stagingPath remains canonical and Plugin_Storage-relative.
 // OperationStorage creates the durable operation-scoped staging directory.
 // It returns a canonical path relative to Plugin_Storage, never an OS path.
 type OperationStorage interface {
