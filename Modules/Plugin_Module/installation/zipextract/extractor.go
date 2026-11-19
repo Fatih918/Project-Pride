@@ -20,9 +20,7 @@ var (
 	ErrLimitExceeded = errors.New("Plugin extraction resource limit exceeded")
 )
 type ArtifactSource interface {
-
 	OpenArtifactFile(context.Context, string) (*os.File, error)
-
 }
 type Inspector interface {
 	Inspect(context.Context, string) (installation.InspectedPackage, error)
@@ -111,7 +109,9 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 			return cleanup(ErrInvalidArchive)
 		}
 		if entry.UncompressedSize64 > e.policy.Limits.MaxSingleFileBytes ||
-			(entry.CompressedSize64 == 0 && entry.UncompressedSize64 != 0) { return cleanup(ErrLimitExceeded) }
+			(entry.CompressedSize64 == 0 && entry.UncompressedSize64 != 0) {
+				return cleanup(ErrLimitExceeded)
+			}
 		if entry.CompressedSize64 > 0 {
 			ratio := entry.UncompressedSize64 / entry.CompressedSize64
 			remainder := entry.UncompressedSize64 % entry.CompressedSize64
