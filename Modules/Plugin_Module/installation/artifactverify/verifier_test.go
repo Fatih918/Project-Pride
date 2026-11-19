@@ -98,7 +98,7 @@ func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact
 	}
 	digest := sha256Hex(artifact)
 	fields := map[string]any{
-		"$schema":      descriptorSchema,
+		"$schema":        descriptorSchema,
 		"schema_version": "1.0.0",
 		"plugin_id":      "example.plugin",
 		"version":        "1.2.0",
