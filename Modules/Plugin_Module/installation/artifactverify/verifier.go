@@ -110,6 +110,9 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 	if err := rejectDuplicateKeys(staged.DescriptorJSON); err != nil {
 		return installation.VerifiedArtifact{}, fmt.Errorf("%w: %v", ErrInvalidDescriptor, err)
 	}
+	if err := validateDescriptorNestedProperties(staged.DescriptorJSON); err != nil {
+		return installation.VerifiedArtifact{}, fmt.Errorf("%w: %v", ErrInvalidDescriptor, err)
+	}
 	var d descriptor
 	if err := json.Unmarshal(staged.DescriptorJSON, &d); err != nil {
 		return installation.VerifiedArtifact{}, fmt.Errorf("%w: %v", ErrInvalidDescriptor, err)
@@ -182,12 +185,12 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 
 func validateDescriptor(d descriptor, plugin domain.Plugin) error {
 	if d.Schema != descriptorSchema || d.SchemaVersion != "1.0.0" ||
-		d.PluginID == "" || d.PluginID != string(plugin.ID) ||
-		d.Version == "" || d.Version != plugin.Manifest.Version ||
-		d.ReleaseID == "" || d.SizeBytes == 0 ||
+		d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
+		d.Version == "" || len([]rune(d.Version)) > 128 || d.Version != plugin.Manifest.Version ||
+		d.ReleaseID == "" || len([]rune(d.ReleaseID)) > 512 || d.SizeBytes == 0 ||
 		d.MediaType != descriptorMediaType ||
 		d.Digest.Algorithm != "sha-256" || len(d.Digest.Value) != sha256.Size*2 ||
-		d.Signature.Algorithm != "Ed25519" || strings.TrimSpace(d.Signature.KeyID) == "" {
+		d.Signature.Algorithm != "Ed25519" || strings.TrimSpace(d.Signature.KeyID) == "" || len([]rune(d.Signature.KeyID)) > 255 {
 		return ErrInvalidDescriptor
 	}
 	if _, err := hex.DecodeString(d.Digest.Value); err != nil || strings.ToLower(d.Digest.Value) != d.Digest.Value {
@@ -196,6 +199,37 @@ func validateDescriptor(d descriptor, plugin domain.Plugin) error {
 	uri, err := url.Parse(d.DownloadURI)
 	if err != nil || uri.Scheme != "https" || uri.Host == "" || uri.User != nil {
 		return ErrInvalidDescriptor
+	}
+	return nil
+}
+
+func validateDescriptorNestedProperties(raw []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	if err := validateOnlyJSONProperties(fields["digest"], "algorithm", "value"); err != nil {
+		return fmt.Errorf("digest: %w", err)
+	}
+	if err := validateOnlyJSONProperties(fields["signature"], "algorithm", "key_id", "value"); err != nil {
+		return fmt.Errorf("signature: %w", err)
+	}
+	return nil
+}
+
+func validateOnlyJSONProperties(raw json.RawMessage, allowed ...string) error {
+	var fields map[string]json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return errors.New("expected JSON object")
+	}
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, key := range allowed {
+		allowedSet[key] = struct{}{}
+	}
+	for key := range fields {
+		if _, ok := allowedSet[key]; !ok {
+			return fmt.Errorf("unknown property %q", key)
+		}
 	}
 	return nil
 }
