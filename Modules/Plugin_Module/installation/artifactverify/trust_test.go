@@ -90,19 +90,19 @@ func TestTrustResolverRejectsRollback(t *testing.T) {
 func signedTrustConfig(t *testing.T, signer ed25519.PrivateKey, marketKey ed25519.PublicKey, sequence uint64) []byte {
 	t.Helper()
 	fields := map[string]any{
-		"$schema":       trustSchema,
+		"$schema":        trustSchema,
 		"schema_version": "1.0.0",
 		"sequence":       sequence,
 		"issued_at":      "2026-12-01T00:00:00Z",
 		"expires_at":     "2027-12-01T00:00:00Z",
 		"keys": []any{
 			map[string]any{
-				"key_id":     "marketplace-key",
-				"algorithm":  "Ed25519",
-				"public_key": base64.StdEncoding.EncodeToString(marketKey),
-				"valid_from": "2026-12-01T00:00:00Z",
+				"key_id":      "marketplace-key",
+				"algorithm":   "Ed25519",
+				"public_key":  base64.StdEncoding.EncodeToString(marketKey),
+				"valid_from":  "2026-12-01T00:00:00Z",
 				"valid_until": "2027-06-01T00:00:00Z",
-				"status":     "active",
+				"status":      "active",
 			},
 		},
 	}
