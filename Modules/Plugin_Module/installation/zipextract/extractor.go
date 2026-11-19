@@ -32,7 +32,6 @@ type Target interface {
 	RemoveExtractionDirectory(context.Context, string, string) error
 }
 type Extractor struct {
-
 	source ArtifactSource
 
 	inspector Inspector
@@ -40,7 +39,6 @@ type Extractor struct {
 	target Target
 
 	policy zipinspect.Policy
-
 }
 
 func New(source ArtifactSource, inspector Inspector, target Target, policy zipinspect.Policy) (*Extractor, error) {
@@ -125,7 +123,8 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 		}
 		input, err := entry.Open()
 		if err != nil {
-			_ = output.Close(); return cleanup(fmt.Errorf("%w: open ZIP entry", ErrInvalidArchive))
+			_ = output.Close();
+	return cleanup(fmt.Errorf("%w: open ZIP entry", ErrInvalidArchive))
 		}
 		written, copyErr := copyBounded(ctx, output, input, entry.UncompressedSize64,
 			e.policy.Limits.MaxSingleFileBytes, &total, e.policy.Limits.MaxTotalExpandedBytes)
