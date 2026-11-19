@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 10 — bounded ZIP inspection/extraction and signed artifact verification primitives implemented.
+**Status:** Increment 11 — bounded ZIP inspection/extraction, signed artifact verification, and persistent trust-sequence storage implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -39,7 +39,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
 - Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
 - Artifact verifier validates the versioned Registry descriptor, checks Plugin/version/media type/HTTPS locator, verifies Ed25519 signatures over RFC 8785 JCS canonical payloads, and hashes the exact staged ZIP with SHA-256.
-- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to an atomic persistence port.
+- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to an atomic persistence port.\n- SQLite schema v3 persists the accepted trust sequence and raw-configuration SHA-256 digest; a single conditional UPSERT atomically rejects rollback/equivocation and permits exact replay.
 - Installation orchestration verifies before extraction and verifies again after extraction before recording VERIFIED, reducing the chance that a changed staged archive is promoted.
 - Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths.
 - Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
@@ -65,9 +65,9 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ## Not implemented yet
 
 - Registry artifact-source resolution and package download, including production population of `StagedArtifact.DescriptorJSON`.
-- ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, persistent trust-sequence storage, composition wiring, and atomic filesystem promotion remain unimplemented.
+- ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, composition wiring, and atomic filesystem promotion remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.
-- Persistent SQLite implementation of the trust sequence/equivocation store, production trust-configuration transport, and distribution bootstrap-key provisioning.
+- Production trust-configuration transport and distribution bootstrap-key provisioning.
 - Production composition-root wiring for the artifact verifier, trust resolver, and final-path adapter.
 - Plugin Manifest and Registry artifact descriptor schemas are specified; the ZIP inspector and artifact descriptor verifier implement the corresponding validation paths.
 - Filesystem promotion adapter and startup recovery coordinator.

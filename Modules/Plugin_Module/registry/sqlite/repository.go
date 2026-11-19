@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 2
+const schemaVersion = 3
 
 type Repository struct {
 	db *sql.DB
@@ -158,7 +158,18 @@ func (r *Repository) migrate(ctx context.Context) error {
 			}
 		}
 	}
-	if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 2"); err != nil {
+	if version < 3 {
+		const createTrustState = `CREATE TABLE plugin_trust_configuration_state (
+			singleton_id INTEGER PRIMARY KEY NOT NULL CHECK (singleton_id = 1),
+			sequence INTEGER NOT NULL CHECK (sequence > 0),
+			digest BLOB NOT NULL CHECK (length(digest) = 32),
+			accepted_at TEXT NOT NULL
+		)`
+		if _, err := tx.ExecContext(ctx, createTrustState); err != nil {
+			return fmt.Errorf("create Plugin trust configuration state schema: %w", err)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 3"); err != nil {
 		return fmt.Errorf("advance plugin registry schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
