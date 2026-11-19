@@ -144,9 +144,7 @@ func (v testVerifier) Verify(context.Context, string, domain.Plugin) (installati
 type testPromoter struct{ err error }
 
 func (p testPromoter) Promote(context.Context, string, string) error {
-
 	return p.err
-
 }
 
 func validPlugin() domain.Plugin {
