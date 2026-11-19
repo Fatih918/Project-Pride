@@ -2,7 +2,10 @@ module pride-plugin-module
 
 go 1.26.6
 
-require modernc.org/sqlite v1.57.0
+require (
+	github.com/cyberphone/json-canonicalization v0.0.0-20261011151737-0c88af095879
+	modernc.org/sqlite v1.57.0
+)
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
