@@ -12,25 +12,33 @@ import (
 	"pride-plugin-module/installation/zipinspect"
 )
 
-type testSource struct{ path string }
+type testSource struct {
+	path string
+}
+
 func (s testSource) OpenArtifactFile(context.Context, string) (*os.File, error) {
 	return os.Open(s.path)
 }
+
 type testInspector struct{}
+
 func (testInspector) Inspect(context.Context, string) (installation.InspectedPackage, error) {
 	return installation.InspectedPackage{}, nil
 }
-type testTarget struct {
-	root string
 
+type testTarget struct {
+	root     string
 	failPath string
 }
+
 func (t testTarget) CreateExtractionRoot(_ context.Context, _ string) error {
 	return os.Mkdir(filepath.Join(t.root, "package"), 0o700)
 }
+
 func (t testTarget) CreateExtractionDirectory(_ context.Context, _, relative string) error {
 	return os.MkdirAll(filepath.Join(t.root, filepath.FromSlash(relative)), 0o700)
 }
+
 func (t testTarget) CreateExtractionFile(_ context.Context, _, relative string) (*os.File, error) {
 	if relative == t.failPath {
 		return nil, errors.New("injected file creation failure")
@@ -41,6 +49,7 @@ func (t testTarget) CreateExtractionFile(_ context.Context, _, relative string) 
 	}
 	return os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 }
+
 func (t testTarget) RemoveExtractionDirectory(_ context.Context, _, relative string) error {
 	return os.RemoveAll(filepath.Join(t.root, relative))
 }
@@ -48,12 +57,16 @@ func (t testTarget) RemoveExtractionDirectory(_ context.Context, _, relative str
 func createTestZIP(t *testing.T, entries map[string]string) string {
 	t.Helper()
 	name := filepath.Join(t.TempDir(), "artifact.zip")
-	file, err := os.Create(name);
-	if err != nil { t.Fatal(err) }
+	file, err := os.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
 	writer := zip.NewWriter(file)
 	for entry, value := range entries {
-		output, err := writer.Create(entry);
-	if err != nil { t.Fatal(err) }
+		output, err := writer.Create(entry)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if _, err := output.Write([]byte(value)); err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +83,11 @@ func createTestZIP(t *testing.T, entries map[string]string) string {
 const testManifest = `{"$schema":"urn:pride:plugin-manifest:1","schema_version":"1.0.0","plugin_id":"example.plugin","name":"Example","version":"1.0.0","description":"Example plugin","author":"PRIDE","license":"MIT","entry_point":"main","minimum_pride_version":"1.0.0"}`
 
 func TestExtractWritesOnlyPackagePayload(t *testing.T) {
-	archive := createTestZIP(t, map[string]string{"plugin.json": testManifest, "package/main": "payload", "package/nested/data.txt": "data"})
+	archive := createTestZIP(t, map[string]string{
+		"plugin.json":             testManifest,
+		"package/main":            "payload",
+		"package/nested/data.txt": "data",
+	})
 	root := t.TempDir()
 	extractor, err := New(testSource{archive}, testInspector{}, testTarget{root: root}, zipinspect.DefaultPolicy())
 	if err != nil {
@@ -92,9 +109,15 @@ func TestExtractWritesOnlyPackagePayload(t *testing.T) {
 }
 
 func TestExtractCleansPartialOutputOnFailure(t *testing.T) {
-	archive := createTestZIP(t, map[string]string{"plugin.json": testManifest, "package/main": "payload", "package/fail": "failure"})
+	archive := createTestZIP(t, map[string]string{
+		"plugin.json":  testManifest,
+		"package/main": "payload",
+		"package/fail": "failure",
+	})
 	root := t.TempDir()
-	extractor, err := New(testSource{archive}, testInspector{}, testTarget{root: root, failPath: "package/fail"}, zipinspect.DefaultPolicy())
+	extractor, err := New(testSource{archive}, testInspector{}, testTarget{
+		root: root, failPath: "package/fail",
+	}, zipinspect.DefaultPolicy())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +130,13 @@ func TestExtractCleansPartialOutputOnFailure(t *testing.T) {
 }
 
 func TestPackageRelativePathRejectsTraversalAndOutsideEntries(t *testing.T) {
-	for _, name := range []string{"../escape", "package/../escape", "/package/main", "package\\main", "other/file"} {
+	for _, name := range []string{
+		"../escape",
+		"package/../escape",
+		"/package/main",
+		"package\\main",
+		"other/file",
+	} {
 		if _, _, err := packageRelativePath(name); err == nil {
 			t.Errorf("expected %q to be rejected", name)
 		}
