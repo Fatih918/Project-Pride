@@ -33,10 +33,10 @@ type IDGenerator interface {
 	NewOperationID(context.Context) (installation.OperationID, error)
 }
 
-// ArtifactAcquirer obtains the artifact into the supplied operation staging
-// directory. stagingPath is canonical and relative to Plugin_Storage; the
-// adapter must resolve it through the storage adapter, never via the cwd.
-// Network and Registry-specific behavior belongs in its adapter.
+// ArtifactAcquirer obtains the immutable release ZIP and its signed Registry
+// descriptor into the supplied operation workspace. It must populate
+// StagedArtifact.DescriptorJSON from the exact descriptor selected by the
+// Registry; stagingPath remains canonical and Plugin_Storage-relative.
 // OperationStorage creates the durable operation-scoped staging directory.
 // It returns a canonical path relative to Plugin_Storage, never an OS path.
 type OperationStorage interface {
@@ -69,7 +69,7 @@ type PlatformMetadataResolver interface {
 // ArtifactVerifier verifies integrity and authenticity under an explicitly
 // configured policy. The service does not choose algorithms or trust roots.
 type ArtifactVerifier interface {
-	Verify(context.Context, string, domain.Plugin) (installation.VerifiedArtifact, error)
+	Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error)
 }
 
 // ArtifactPromoter atomically promotes a verified staging directory to its
@@ -225,6 +225,13 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if err := plugin.Validate(); err != nil {
 		return fail("validate assembled Plugin", err)
 	}
+	// Verify the exact staged ZIP and signed descriptor before extracting
+	// developer-controlled payload into the operation workspace.
+	verified, err := s.verifier.Verify(ctx, staged, inspected, plugin.Clone())
+	if err != nil {
+		return fail("verify Plugin artifact", err)
+	}
+
 	extractedPath, err := s.extractor.Extract(ctx, staged.StagingPath)
 	if err != nil {
 		return fail("extract Plugin package", err)
@@ -233,10 +240,16 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 		return fail("validate extracted package location", installation.ErrRecordMismatch)
 	}
 
-	verified, err := s.verifier.Verify(ctx, staged.StagingPath, plugin.Clone())
+	// Re-hash and re-verify after extraction so a changed staged ZIP cannot be
+	// promoted merely because an earlier verification succeeded.
+	reverified, err := s.verifier.Verify(ctx, staged, inspected, plugin.Clone())
 	if err != nil {
-		return fail("verify Plugin artifact", err)
+		return fail("reverify Plugin artifact after extraction", err)
 	}
+	if reverified != verified {
+		return fail("compare Plugin artifact verification evidence", installation.ErrRecordMismatch)
+	}
+	verified = reverified
 	if err := s.repository.RecordVerified(ctx, id, verified); err != nil {
 		return fail("record verified artifact", err)
 	}
@@ -305,6 +318,10 @@ func failureCode(stage string) string {
 		return "INVALID_EXTRACTION_LOCATION"
 	case "verify Plugin artifact":
 		return "ARTIFACT_VERIFICATION_FAILED"
+	case "reverify Plugin artifact after extraction":
+		return "ARTIFACT_REVERIFICATION_FAILED"
+	case "compare Plugin artifact verification evidence":
+		return "VERIFICATION_EVIDENCE_MISMATCH"
 	case "record verified artifact":
 		return "VERIFICATION_RECORD_FAILED"
 	case "promote verified artifact":

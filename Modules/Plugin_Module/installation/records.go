@@ -60,7 +60,8 @@ type InstallationOperation struct {
 }
 
 type StagedArtifact struct {
-	StagingPath string
+	StagingPath    string
+	DescriptorJSON []byte
 }
 
 type VerifiedArtifact struct {
