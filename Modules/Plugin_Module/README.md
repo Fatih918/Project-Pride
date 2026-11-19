@@ -1,8 +1,17 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 12 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, and bounded HTTP artifact acquisition implemented.
+**Status:** Increment 13 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, bounded HTTP artifact acquisition, and bounded HTTPS trust-configuration transport implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
+
+## Increment 13 — Trust configuration transport
+
+- Added `artifactverify.HTTPTrustConfigurationSource` for a distribution-configured HTTPS endpoint; no Marketplace endpoint or authentication protocol is invented.
+- Requires an exact hostname allowlist, HTTPS, port 443, TLS 1.2+, no redirects, no environment proxy, and DNS resolution that rejects non-public destinations.
+- Bounds response headers to 64 KiB, trust JSON to 1 MiB, and request timeout to 1–60 seconds; requires HTTP 200 and `application/json`.
+- Keeps transport separate from trust: fetched bytes remain untrusted until `TrustResolver` verifies the Ed25519 signature against distribution-provisioned bootstrap public keys.
+- Documents the release-controlled bootstrap-key provisioning boundary. No fabricated production key or insecure environment override is included.
+- The actual trust endpoint, bootstrap public-key value, Marketplace service authentication, and production composition root remain distribution/service responsibilities.
 
 ## Increment 12 — Registry artifact acquisition
 
@@ -10,7 +19,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Added `installation/acquisition.HTTPArtifactAcquirer` to download the ZIP from the descriptor's HTTPS locator while preserving the exact descriptor bytes for downstream verification.
 - Enforced exact artifact-host allowlisting, TLS 1.2+, no redirects/proxies, non-public DNS address rejection, bounded timeouts/headers, context-aware streaming, and PZIP-0001's 100 MiB compressed-size ceiling.
 - Required actual downloaded bytes to match the descriptor's declared size; partial artifact files are removed after acquisition failures.
-- Kept signature and SHA-256 verification in `installation/artifactverify`; acquisition does not treat the descriptor as trusted.
+- Kept signature and SHA-256 verification in `installation/artifactverify`; acquisition does not treat downloaded metadata as trusted.
 - The production Official Registry resolver remains an injected port because no Registry API/endpoint contract has been approved.
 
 ## Implemented
@@ -41,24 +50,20 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Canonical `Plugin_Storage`-relative path generation and safe resolution to absolute OS paths; persisted paths never depend on the process working directory.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
-- Storage and SQLite repository tests.
+- SQLite schema v3 persists the accepted trust sequence and raw-configuration SHA-256 digest; a single conditional UPSERT atomically rejects rollback/equivocation and permits exact replay.
 
 ### Installation application service
 - Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
 - Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
 - Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
 - Artifact verifier validates the versioned Registry descriptor, checks Plugin/version/media type/HTTPS locator, verifies Ed25519 signatures over RFC 8785 JCS canonical payloads, and hashes the exact staged ZIP with SHA-256.
-- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to an atomic persistence port.\n- SQLite schema v3 persists the accepted trust sequence and raw-configuration SHA-256 digest; a single conditional UPSERT atomically rejects rollback/equivocation and permits exact replay.
+- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to the SQLite-backed store.
+- Bounded HTTPS trust transport retrieves the signed trust document without treating transport success as authenticity.
 - Installation orchestration verifies before extraction and verifies again after extraction before recording VERIFIED, reducing the chance that a changed staged archive is promoted.
-- Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths.
-- Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
-- Inspection and extraction remain separate components: inspection validates the complete package; the extractor then streams payload files into the same operation staging workspace.
-- A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
+- Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths and creates extraction outputs exclusively through its `os.Root` confinement.
+- A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author platform-owned fields.
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
-- Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
-- Install/update preconditions and Plugin identity/version validation.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
-- Unit tests for successful installation, pre-promotion failure, update preconditions, and recoverable commit failure.
 
 ## Architectural boundaries
 
@@ -74,17 +79,17 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ## Not implemented yet
 
 - Production Official Registry descriptor resolver and authenticated Registry API/endpoint contract.
-- ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, composition wiring, and atomic filesystem promotion remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.
-- Production trust-configuration transport and distribution bootstrap-key provisioning.
-- Production composition-root wiring for the artifact verifier, trust resolver, and final-path adapter.
-- Plugin Manifest and Registry artifact descriptor schemas are specified; the ZIP inspector and artifact descriptor verifier implement the corresponding validation paths.
+- Actual distribution bootstrap public-key value and release/build provisioning.
+- Production composition-root wiring for the Registry resolver, trust source, bootstrap keys, artifact verifier, and final-path adapter.
 - Filesystem promotion adapter and startup recovery coordinator.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification and bounded acquisition primitives are available, but production installation remains disabled until the Official Registry resolver, trust/bootstrap-key provisioning, production composition, filesystem promotion, and startup recovery are implemented.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are implemented.
+
+The detailed deployment boundary is in `docs/Trust Configuration Transport and Bootstrap-Key Provisioning.md`.
 
 ## Checks
 
@@ -104,5 +109,4 @@ go test ./...
 go vet ./...
 ```
 
-
-The accepted PZIP-0001 policy fixes the ZIP processing limits: 100 MiB compressed archive, 512 MiB total expanded bytes, 128 MiB per file, 10,000 entries, directory depth 32, per-entry compression ratio 100:1, normalized path length 240 bytes, and 16 MiB parser metadata budget. The policy does not itself implement or enable extraction.
+The accepted PZIP-0001 policy fixes the ZIP processing limits: 100 MiB compressed archive, 512 MiB total expanded bytes, 128 MiB per file, 10,000 entries, directory depth 32, per-entry compression ratio 100:1, normalized path length 240 bytes, and 16 MiB parser metadata budget.
