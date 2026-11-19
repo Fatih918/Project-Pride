@@ -104,10 +104,6 @@ func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, 
 	if err!=nil || len(signature)!=ed25519.SignatureSize || !ed25519.Verify(bootstrapKey,canonical,signature) {
 		return TrustedKey{},ErrInvalidTrustConfiguration
 	}
-	digest:=sha256.Sum256(raw)
-	if err:=r.sequences.AcceptTrustConfiguration(ctx,config.Sequence,digest); err!=nil {
-		return TrustedKey{},fmt.Errorf("%w: sequence rollback/equivocation: %v",ErrInvalidTrustConfiguration,err)
-	}
 	seen:=make(map[string]struct{},len(config.Keys))
 	for _,record:=range config.Keys {
 		if record.KeyID=="" || record.Algorithm!="Ed25519" || (record.Status!="active" && record.Status!="revoked") {
@@ -115,6 +111,10 @@ func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, 
 		}
 		if _,exists:=seen[record.KeyID]; exists { return TrustedKey{},ErrInvalidTrustConfiguration }
 		seen[record.KeyID]=struct{}{}
+	}
+	digest:=sha256.Sum256(raw)
+	if err:=r.sequences.AcceptTrustConfiguration(ctx,config.Sequence,digest); err!=nil {
+		return TrustedKey{},fmt.Errorf("%w: sequence rollback/equivocation: %v",ErrInvalidTrustConfiguration,err)
 	}
 	for _,record:=range config.Keys {
 		if record.KeyID!=keyID { continue }
