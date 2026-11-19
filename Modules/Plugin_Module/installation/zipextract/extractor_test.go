@@ -21,11 +21,9 @@ func (testInspector) Inspect(context.Context, string) (installation.InspectedPac
 	return installation.InspectedPackage{}, nil
 }
 type testTarget struct {
-
 	root string
 
 	failPath string
-
 }
 func (t testTarget) CreateExtractionRoot(_ context.Context, _ string) error {
 	return os.Mkdir(filepath.Join(t.root, "package"), 0o700)
@@ -50,10 +48,12 @@ func (t testTarget) RemoveExtractionDirectory(_ context.Context, _, relative str
 func createTestZIP(t *testing.T, entries map[string]string) string {
 	t.Helper()
 	name := filepath.Join(t.TempDir(), "artifact.zip")
-	file, err := os.Create(name); if err != nil { t.Fatal(err) }
+	file, err := os.Create(name);
+	if err != nil { t.Fatal(err) }
 	writer := zip.NewWriter(file)
 	for entry, value := range entries {
-		output, err := writer.Create(entry); if err != nil { t.Fatal(err) }
+		output, err := writer.Create(entry);
+	if err != nil { t.Fatal(err) }
 		if _, err := output.Write([]byte(value)); err != nil {
 			t.Fatal(err)
 		}
