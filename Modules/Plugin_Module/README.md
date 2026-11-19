@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 8 — ZIP Package Inspection implemented; extraction pending.
+**Status:** Increment 9 — bounded ZIP inspection and confined ZIP extraction implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -37,6 +37,8 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ### Installation application service
 - Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
 - Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
+- Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
+- Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
 - Inspection streams decompressed entries and counts actual expanded bytes; extraction remains a separate operation.
 - A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
@@ -59,7 +61,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ## Not implemented yet
 
 - Registry artifact-source resolution and package download.
-- ZIP installation policy v1.0.0 is accepted and versioned; secure ZIP extraction, concrete artifact verification, and atomic filesystem promotion adapters remain unimplemented.
+- ZIP installation policy v1.0.0, bounded ZIP inspection, and confined ZIP extraction are implemented; concrete artifact verification and atomic filesystem promotion adapters remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.
 - Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.
