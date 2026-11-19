@@ -157,3 +157,15 @@ func TestLoadPolicyRejectsDuplicateAndTrailingJSON(t *testing.T) {
 		t.Fatal("expected trailing JSON rejection")
 	}
 }
+
+func TestInspectRejectsFileDirectoryPathConflict(t *testing.T) {
+	file := makeArchive(t, map[string]string{
+		"plugin.json": validManifest,
+		"package/main": "file",
+		"package/main/child": "nested",
+	})
+	inspector, _ := New(fileSource{file}, DefaultPolicy())
+	if _, err := inspector.Inspect(context.Background(), "temporary/op-1"); err == nil {
+		t.Fatal("expected file/directory path conflict rejection")
+	}
+}

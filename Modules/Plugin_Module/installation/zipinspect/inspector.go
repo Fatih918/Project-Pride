@@ -311,7 +311,8 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		return nil, 0, 0, ErrInvalidArchive
 	}
 	entries := make([]centralEntry, 0, totalEntries)
-	seen := make(map[string]struct{}, totalEntries)
+	seen := make(map[string]bool, totalEntries)
+	descendants := make(map[string]uint32, totalEntries)
 	var expanded, metadata uint64
 	metadata = cdSize
 	cursor := 0
@@ -372,7 +373,18 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		if _, exists := seen[folded]; exists {
 			return nil, 0, 0, fmt.Errorf("%w: duplicate or case-fold collision", ErrUnsafeEntry)
 		}
-		seen[folded] = struct{}{}
+		parts := strings.Split(folded, "/")
+		for partIndex := 1; partIndex < len(parts); partIndex++ {
+			parent := strings.Join(parts[:partIndex], "/")
+			if parentIsDirectory, exists := seen[parent]; exists && !parentIsDirectory {
+				return nil, 0, 0, fmt.Errorf("%w: file entry cannot contain child paths", ErrUnsafeEntry)
+			}
+			descendants[parent]++
+		}
+		if !directory && descendants[folded] > 0 {
+			return nil, 0, 0, fmt.Errorf("%w: file entry conflicts with child paths", ErrUnsafeEntry)
+		}
+		seen[folded] = directory
 		modeType := (external >> 16) & 0170000
 		if modeType != 0 && modeType != 0100000 && modeType != 0040000 {
 			return nil, 0, 0, ErrUnsafeEntry
@@ -420,7 +432,7 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 	if cursor != len(central) || len(entries) != int(totalEntries) {
 		return nil, 0, 0, ErrInvalidArchive
 	}
-	if _, ok := seen["plugin.json"]; !ok {
+	if isDirectory, ok := seen["plugin.json"]; !ok || isDirectory {
 		return nil, 0, 0, ErrInvalidManifest
 	}
 	hasPackageFile := false
