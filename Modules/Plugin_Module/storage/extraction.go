@@ -59,6 +59,9 @@ func (a *Adapter) CreateExtractionFile(ctx context.Context, workspace, relativeP
 	if err := ctx.Err(); err != nil { return nil, err }
 	if err := a.validateOperationWorkspace(workspace); err != nil { return nil, err }
 	if err := validateExtractionRelativePath(relativePath); err != nil { return nil, err }
+	packageRoot := path.Join(workspace, "package")
+	rootInfo, rootErr := a.root.Lstat(filepath.FromSlash(packageRoot))
+	if rootErr != nil || !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 { return nil, ErrInvalidExtractionPath }
 	parent := path.Dir(relativePath)
 	if parent != "." && parent != "package" {
 		if err := a.CreateExtractionDirectory(ctx, workspace, parent); err != nil { return nil, err }
