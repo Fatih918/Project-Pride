@@ -136,7 +136,7 @@ type testVerifier struct {
 	err    error
 }
 
-func (v testVerifier) Verify(context.Context, string, domain.Plugin) (installation.VerifiedArtifact, error) {
+func (v testVerifier) Verify(context.Context, installation.StagedArtifact, domain.Plugin) (installation.VerifiedArtifact, error) {
 	return v.result, v.err
 }
 
