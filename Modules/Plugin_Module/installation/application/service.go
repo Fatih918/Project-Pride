@@ -231,9 +231,6 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if err != nil {
 		return fail("verify Plugin artifact", err)
 	}
-	if err := s.repository.RecordVerified(ctx, id, verified); err != nil {
-		return fail("record verified artifact", err)
-	}
 
 	extractedPath, err := s.extractor.Extract(ctx, staged.StagingPath)
 	if err != nil {
@@ -241,6 +238,20 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	}
 	if extractedPath != staged.StagingPath+"/package" {
 		return fail("validate extracted package location", installation.ErrRecordMismatch)
+	}
+
+	// Re-hash and re-verify after extraction so a changed staged ZIP cannot be
+	// promoted merely because an earlier verification succeeded.
+	reverified, err := s.verifier.Verify(ctx, staged, inspected, plugin.Clone())
+	if err != nil {
+		return fail("reverify Plugin artifact after extraction", err)
+	}
+	if reverified != verified {
+		return fail("compare Plugin artifact verification evidence", installation.ErrRecordMismatch)
+	}
+	verified = reverified
+	if err := s.repository.RecordVerified(ctx, id, verified); err != nil {
+		return fail("record verified artifact", err)
 	}
 	if err := s.promoter.Promote(ctx, staged.StagingPath, verified.FinalArtifactPath); err != nil {
 		return fail("promote verified artifact", err)
