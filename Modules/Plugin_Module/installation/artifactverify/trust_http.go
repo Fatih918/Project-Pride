@@ -32,9 +32,9 @@ type HTTPTrustConfigurationSource struct {
 // EndpointURL must be an HTTPS URL and its hostname must appear exactly in
 // AllowedHosts. Wildcards and IP-literal hosts are not supported.
 type HTTPTrustConfigurationSourceConfig struct {
-	EndpointURL string
+	EndpointURL  string
 	AllowedHosts []string
-	Timeout time.Duration
+	Timeout      time.Duration
 }
 
 // NewHTTPTrustConfigurationSource constructs a fail-closed HTTPS source.
@@ -73,9 +73,9 @@ func NewHTTPTrustConfigurationSource(config HTTPTrustConfigurationSourceConfig) 
 
 	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}
 	transport := &http.Transport{
-		Proxy: nil,
-		TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
-		DisableCompression: true,
+		Proxy:                  nil,
+		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12},
+		DisableCompression:     true,
 		MaxResponseHeaderBytes: 64 << 10,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			dialHost, port, err := net.SplitHostPort(address)
@@ -97,7 +97,7 @@ func NewHTTPTrustConfigurationSource(config HTTPTrustConfigurationSourceConfig) 
 	}
 	client := &http.Client{
 		Transport: transport,
-		Timeout: config.Timeout,
+		Timeout:   config.Timeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
