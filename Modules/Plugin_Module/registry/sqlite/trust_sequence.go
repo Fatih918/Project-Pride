@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 )
 
@@ -20,7 +19,7 @@ func (r *Repository) AcceptTrustConfiguration(ctx context.Context, sequence uint
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if r == nil || r.db == nil || sequence == 0 || sequence > math.MaxInt64 {
+	if r == nil || r.db == nil || sequence == 0 || sequence > uint64(1<<63-1) {
 		return fmt.Errorf("%w: invalid trust sequence store input", ErrTrustSequenceRejected)
 	}
 
