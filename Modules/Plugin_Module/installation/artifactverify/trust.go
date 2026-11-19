@@ -87,6 +87,26 @@ func NewTrustResolver(source TrustConfigurationSource, sequences TrustSequenceSt
 	}, nil
 }
 
+func validateTrustNestedProperties(raw []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	if err := validateOnlyJSONProperties(fields["signature"], "algorithm", "key_id", "value"); err != nil {
+		return fmt.Errorf("signature: %w", err)
+	}
+	var keys []json.RawMessage
+	if err := json.Unmarshal(fields["keys"], &keys); err != nil {
+		return fmt.Errorf("keys: %w", err)
+	}
+	for index, key := range keys {
+		if err := validateOnlyJSONProperties(key, "key_id", "algorithm", "public_key", "valid_from", "valid_until", "status"); err != nil {
+			return fmt.Errorf("keys[%d]: %w", index, err)
+		}
+	}
+	return nil
+}
+
 func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, now time.Time) (TrustedKey, error) {
 	raw, err := r.source.ReadTrustConfiguration(ctx)
 	if err != nil {
@@ -98,13 +118,16 @@ func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, 
 	if err := rejectDuplicateKeys(raw); err != nil {
 		return TrustedKey{}, fmt.Errorf("%w: %v", ErrInvalidTrustConfiguration, err)
 	}
+	if err := validateTrustNestedProperties(raw); err != nil {
+		return TrustedKey{}, fmt.Errorf("%w: %v", ErrInvalidTrustConfiguration, err)
+	}
 
 	var config trustConfiguration
 	if err := json.Unmarshal(raw, &config); err != nil {
 		return TrustedKey{}, fmt.Errorf("%w: %v", ErrInvalidTrustConfiguration, err)
 	}
 	if config.Schema != trustSchema || config.SchemaVersion != "1.0.0" || config.Sequence == 0 ||
-		config.Signature.Algorithm != "Ed25519" || config.Signature.KeyID == "" {
+		config.Signature.Algorithm != "Ed25519" || config.Signature.KeyID == "" || len([]rune(config.Signature.KeyID)) > 255 {
 		return TrustedKey{}, ErrInvalidTrustConfiguration
 	}
 
@@ -137,7 +160,7 @@ func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, 
 	resolved := make(map[string]TrustedKey, len(config.Keys))
 	revoked := make(map[string]bool, len(config.Keys))
 	for _, record := range config.Keys {
-		if record.KeyID == "" || record.Algorithm != "Ed25519" || (record.Status != "active" && record.Status != "revoked") {
+		if record.KeyID == "" || len([]rune(record.KeyID)) > 255 || record.Algorithm != "Ed25519" || (record.Status != "active" && record.Status != "revoked") {
 			return TrustedKey{}, ErrInvalidTrustConfiguration
 		}
 		if _, exists := resolved[record.KeyID]; exists {
