@@ -160,8 +160,8 @@ func TestLoadPolicyRejectsDuplicateAndTrailingJSON(t *testing.T) {
 
 func TestInspectRejectsFileDirectoryPathConflict(t *testing.T) {
 	file := makeArchive(t, map[string]string{
-		"plugin.json": validManifest,
-		"package/main": "file",
+		"plugin.json":        validManifest,
+		"package/main":       "file",
 		"package/main/child": "nested",
 	})
 	inspector, _ := New(fileSource{file}, DefaultPolicy())
