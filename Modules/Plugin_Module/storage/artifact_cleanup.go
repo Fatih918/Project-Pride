@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"path"
+	"path/filepath"
 )
 
 // RemoveArtifactFile removes only the regular artifact.zip file belonging to

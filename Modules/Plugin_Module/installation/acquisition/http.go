@@ -29,7 +29,7 @@ var (
 	ErrUnsafeArtifactURL = errors.New("artifact URL is not permitted by acquisition policy")
 	ErrArtifactTooLarge  = errors.New("artifact exceeds configured compressed-size limit")
 	ErrArtifactSize      = errors.New("downloaded artifact size does not match descriptor")
-	ErrUnexpectedStatus = errors.New("artifact host returned an unexpected HTTP status")
+	ErrUnexpectedStatus  = errors.New("artifact host returned an unexpected HTTP status")
 )
 
 // DescriptorResolver resolves an opaque immutable source reference to the
@@ -173,6 +173,7 @@ func (a *HTTPArtifactAcquirer) Acquire(ctx context.Context, sourceReference, sta
 		return installation.StagedArtifact{}, fmt.Errorf("create artifact request: %w", err)
 	}
 	request.Header.Set("Accept", "application/vnd.pride.plugin+zip")
+	request.Header.Set("Accept-Encoding", "identity")
 	response, err := a.client.Do(request)
 	if err != nil {
 		return installation.StagedArtifact{}, fmt.Errorf("download Plugin artifact: %w", err)
@@ -180,6 +181,9 @@ func (a *HTTPArtifactAcquirer) Acquire(ctx context.Context, sourceReference, sta
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
 		return installation.StagedArtifact{}, fmt.Errorf("%w: %d", ErrUnexpectedStatus, response.StatusCode)
+	}
+	if encoding := response.Header.Get("Content-Encoding"); encoding != "" && encoding != "identity" {
+		return installation.StagedArtifact{}, ErrInvalidDescriptor
 	}
 	if response.ContentLength >= 0 && response.ContentLength != int64(descriptor.SizeBytes) {
 		return installation.StagedArtifact{}, ErrArtifactSize
@@ -270,7 +274,25 @@ func normalizeHost(host string) string {
 }
 
 func isPublicUnicast(ip net.IP) bool {
-	return ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() &&
+	if ip == nil {
+		return false
+	}
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+		// Reject shared address space and special-purpose/documentation ranges
+		// in addition to RFC 1918, loopback, and link-local addresses.
+		if v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 ||
+			v4[0] == 192 && v4[1] == 0 && (v4[2] == 0 || v4[2] == 2) ||
+			v4[0] == 192 && v4[1] == 88 && v4[2] == 99 ||
+			v4[0] == 198 && (v4[1] == 18 || v4[1] == 19 || v4[1] == 51 && v4[2] == 100) ||
+			v4[0] == 203 && v4[1] == 0 && v4[2] == 113 ||
+			v4[0] >= 240 {
+			return false
+		}
+	} else if strings.HasPrefix(strings.ToLower(ip.String()), "2001:db8:") {
+		return false
+	}
+	return ip.IsGlobalUnicast() && !ip.IsPrivate() &&
 		!ip.IsLoopback() && !ip.IsLinkLocalUnicast() &&
 		!ip.IsLinkLocalMulticast() && !ip.IsMulticast() && !ip.IsUnspecified()
 }
