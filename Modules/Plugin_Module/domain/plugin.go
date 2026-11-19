@@ -41,6 +41,7 @@ type Manifest struct {
 	RepositoryURL       string
 	IssueTrackerURL     string
 	Keywords            []string
+	Screenshots         []string
 	Category            string
 	Icon                string
 	ChangelogURL        string
@@ -76,6 +77,7 @@ type Plugin struct {
 // Clone returns a defensive deep copy so callers cannot mutate stored records.
 func (p Plugin) Clone() Plugin {
 	p.Manifest.Keywords = append([]string(nil), p.Manifest.Keywords...)
+	p.Manifest.Screenshots = append([]string(nil), p.Manifest.Screenshots...)
 	p.Protected.Capabilities = append([]Capability(nil), p.Protected.Capabilities...)
 	p.Protected.PermissionIDs = append([]string(nil), p.Protected.PermissionIDs...)
 	p.Protected.Attributes = cloneMap(p.Protected.Attributes)
