@@ -38,6 +38,7 @@ var (
 )
 
 type Policy struct {
+	Schema string `json:"$schema"`
 	SchemaVersion string `json:"schema_version"`
 	PolicyID string `json:"policy_id"`
 	PackageFormat struct {
@@ -58,7 +59,7 @@ type Policy struct {
 
 func DefaultPolicy() Policy {
 	var p Policy
-	p.SchemaVersion, p.PolicyID = "1.0.0", "pride.plugin.zip-installation"
+	p.Schema, p.SchemaVersion, p.PolicyID = policySchema, "1.0.0", "pride.plugin.zip-installation"
 	p.PackageFormat.ArchiveFormat, p.PackageFormat.MediaType = "zip", "application/vnd.pride.plugin+zip"
 	p.Limits.MaxCompressedArchiveBytes = 104857600
 	p.Limits.MaxTotalExpandedBytes = 536870912
@@ -77,6 +78,7 @@ func LoadPolicy(r io.Reader) (Policy, error) {
 	var p Policy
 	dec := json.NewDecoder(io.LimitReader(r, 1<<20))
 	if err := dec.Decode(&p); err != nil { return Policy{}, fmt.Errorf("%w: %v", ErrInvalidPolicy, err) }
+	if err := dec.Decode(new(any)); err != io.EOF { return Policy{}, ErrInvalidPolicy }
 	if err := p.Validate(); err != nil { return Policy{}, err }
 	return p, nil
 }
@@ -109,6 +111,7 @@ type centralEntry struct {
 	compressed uint64
 	expanded uint64
 	localOffset uint64
+	crc32 uint32
 	flags uint16
 	method uint16
 }
@@ -211,12 +214,13 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		commentLen := int(binary.LittleEndian.Uint16(h[32:34]))
 		diskStart := binary.LittleEndian.Uint16(h[34:36])
 		external := binary.LittleEndian.Uint32(h[38:42])
+		crc32 := binary.LittleEndian.Uint32(h[16:20])
 		localOffset := uint64(binary.LittleEndian.Uint32(h[42:46]))
 		recordLen := 46+nameLen+extraLen+commentLen
 		if recordLen > len(central)-cursor || nameLen == 0 || diskStart != 0 { return nil, 0, 0, ErrInvalidArchive }
 		nameBytes := central[cursor+46:cursor+46+nameLen]
 		extra := central[cursor+46+nameLen:cursor+46+nameLen+extraLen]
-		if !utf8.Valid(nameBytes) || hasExtra(extra, zip64ExtraID) { return nil, 0, 0, ErrUnsupportedZIP64 }
+		if !utf8.Valid(nameBytes) || (flags&0x0800 == 0 && !isASCII(nameBytes)) || hasExtra(extra, zip64ExtraID) { return nil, 0, 0, ErrUnsupportedZIP64 }
 		if compressed == 0xffffffff || uncompressed == 0xffffffff || localOffset == 0xffffffff { return nil, 0, 0, ErrUnsupportedZIP64 }
 		if err := validateExtra(extra); err != nil { return nil, 0, 0, err }
 		if flags&0x0001 != 0 || flags&0x0040 != 0 { return nil, 0, 0, fmt.Errorf("%w: encrypted entry", ErrInvalidArchive) }
@@ -232,6 +236,7 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		seen[folded] = struct{}{}
 		modeType := (external >> 16) & 0170000
 		if modeType != 0 && modeType != 0100000 && modeType != 0040000 { return nil, 0, 0, ErrUnsafeEntry }
+		if external&0x00000400 != 0 || (external&0x10 != 0) != directory { return nil, 0, 0, ErrUnsafeEntry }
 		if modeType == 0040000 && !directory { return nil, 0, 0, ErrUnsafeEntry }
 		if modeType == 0100000 && directory { return nil, 0, 0, ErrUnsafeEntry }
 		if directory && (compressed != 0 || uncompressed != 0) { return nil, 0, 0, ErrUnsafeEntry }
@@ -245,8 +250,8 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		}
 		metadata += uint64(len(normalized))*2 + 128
 		if metadata > policy.Limits.MaxMetadataAllocationBytes { return nil, 0, 0, ErrInvalidArchive }
-		if err := validateLocalHeader(file, size, cdOffset, localOffset, nameBytes, flags, method, compressed); err != nil { return nil, 0, 0, err }
-		entries = append(entries, centralEntry{name:name, normalized:normalized, directory:directory, compressed:compressed, expanded:uncompressed, localOffset:localOffset, flags:flags, method:method})
+		if err := validateLocalHeader(file, size, cdOffset, localOffset, nameBytes, flags, method, compressed, uncompressed, crc32); err != nil { return nil, 0, 0, err }
+		entries = append(entries, centralEntry{name:name, normalized:normalized, directory:directory, compressed:compressed, expanded:uncompressed, localOffset:localOffset, crc32:crc32, flags:flags, method:method})
 		cursor += recordLen
 	}
 	if cursor != len(central) || len(entries) != int(totalEntries) { return nil, 0, 0, ErrInvalidArchive }
@@ -257,7 +262,7 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 	return entries, cdOffset, expanded, nil
 }
 
-func validateLocalHeader(file *os.File, archiveSize, centralOffset, offset uint64, name []byte, flags, method uint16, compressed uint64) error {
+func validateLocalHeader(file *os.File, archiveSize, centralOffset, offset uint64, name []byte, flags, method uint16, compressed, expanded uint64, crc32 uint32) error {
 	if offset+30 > archiveSize || offset+30 > centralOffset { return ErrInvalidArchive }
 	var header [30]byte
 	if _, err := file.ReadAt(header[:], int64(offset)); err != nil { return ErrInvalidArchive }
@@ -265,6 +270,12 @@ func validateLocalHeader(file *os.File, archiveSize, centralOffset, offset uint6
 	localFlags, localMethod := binary.LittleEndian.Uint16(header[6:8]), binary.LittleEndian.Uint16(header[8:10])
 	nameLen, extraLen := uint64(binary.LittleEndian.Uint16(header[26:28])), uint64(binary.LittleEndian.Uint16(header[28:30]))
 	if localFlags != flags || localMethod != method || nameLen != uint64(len(name)) { return ErrInvalidArchive }
+	localCRC := binary.LittleEndian.Uint32(header[14:18])
+	localCompressed := binary.LittleEndian.Uint32(header[18:22])
+	localExpanded := binary.LittleEndian.Uint32(header[22:26])
+	if localCompressed == 0xffffffff || localExpanded == 0xffffffff { return ErrUnsupportedZIP64 }
+	if flags&0x0008 == 0 && (localCRC != crc32 || uint64(localCompressed) != compressed || uint64(localExpanded) != expanded) { return ErrInvalidArchive }
+	if flags&0x0008 != 0 && ((localCompressed != 0 && uint64(localCompressed) != compressed) || (localExpanded != 0 && uint64(localExpanded) != expanded)) { return ErrInvalidArchive }
 	extraStart := offset+30+nameLen
 	dataStart := extraStart+extraLen
 	if dataStart < extraStart || dataStart > centralOffset { return ErrInvalidArchive }
@@ -277,6 +288,8 @@ func validateLocalHeader(file *os.File, archiveSize, centralOffset, offset uint6
 	if dataStart+compressed < dataStart || dataStart+compressed > centralOffset { return ErrInvalidArchive }
 	return nil
 }
+
+func isASCII(value []byte) bool { for _, b := range value { if b >= 0x80 { return false } }; return true }
 
 func validateExtra(extra []byte) error {
 	for len(extra) > 0 {
