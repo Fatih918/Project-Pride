@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -68,6 +67,5 @@ func signedTrustConfig(t *testing.T, signer ed25519.PrivateKey, marketKey ed2551
 	canonical,err:=(JCSCanonicalizer{}).Canonicalize(payload); if err!=nil { t.Fatal(err) }
 	fields["signature"]=map[string]string{"algorithm":"Ed25519","key_id":"distribution-root","value":base64.StdEncoding.EncodeToString(ed25519.Sign(signer,canonical))}
 	raw,err:=json.Marshal(fields); if err!=nil { t.Fatal(err) }
-	_ = sha256.Sum256(raw)
 	return raw
 }
