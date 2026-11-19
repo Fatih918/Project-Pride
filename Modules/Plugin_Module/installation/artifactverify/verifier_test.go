@@ -17,9 +17,6 @@ import (
 	"pride-plugin-module/installation"
 )
 
-type testCanonicalizer struct{}
-func (testCanonicalizer) Canonicalize(value []byte) ([]byte, error) { return value, nil }
-
 type testKeys struct { key ed25519.PublicKey; revoked bool }
 func (k testKeys) ResolveDescriptorKey(context.Context, string, time.Time) (TrustedKey, error) {
 	return TrustedKey{PublicKey:k.key, ValidFrom:time.Date(2026,1,1,0,0,0,0,time.UTC), ValidUntil:time.Date(2030,1,1,0,0,0,0,time.UTC), Revoked:k.revoked}, nil
@@ -86,7 +83,7 @@ func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact
 	signature:=ed25519.Sign(privateKey,payload)
 	fields["signature"]=map[string]string{"algorithm":"Ed25519","key_id":"marketplace-2026","value":base64.StdEncoding.EncodeToString(signature)}
 	raw,err:=json.Marshal(fields); if err!=nil { t.Fatal(err) }
-	verifier,err:=New(testSource{path:artifactPath},testKeys{key:publicKey,revoked:revoked},testCanonicalizer{},testPaths{})
+	verifier,err:=New(testSource{path:artifactPath},testKeys{key:publicKey,revoked:revoked},JCSCanonicalizer{},testPaths{})
 	if err!=nil { t.Fatal(err) }
 	verifier.now=func()time.Time{return time.Date(2027,1,1,0,0,0,0,time.UTC)}
 	return verifier,installation.StagedArtifact{StagingPath:"temporary/op-1",DescriptorJSON:raw},domain.Plugin{
