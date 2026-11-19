@@ -4,9 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/binary"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
+	"strings"
 )
 
 type fileSource struct{ path string }
@@ -60,4 +63,30 @@ func TestInspectHonorsContextCancellation(t *testing.T) {
 	inspector,_:=New(fileSource{file},DefaultPolicy())
 	ctx,cancel:=context.WithCancel(context.Background());cancel()
 	if _,err:=inspector.Inspect(ctx,"temporary/op-1");err==nil{t.Fatal("expected context cancellation")}
+}
+
+func TestInspectRejectsZIP64EOCDSentinel(t *testing.T) {
+	file := makeArchive(t, map[string]string{"plugin.json": validManifest, "package/main": "ok"})
+	data, err := os.ReadFile(file)
+	if err != nil { t.Fatal(err) }
+	offset := bytes.LastIndex(data, []byte{0x50, 0x4b, 0x05, 0x06})
+	if offset < 0 { t.Fatal("EOCD not found in test archive") }
+	binary.LittleEndian.PutUint16(data[offset+8:offset+10], 0xffff)
+	binary.LittleEndian.PutUint16(data[offset+10:offset+12], 0xffff)
+	if err := os.WriteFile(file, data, 0o600); err != nil { t.Fatal(err) }
+	inspector, _ := New(fileSource{file}, DefaultPolicy())
+	_, err = inspector.Inspect(context.Background(), "temporary/op-1")
+	if !errors.Is(err, ErrUnsupportedZIP64) { t.Fatalf("expected ZIP64 rejection, got %v", err) }
+}
+
+func TestInspectRejectsCompressionRatioOverPolicy(t *testing.T) {
+	file := makeArchive(t, map[string]string{"plugin.json": validManifest, "package/main": strings.Repeat("a", 20000)})
+	inspector, _ := New(fileSource{file}, DefaultPolicy())
+	if _, err := inspector.Inspect(context.Background(), "temporary/op-1"); err == nil { t.Fatal("expected compression-ratio rejection") }
+}
+
+func TestInspectRejectsCaseFoldCollision(t *testing.T) {
+	file := makeArchive(t, map[string]string{"plugin.json": validManifest, "package/Main": "one", "package/main": "two"})
+	inspector, _ := New(fileSource{file}, DefaultPolicy())
+	if _, err := inspector.Inspect(context.Background(), "temporary/op-1"); err == nil { t.Fatal("expected case-fold collision rejection") }
 }

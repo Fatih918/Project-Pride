@@ -58,7 +58,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 - Registry artifact-source resolution and package download.
 - Registry artifact-source resolution and package download.
-- ZIP installation policy v1.0.0 is accepted and versioned; ZIP inspection/extraction, concrete artifact verification, and atomic filesystem promotion adapters remain unimplemented.
+- ZIP installation policy v1.0.0 is accepted and versioned; secure ZIP extraction, concrete artifact verification, and atomic filesystem promotion adapters remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.
 - Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.

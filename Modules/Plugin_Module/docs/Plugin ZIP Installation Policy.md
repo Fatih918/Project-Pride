@@ -57,7 +57,7 @@ The metadata budget covers parser-owned central-directory bytes and normalized p
 
 The budget is an implementation resource ceiling, not a claim that every Go runtime allocation can be measured exactly. A parser that cannot enforce a bounded pre-parse and retained-metadata budget MUST NOT be used for production package processing.
 
-## 4. Failure behavior
+### 3.5 ZIP64 compatibility\n\nZIP64 is not supported by PZIP-0001 v1.0.0. Inspectors MUST reject ZIP64 end-of-central-directory records and locators, ZIP64 sentinel values in classic EOCD or entry headers, and ZIP64 extra fields in central or local headers. Packages that require ZIP64 MUST be republished using the classic ZIP format within the accepted size and entry limits.\n\n## 4. Failure behavior
 
 Exceeding any limit MUST reject the package before promotion. Partial extraction MUST remain confined to the operation-scoped staging workspace and MUST never be marked verified or installed. The caller may clean or quarantine the failed workspace according to the separately approved recovery/retention policy; it MUST NOT expose partial content to discovery or runtime.
 

@@ -45,7 +45,7 @@ The signature binds Plugin identity, version, immutable release ID, download URI
 
 ## 4. D2 — ZIP package format
 
-The first supported package format is ZIP with media type application/vnd.pride.plugin+zip. The archive layout is:
+The first supported package format is ZIP with media type application/vnd.pride.plugin+zip. ZIP64 is not supported by policy v1: inspectors MUST reject ZIP64 end-of-central-directory records/locators, ZIP64 sentinel fields, and ZIP64 extra fields in both central and local headers. The archive layout is:
 
 ```text
 plugin-package.zip
