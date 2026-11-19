@@ -107,6 +107,21 @@ func (i testInspector) Inspect(context.Context, string) (installation.InspectedP
 	return i.pkg, i.err
 }
 
+type testExtractor struct {
+	err  error
+	path string
+}
+
+func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, error) {
+	if e.err != nil {
+		return "", e.err
+	}
+	if e.path != "" {
+		return e.path, nil
+	}
+	return stagingPath + "/package", nil
+}
+
 type testMetadataResolver struct {
 	metadata installation.PlatformMetadata
 	err      error
@@ -127,7 +142,9 @@ func (v testVerifier) Verify(context.Context, string, domain.Plugin) (installati
 
 type testPromoter struct{ err error }
 
-func (p testPromoter) Promote(context.Context, string, string) error { return p.err }
+func (p testPromoter) Promote(context.Context, string, string) error {
+	return p.err
+}
 
 func validPlugin() domain.Plugin {
 	id := domain.PluginID("example.plugin")
@@ -143,7 +160,7 @@ func validPlugin() domain.Plugin {
 
 func newTestService(t *testing.T, repo *testRepository, acquirer ArtifactAcquirer, inspector PackageInspector, verifier ArtifactVerifier, promoter ArtifactPromoter) *Service {
 	t.Helper()
-	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}, verifier, promoter)
+	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testExtractor{}, testMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}, verifier, promoter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,6 +194,20 @@ func TestInstallMarksPrePromotionFailure(t *testing.T) {
 		t.Fatal("expected acquisition error")
 	}
 	if repo.markedFailed != "ARTIFACT_ACQUISITION_FAILED" {
+		t.Fatalf("unexpected failure code: %q", repo.markedFailed)
+	}
+}
+
+func TestInstallMarksPackageExtractionFailure(t *testing.T) {
+	repo := &testRepository{selectedErr: installation.ErrVersionNotFound}
+	plugin := validPlugin()
+	service := newTestService(t, repo, testAcquirer{}, testInspector{pkg: installation.InspectedPackage{Manifest: plugin.Manifest}}, testVerifier{}, testPromoter{})
+	service.extractor = testExtractor{err: errors.New("unsafe archive payload")}
+	err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "release:1.2.0", Kind: installation.KindInstall})
+	if err == nil {
+		t.Fatal("expected extraction failure")
+	}
+	if repo.markedFailed != "PACKAGE_EXTRACTION_FAILED" {
 		t.Fatalf("unexpected failure code: %q", repo.markedFailed)
 	}
 }
