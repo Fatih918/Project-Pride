@@ -17,81 +17,123 @@ import (
 	"pride-plugin-module/installation"
 )
 
-type testKeys struct { key ed25519.PublicKey; revoked bool }
-func (k testKeys) ResolveDescriptorKey(context.Context, string, time.Time) (TrustedKey, error) {
-	return TrustedKey{PublicKey:k.key, ValidFrom:time.Date(2026,1,1,0,0,0,0,time.UTC), ValidUntil:time.Date(2030,1,1,0,0,0,0,time.UTC), Revoked:k.revoked}, nil
+type testKeys struct {
+	key     ed25519.PublicKey
+	revoked bool
 }
 
-type testSource struct { path string }
-func (s testSource) OpenArtifactFile(ctx context.Context, _ string) (*os.File,error) {
-	if err:=ctx.Err(); err!=nil { return nil,err }
+func (k testKeys) ResolveDescriptorKey(context.Context, string, time.Time) (TrustedKey, error) {
+	return TrustedKey{
+		PublicKey:  k.key,
+		ValidFrom:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		ValidUntil: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC),
+		Revoked:    k.revoked,
+	}, nil
+}
+
+type testSource struct {
+	path string
+}
+
+func (s testSource) OpenArtifactFile(ctx context.Context, _ string) (*os.File, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return os.Open(s.path)
 }
+
 type testPaths struct{}
-func (testPaths) ResolveFinalArtifactPath(_ context.Context, id domain.PluginID, version string) (string,error) {
-	return "installed/"+string(id)+"/"+version,nil
+
+func (testPaths) ResolveFinalArtifactPath(_ context.Context, id domain.PluginID, version string) (string, error) {
+	return "installed/" + string(id) + "/" + version, nil
 }
 
 func TestVerifierAcceptsSignedDescriptorAndExactArtifact(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
-	got, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{ManifestJSON:[]byte(`{"plugin_id":"example.plugin"}`)}, plugin)
-	if err != nil { t.Fatal(err) }
-	if got.DigestAlgorithm!="sha-256" || got.DigestValue=="" || got.FinalArtifactPath!="installed/example.plugin/1.2.0" {
-		t.Fatalf("unexpected verification result: %#v",got)
+	got, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{ManifestJSON: []byte(`{"plugin_id":"example.plugin"}`)}, plugin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.DigestAlgorithm != "sha-256" || got.DigestValue == "" || got.FinalArtifactPath != "installed/example.plugin/1.2.0" {
+		t.Fatalf("unexpected verification result: %#v", got)
 	}
 }
 
 func TestVerifierRejectsChangedArtifactBytes(t *testing.T) {
 	verifier, staged, plugin, artifactPath, _ := fixture(t, false)
-	if err:=os.WriteFile(artifactPath,[]byte("changed bytes"),0o600); err!=nil { t.Fatal(err) }
-	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
+	if err := os.WriteFile(artifactPath, []byte("changed bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil {
 		t.Fatal("expected changed artifact bytes to fail digest verification")
 	}
 }
 
 func TestVerifierRejectsRevokedKey(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, true)
-	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil {
 		t.Fatal("expected revoked signing key to be rejected")
 	}
 }
 
 func TestVerifierRejectsDuplicateDescriptorKeys(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
-	staged.DescriptorJSON=[]byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
-	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
+	staged.DescriptorJSON = []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil {
 		t.Fatal("expected duplicate descriptor key to be rejected")
 	}
 }
 
 func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact, domain.Plugin, string, ed25519.PrivateKey) {
 	t.Helper()
-	dir:=t.TempDir()
-	artifactPath:=filepath.Join(dir,"artifact.zip")
-	artifact:=[]byte("immutable test ZIP bytes")
-	if err:=os.WriteFile(artifactPath,artifact,0o600); err!=nil { t.Fatal(err) }
-	publicKey,privateKey,err:=ed25519.GenerateKey(rand.Reader)
-	if err!=nil { t.Fatal(err) }
-	digest:=sha256Hex(artifact)
-	fields:=map[string]any{
-		"$schema":descriptorSchema,"schema_version":"1.0.0","plugin_id":"example.plugin","version":"1.2.0",
-		"release_id":"release-123","download_uri":"https://artifacts.example.test/release.zip",
-		"media_type":descriptorMediaType,"size_bytes":len(artifact),
-		"digest":map[string]string{"algorithm":"sha-256","value":digest},
+	dir := t.TempDir()
+	artifactPath := filepath.Join(dir, "artifact.zip")
+	artifact := []byte("immutable test ZIP bytes")
+	if err := os.WriteFile(artifactPath, artifact, 0o600); err != nil {
+		t.Fatal(err)
 	}
-	payload,err:=json.Marshal(fields); if err!=nil { t.Fatal(err) }
-	signature:=ed25519.Sign(privateKey,payload)
-	fields["signature"]=map[string]string{"algorithm":"Ed25519","key_id":"marketplace-2026","value":base64.StdEncoding.EncodeToString(signature)}
-	raw,err:=json.Marshal(fields); if err!=nil { t.Fatal(err) }
-	verifier,err:=New(testSource{path:artifactPath},testKeys{key:publicKey,revoked:revoked},JCSCanonicalizer{},testPaths{})
-	if err!=nil { t.Fatal(err) }
-	verifier.now=func()time.Time{return time.Date(2027,1,1,0,0,0,0,time.UTC)}
-	return verifier,installation.StagedArtifact{StagingPath:"temporary/op-1",DescriptorJSON:raw},domain.Plugin{
-		ID:"example.plugin",Manifest:domain.Manifest{PluginID:"example.plugin",Version:"1.2.0"},
-	},artifactPath,privateKey
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256Hex(artifact)
+	fields := map[string]any{
+		"$schema":      descriptorSchema,
+		"schema_version": "1.0.0",
+		"plugin_id":      "example.plugin",
+		"version":        "1.2.0",
+		"release_id":     "release-123",
+		"download_uri":   "https://artifacts.example.test/release.zip",
+		"media_type":     descriptorMediaType,
+		"size_bytes":     len(artifact),
+		"digest":         map[string]string{"algorithm": "sha-256", "value": digest},
+	}
+	payload, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signature := ed25519.Sign(privateKey, payload)
+	fields["signature"] = map[string]string{
+		"algorithm": "Ed25519",
+		"key_id":    "marketplace-2026",
+		"value":     base64.StdEncoding.EncodeToString(signature),
+	}
+	raw, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier, err := New(testSource{path: artifactPath}, testKeys{key: publicKey, revoked: revoked}, JCSCanonicalizer{}, testPaths{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	verifier.now = func() time.Time { return time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC) }
+	return verifier, installation.StagedArtifact{StagingPath: "temporary/op-1", DescriptorJSON: raw}, domain.Plugin{
+		ID:       "example.plugin",
+		Manifest: domain.Manifest{PluginID: "example.plugin", Version: "1.2.0"},
+	}, artifactPath, privateKey
 }
 
 func sha256Hex(value []byte) string {
-	sum:=sha256.Sum256(value)
+	sum := sha256.Sum256(value)
 	return hex.EncodeToString(sum[:])
 }
