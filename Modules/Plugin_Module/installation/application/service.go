@@ -69,7 +69,7 @@ type PlatformMetadataResolver interface {
 // ArtifactVerifier verifies integrity and authenticity under an explicitly
 // configured policy. The service does not choose algorithms or trust roots.
 type ArtifactVerifier interface {
-	Verify(context.Context, string, domain.Plugin) (installation.VerifiedArtifact, error)
+	Verify(context.Context, installation.StagedArtifact, domain.Plugin) (installation.VerifiedArtifact, error)
 }
 
 // ArtifactPromoter atomically promotes a verified staging directory to its
@@ -225,20 +225,22 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if err := plugin.Validate(); err != nil {
 		return fail("validate assembled Plugin", err)
 	}
+	// Verify the exact staged ZIP and signed descriptor before extracting
+	// developer-controlled payload into the operation workspace.
+	verified, err := s.verifier.Verify(ctx, staged, plugin.Clone())
+	if err != nil {
+		return fail("verify Plugin artifact", err)
+	}
+	if err := s.repository.RecordVerified(ctx, id, verified); err != nil {
+		return fail("record verified artifact", err)
+	}
+
 	extractedPath, err := s.extractor.Extract(ctx, staged.StagingPath)
 	if err != nil {
 		return fail("extract Plugin package", err)
 	}
 	if extractedPath != staged.StagingPath+"/package" {
 		return fail("validate extracted package location", installation.ErrRecordMismatch)
-	}
-
-	verified, err := s.verifier.Verify(ctx, staged.StagingPath, plugin.Clone())
-	if err != nil {
-		return fail("verify Plugin artifact", err)
-	}
-	if err := s.repository.RecordVerified(ctx, id, verified); err != nil {
-		return fail("record verified artifact", err)
 	}
 	if err := s.promoter.Promote(ctx, staged.StagingPath, verified.FinalArtifactPath); err != nil {
 		return fail("promote verified artifact", err)
