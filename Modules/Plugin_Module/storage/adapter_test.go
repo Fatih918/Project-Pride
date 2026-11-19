@@ -176,3 +176,41 @@ func TestAdapterRejectsSymlinkedTemporaryParent(t *testing.T) {
 		t.Fatalf("expected symlinked parent rejection, got %v", err)
 	}
 }
+
+func TestAdapterCreatesAndRemovesConfinedExtractionTree(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil { t.Fatal(err) }
+	adapter, err := NewAdapter(layout)
+	if err != nil { t.Fatal(err) }
+	defer adapter.Close()
+	workspace, err := adapter.CreateTemporaryOperationDirectory(context.Background(), "extract-1")
+	if err != nil { t.Fatal(err) }
+	if err := adapter.CreateExtractionRoot(context.Background(), workspace); err != nil { t.Fatal(err) }
+	if err := adapter.CreateExtractionDirectory(context.Background(), workspace, "package/nested"); err != nil { t.Fatal(err) }
+	file, err := adapter.CreateExtractionFile(context.Background(), workspace, "package/nested/main.lua")
+	if err != nil { t.Fatal(err) }
+	if _, err := file.Write([]byte("return true")); err != nil { t.Fatal(err) }
+	if err := file.Close(); err != nil { t.Fatal(err) }
+	if _, err := adapter.CreateExtractionFile(context.Background(), workspace, "package/nested/main.lua"); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("expected exclusive file creation, got %v", err)
+	}
+	if err := adapter.RemoveExtractionDirectory(context.Background(), workspace, "package"); err != nil { t.Fatal(err) }
+	if _, err := os.Stat(filepath.Join(layout.PluginStorageRoot(), "temporary", "extract-1", "package")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected extraction subtree removal, got %v", err)
+	}
+}
+
+func TestAdapterRejectsExtractionTraversal(t *testing.T) {
+	layout, err := NewLayout(Config{RootOverride: t.TempDir()})
+	if err != nil { t.Fatal(err) }
+	adapter, err := NewAdapter(layout)
+	if err != nil { t.Fatal(err) }
+	defer adapter.Close()
+	workspace, err := adapter.CreateTemporaryOperationDirectory(context.Background(), "extract-2")
+	if err != nil { t.Fatal(err) }
+	for _, candidate := range []string{"../escape", "/absolute", "package/../../escape", "package\\escape", "other/file"} {
+		if _, err := adapter.CreateExtractionFile(context.Background(), workspace, candidate); err == nil {
+			t.Errorf("expected %q to be rejected", candidate)
+		}
+	}
+}
