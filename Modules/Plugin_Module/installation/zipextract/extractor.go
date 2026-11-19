@@ -16,29 +16,30 @@ import (
 
 var (
 	ErrInvalidArchive = errors.New("invalid Plugin ZIP archive")
-	ErrUnsafePath = errors.New("unsafe Plugin extraction path")
-	ErrLimitExceeded = errors.New("Plugin extraction resource limit exceeded")
+	ErrUnsafePath     = errors.New("unsafe Plugin extraction path")
+	ErrLimitExceeded  = errors.New("Plugin extraction resource limit exceeded")
 )
+
 type ArtifactSource interface {
 	OpenArtifactFile(context.Context, string) (*os.File, error)
 }
+
 type Inspector interface {
 	Inspect(context.Context, string) (installation.InspectedPackage, error)
 }
+
 type Target interface {
 	CreateExtractionRoot(context.Context, string) error
 	CreateExtractionDirectory(context.Context, string, string) error
 	CreateExtractionFile(context.Context, string, string) (*os.File, error)
 	RemoveExtractionDirectory(context.Context, string, string) error
 }
+
 type Extractor struct {
-	source ArtifactSource
-
+	source    ArtifactSource
 	inspector Inspector
-
-	target Target
-
-	policy zipinspect.Policy
+	target    Target
+	policy    zipinspect.Policy
 }
 
 func New(source ArtifactSource, inspector Inspector, target Target, policy zipinspect.Policy) (*Extractor, error) {
@@ -60,13 +61,16 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 	if _, err := e.inspector.Inspect(ctx, stagingPath); err != nil {
 		return "", fmt.Errorf("revalidate Plugin package before extraction: %w", err)
 	}
+
 	archive, err := e.source.OpenArtifactFile(ctx, stagingPath)
 	if err != nil {
 		return "", fmt.Errorf("open staged Plugin artifact: %w", err)
 	}
 	defer archive.Close()
+
 	info, err := archive.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || uint64(info.Size()) > e.policy.Limits.MaxCompressedArchiveBytes {
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 ||
+		uint64(info.Size()) > e.policy.Limits.MaxCompressedArchiveBytes {
 		return "", ErrInvalidArchive
 	}
 	reader, err := zip.NewReader(archive, info.Size())
@@ -79,7 +83,9 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 		return "", fmt.Errorf("create fresh extraction root: %w", err)
 	}
 	cleanup := func(cause error) (string, error) {
-		if cleanupErr := e.target.RemoveExtractionDirectory(context.WithoutCancel(ctx), stagingPath, outputRoot); cleanupErr != nil {
+		if cleanupErr := e.target.RemoveExtractionDirectory(
+			context.WithoutCancel(ctx), stagingPath, outputRoot,
+		); cleanupErr != nil {
 			return "", errors.Join(cause, fmt.Errorf("remove partial extraction: %w", cleanupErr))
 		}
 		return "", cause
@@ -98,36 +104,47 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 			continue
 		}
 		if directory {
-			if err := e.target.CreateExtractionDirectory(ctx, stagingPath, path.Join(outputRoot, name)); err != nil {
+			if err := e.target.CreateExtractionDirectory(
+				ctx, stagingPath, path.Join(outputRoot, name),
+			); err != nil {
 				return cleanup(fmt.Errorf("create package directory: %w", err))
 			}
 			continue
 		}
+
 		if entry.Method != zip.Store && entry.Method != zip.Deflate {
 			return cleanup(ErrInvalidArchive)
 		}
 		if entry.UncompressedSize64 > e.policy.Limits.MaxSingleFileBytes ||
 			(entry.CompressedSize64 == 0 && entry.UncompressedSize64 != 0) {
-				return cleanup(ErrLimitExceeded)
-			}
+			return cleanup(ErrLimitExceeded)
+		}
 		if entry.CompressedSize64 > 0 {
 			ratio := entry.UncompressedSize64 / entry.CompressedSize64
 			remainder := entry.UncompressedSize64 % entry.CompressedSize64
-			if ratio > e.policy.Limits.MaxCompressionRatio || (ratio == e.policy.Limits.MaxCompressionRatio && remainder != 0) {
+			if ratio > e.policy.Limits.MaxCompressionRatio ||
+				(ratio == e.policy.Limits.MaxCompressionRatio && remainder != 0) {
 				return cleanup(ErrLimitExceeded)
 			}
 		}
-		output, err := e.target.CreateExtractionFile(ctx, stagingPath, path.Join(outputRoot, name))
+
+		output, err := e.target.CreateExtractionFile(
+			ctx, stagingPath, path.Join(outputRoot, name),
+		)
 		if err != nil {
 			return cleanup(fmt.Errorf("create extracted file: %w", err))
 		}
 		input, err := entry.Open()
 		if err != nil {
-			_ = output.Close();
-	return cleanup(fmt.Errorf("%w: open ZIP entry", ErrInvalidArchive))
+			_ = output.Close()
+			return cleanup(fmt.Errorf("%w: open ZIP entry", ErrInvalidArchive))
 		}
-		written, copyErr := copyBounded(ctx, output, input, entry.UncompressedSize64,
-			e.policy.Limits.MaxSingleFileBytes, &total, e.policy.Limits.MaxTotalExpandedBytes)
+
+		written, copyErr := copyBounded(
+			ctx, output, input, entry.UncompressedSize64,
+			e.policy.Limits.MaxSingleFileBytes, &total,
+			e.policy.Limits.MaxTotalExpandedBytes,
+		)
 		inputCloseErr := input.Close()
 		outputCloseErr := output.Close()
 		if copyErr != nil {
@@ -143,10 +160,18 @@ func (e *Extractor) Extract(ctx context.Context, stagingPath string) (string, er
 			return cleanup(ErrInvalidArchive)
 		}
 	}
+
 	return stagingPath + "/" + outputRoot, nil
 }
 
-func copyBounded(ctx context.Context, destination io.Writer, source io.Reader, expected, fileLimit uint64, total *uint64, totalLimit uint64) (uint64, error) {
+func copyBounded(
+	ctx context.Context,
+	destination io.Writer,
+	source io.Reader,
+	expected, fileLimit uint64,
+	total *uint64,
+	totalLimit uint64,
+) (uint64, error) {
 	buffer := make([]byte, 32*1024)
 	var written uint64
 	for {
@@ -155,9 +180,13 @@ func copyBounded(ctx context.Context, destination io.Writer, source io.Reader, e
 		}
 		n, readErr := source.Read(buffer)
 		if n > 0 {
+			if err := ctx.Err(); err != nil {
+				return written, err
+			}
 			count := uint64(n)
 			if count > fileLimit || count > totalLimit || count > expected ||
-				written > fileLimit-count || *total > totalLimit-count || written > expected-count {
+				written > fileLimit-count || *total > totalLimit-count ||
+				written > expected-count {
 				return written, ErrLimitExceeded
 			}
 			w, writeErr := destination.Write(buffer[:n])
@@ -187,7 +216,8 @@ func copyBounded(ctx context.Context, destination io.Writer, source io.Reader, e
 }
 
 func packageRelativePath(name string) (string, bool, error) {
-	if name == "" || strings.Contains(name, "\\") || strings.ContainsRune(name, 0) || strings.HasPrefix(name, "/") {
+	if name == "" || strings.Contains(name, "\\") ||
+		strings.ContainsRune(name, 0) || strings.HasPrefix(name, "/") {
 		return "", false, ErrUnsafePath
 	}
 	directory := strings.HasSuffix(name, "/")
