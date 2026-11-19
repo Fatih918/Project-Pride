@@ -254,7 +254,7 @@ func TestInstallVerifiesArtifactBeforeExtraction(t *testing.T) {
 	if err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "release:1.2.0", Kind: installation.KindInstall}); err != nil {
 		t.Fatal(err)
 	}
-	if len(order) != 2 || order[0] != "verify" || order[1] != "extract" {
-		t.Fatalf("expected verification before extraction, got %#v", order)
+	if len(order) != 3 || order[0] != "verify" || order[1] != "extract" || order[2] != "verify" {
+		t.Fatalf("expected verification, extraction, then verification again, got %#v", order)
 	}
 }
