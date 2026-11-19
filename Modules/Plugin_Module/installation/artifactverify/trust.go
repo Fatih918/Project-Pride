@@ -104,26 +104,25 @@ func (r *TrustResolver) ResolveDescriptorKey(ctx context.Context, keyID string, 
 	if err!=nil || len(signature)!=ed25519.SignatureSize || !ed25519.Verify(bootstrapKey,canonical,signature) {
 		return TrustedKey{},ErrInvalidTrustConfiguration
 	}
-	seen:=make(map[string]struct{},len(config.Keys))
+	resolved:=make(map[string]TrustedKey,len(config.Keys))
+	revoked:=make(map[string]bool,len(config.Keys))
 	for _,record:=range config.Keys {
 		if record.KeyID=="" || record.Algorithm!="Ed25519" || (record.Status!="active" && record.Status!="revoked") {
 			return TrustedKey{},ErrInvalidTrustConfiguration
 		}
-		if _,exists:=seen[record.KeyID]; exists { return TrustedKey{},ErrInvalidTrustConfiguration }
-		seen[record.KeyID]=struct{}{}
+		if _,exists:=resolved[record.KeyID]; exists { return TrustedKey{},ErrInvalidTrustConfiguration }
+		publicKey,err:=base64.StdEncoding.Strict().DecodeString(record.PublicKey)
+		if err!=nil || len(publicKey)!=ed25519.PublicKeySize { return TrustedKey{},ErrInvalidTrustConfiguration }
+		validFrom,err:=time.Parse(time.RFC3339,record.ValidFrom); if err!=nil { return TrustedKey{},ErrInvalidTrustConfiguration }
+		validUntil,err:=time.Parse(time.RFC3339,record.ValidUntil); if err!=nil || !validUntil.After(validFrom) { return TrustedKey{},ErrInvalidTrustConfiguration }
+		resolved[record.KeyID]=TrustedKey{PublicKey:ed25519.PublicKey(publicKey),ValidFrom:validFrom,ValidUntil:validUntil}
+		revoked[record.KeyID]=record.Status=="revoked"
 	}
 	digest:=sha256.Sum256(raw)
 	if err:=r.sequences.AcceptTrustConfiguration(ctx,config.Sequence,digest); err!=nil {
 		return TrustedKey{},fmt.Errorf("%w: sequence rollback/equivocation: %v",ErrInvalidTrustConfiguration,err)
 	}
-	for _,record:=range config.Keys {
-		if record.KeyID!=keyID { continue }
-		if record.Status!="active" { return TrustedKey{},ErrUntrustedKey }
-		publicKey,err:=base64.StdEncoding.Strict().DecodeString(record.PublicKey)
-		if err!=nil || len(publicKey)!=ed25519.PublicKeySize { return TrustedKey{},ErrInvalidTrustConfiguration }
-		validFrom,err:=time.Parse(time.RFC3339,record.ValidFrom); if err!=nil { return TrustedKey{},ErrInvalidTrustConfiguration }
-		validUntil,err:=time.Parse(time.RFC3339,record.ValidUntil); if err!=nil || !validUntil.After(validFrom) { return TrustedKey{},ErrInvalidTrustConfiguration }
-		return TrustedKey{PublicKey:ed25519.PublicKey(publicKey),ValidFrom:validFrom,ValidUntil:validUntil},nil
-	}
-	return TrustedKey{},ErrUntrustedKey
+	key,ok:=resolved[keyID]
+	if !ok || revoked[keyID] { return TrustedKey{},ErrUntrustedKey }
+	return key,nil
 }
