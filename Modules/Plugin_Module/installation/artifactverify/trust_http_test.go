@@ -39,19 +39,13 @@ func TestHTTPTrustConfigurationSourceReadsJSONDocument(t *testing.T) {
 	}))
 	defer server.Close()
 
-	endpoint, err := server.Client().Get(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = endpoint.Body.Close()
-
 	parsed, err := parseTestEndpoint(server.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	source := &HTTPTrustConfigurationSource{
 		endpoint: parsed,
-		client: server.Client(),
+		client:   server.Client(),
 	}
 	got, err := source.ReadTrustConfiguration(context.Background())
 	if err != nil {
