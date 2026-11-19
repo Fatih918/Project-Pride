@@ -318,6 +318,10 @@ func failureCode(stage string) string {
 		return "INVALID_EXTRACTION_LOCATION"
 	case "verify Plugin artifact":
 		return "ARTIFACT_VERIFICATION_FAILED"
+	case "reverify Plugin artifact after extraction":
+		return "ARTIFACT_REVERIFICATION_FAILED"
+	case "compare Plugin artifact verification evidence":
+		return "VERIFICATION_EVIDENCE_MISMATCH"
 	case "record verified artifact":
 		return "VERIFICATION_RECORD_FAILED"
 	case "promote verified artifact":
