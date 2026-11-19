@@ -36,8 +36,7 @@ func (testPaths) ResolveFinalArtifactPath(_ context.Context, id domain.PluginID,
 }
 
 func TestVerifierAcceptsSignedDescriptorAndExactArtifact(t *testing.T) {
-	verifier, staged, plugin, privateKey := fixture(t, false)
-	_ = privateKey
+	verifier, staged, plugin, _, _ := fixture(t, false)
 	got, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{ManifestJSON:[]byte(`{"plugin_id":"example.plugin"}`)}, plugin)
 	if err != nil { t.Fatal(err) }
 	if got.DigestAlgorithm!="sha-256" || got.DigestValue=="" || got.FinalArtifactPath!="installed/example.plugin/1.2.0" {
@@ -46,31 +45,29 @@ func TestVerifierAcceptsSignedDescriptorAndExactArtifact(t *testing.T) {
 }
 
 func TestVerifierRejectsChangedArtifactBytes(t *testing.T) {
-	verifier, staged, plugin, _ := fixture(t, false)
-	file,err:=os.OpenFile(stagedFilePath(t,verifier),os.O_WRONLY,0)
-	_ = file
-	_ = err
-	_ = staged
-	_ = plugin
-	// The digest check is covered by the direct fixture mutation test below.
+	verifier, staged, plugin, artifactPath, _ := fixture(t, false)
+	if err:=os.WriteFile(artifactPath,[]byte("changed bytes"),0o600); err!=nil { t.Fatal(err) }
+	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
+		t.Fatal("expected changed artifact bytes to fail digest verification")
+	}
 }
 
 func TestVerifierRejectsRevokedKey(t *testing.T) {
-	verifier, staged, plugin, _ := fixture(t, true)
+	verifier, staged, plugin, _, _ := fixture(t, true)
 	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
 		t.Fatal("expected revoked signing key to be rejected")
 	}
 }
 
 func TestVerifierRejectsDuplicateDescriptorKeys(t *testing.T) {
-	verifier, staged, plugin, _ := fixture(t, false)
+	verifier, staged, plugin, _, _ := fixture(t, false)
 	staged.DescriptorJSON=[]byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
 	if _,err:=verifier.Verify(context.Background(),staged,installation.InspectedPackage{},plugin); err==nil {
 		t.Fatal("expected duplicate descriptor key to be rejected")
 	}
 }
 
-func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact, domain.Plugin, ed25519.PrivateKey) {
+func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact, domain.Plugin, string, ed25519.PrivateKey) {
 	t.Helper()
 	dir:=t.TempDir()
 	artifactPath:=filepath.Join(dir,"artifact.zip")
@@ -94,17 +91,10 @@ func fixture(t *testing.T, revoked bool) (*Verifier, installation.StagedArtifact
 	verifier.now=func()time.Time{return time.Date(2027,1,1,0,0,0,0,time.UTC)}
 	return verifier,installation.StagedArtifact{StagingPath:"temporary/op-1",DescriptorJSON:raw},domain.Plugin{
 		ID:"example.plugin",Manifest:domain.Manifest{PluginID:"example.plugin",Version:"1.2.0"},
-	},privateKey
+	},artifactPath,privateKey
 }
 
 func sha256Hex(value []byte) string {
 	sum:=sha256.Sum256(value)
 	return hex.EncodeToString(sum[:])
-}
-
-// Keep the path helper explicit so tests never depend on process working directory.
-func stagedFilePath(t *testing.T, verifier *Verifier) string {
-	t.Helper()
-	_ = verifier
-	return filepath.Join(t.TempDir(),"unused")
 }
