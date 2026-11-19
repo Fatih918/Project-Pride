@@ -1,8 +1,17 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 11 — bounded ZIP inspection/extraction, signed artifact verification, and persistent trust-sequence storage implemented.
+**Status:** Increment 12 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, and bounded HTTP artifact acquisition implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
+
+## Increment 12 — Registry artifact acquisition
+
+- Added an SDK-neutral `DescriptorResolver` port that resolves an opaque immutable source reference into the exact signed Marketplace descriptor.
+- Added `installation/acquisition.HTTPArtifactAcquirer` to download the ZIP from the descriptor's HTTPS locator while preserving the exact descriptor bytes for downstream verification.
+- Enforced exact artifact-host allowlisting, TLS 1.2+, no redirects/proxies, non-public DNS address rejection, bounded timeouts/headers, context-aware streaming, and PZIP-0001's 100 MiB compressed-size ceiling.
+- Required actual downloaded bytes to match the descriptor's declared size; partial artifact files are removed after acquisition failures.
+- Kept signature and SHA-256 verification in `installation/artifactverify`; acquisition does not treat the descriptor as trusted.
+- The production Official Registry resolver remains an injected port because no Registry API/endpoint contract has been approved.
 
 ## Implemented
 
@@ -28,7 +37,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
 - Validated path helpers with traversal and symlink-containment checks.
 - Operation-scoped temporary and quarantine path resolution, plus exclusive private staging-directory creation.
-- Root-confined filesystem adapter for operation workspaces and exclusive `artifact.zip` creation/read access.
+- Root-confined filesystem adapter for operation workspaces and exclusive `artifact.zip` creation/read/removal.
 - Canonical `Plugin_Storage`-relative path generation and safe resolution to absolute OS paths; persisted paths never depend on the process working directory.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
@@ -64,7 +73,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 ## Not implemented yet
 
-- Registry artifact-source resolution and package download, including production population of `StagedArtifact.DescriptorJSON`.
+- Production Official Registry descriptor resolver and authenticated Registry API/endpoint contract.
 - ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, composition wiring, and atomic filesystem promotion remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.
 - Production trust-configuration transport and distribution bootstrap-key provisioning.
@@ -75,7 +84,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification primitives are available, but production installation remains disabled until the Registry acquisition adapter supplies signed descriptors, the trust sequence store and bootstrap-key provisioning are wired, and filesystem promotion/recovery are implemented.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification and bounded acquisition primitives are available, but production installation remains disabled until the Official Registry resolver, trust/bootstrap-key provisioning, production composition, filesystem promotion, and startup recovery are implemented.
 
 ## Checks
 
