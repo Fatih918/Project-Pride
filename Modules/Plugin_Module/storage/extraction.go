@@ -29,10 +29,12 @@ func (a *Adapter) CreateExtractionDirectory(ctx context.Context, workspace, rela
 	if err := ctx.Err(); err != nil { return err }
 	if err := a.validateOperationWorkspace(workspace); err != nil { return err }
 	if err := validateExtractionRelativePath(relativePath); err != nil { return err }
-	if relativePath == "package" { return ErrInvalidExtractionPath }
-	target := path.Join(workspace, relativePath)
-	parts := strings.Split(target, "/")
-	current := ""
+	if !strings.HasPrefix(relativePath, "package/") { return ErrInvalidExtractionPath }
+	packageRoot := path.Join(workspace, "package")
+	rootInfo, err := a.root.Lstat(filepath.FromSlash(packageRoot))
+	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 { return ErrInvalidExtractionPath }
+	parts := strings.Split(strings.TrimPrefix(relativePath, "package/"), "/")
+	current := packageRoot
 	for _, part := range parts {
 		if err := ctx.Err(); err != nil { return err }
 		current = path.Join(current, part)
@@ -77,7 +79,7 @@ func (a *Adapter) RemoveExtractionDirectory(ctx context.Context, workspace, rela
 }
 
 func validateExtractionRelativePath(value string) error {
-	if value == "" || strings.Contains(value, "\\") || strings.ContainsRune(value, 0) ||
+	if value == "" || !strings.HasPrefix(value, "package/") || strings.Contains(value, "\\") || strings.ContainsRune(value, 0) ||
 		strings.HasPrefix(value, "/") || path.Clean(value) != value { return ErrInvalidExtractionPath }
 	for _, part := range strings.Split(value, "/") {
 		if part == "" || part == "." || part == ".." || strings.Contains(part, ":") { return ErrInvalidExtractionPath }
