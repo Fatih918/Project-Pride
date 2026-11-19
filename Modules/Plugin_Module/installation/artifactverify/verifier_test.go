@@ -76,6 +76,24 @@ func TestVerifierRejectsRevokedKey(t *testing.T) {
 	}
 }
 
+func TestVerifierRejectsUnknownSignatureEnvelopeProperties(t *testing.T) {
+	verifier, staged, plugin, _, _ := fixture(t, false)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
+	var signature map[string]any
+	if err := json.Unmarshal(fields["signature"], &signature); err != nil {
+		t.Fatal(err)
+	}
+	signature["untrusted_extension"] = "not allowed"
+	fields["signature"], _ = json.Marshal(signature)
+	staged.DescriptorJSON, _ = json.Marshal(fields)
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil {
+		t.Fatal("expected unknown signature envelope property to be rejected")
+	}
+}
+
 func TestVerifierRejectsDuplicateDescriptorKeys(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
 	staged.DescriptorJSON = []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
