@@ -54,6 +54,12 @@ type PackageInspector interface {
 	Inspect(context.Context, string) (installation.InspectedPackage, error)
 }
 
+// PackageExtractor materializes only validated package payload files inside
+// the same operation-scoped staging workspace.
+type PackageExtractor interface {
+	Extract(context.Context, string) (string, error)
+}
+
 // PlatformMetadataResolver supplies Marketplace/Registry-owned metadata. The
 // package Manifest is never allowed to authoritatively set these fields.
 type PlatformMetadataResolver interface {
@@ -80,6 +86,7 @@ type Service struct {
 	storage    OperationStorage
 	acquirer   ArtifactAcquirer
 	inspector  PackageInspector
+	extractor  PackageExtractor
 	metadata   PlatformMetadataResolver
 	verifier   ArtifactVerifier
 	promoter   ArtifactPromoter
@@ -92,11 +99,12 @@ func NewService(
 	storage OperationStorage,
 	acquirer ArtifactAcquirer,
 	inspector PackageInspector,
+	extractor PackageExtractor,
 	metadata PlatformMetadataResolver,
 	verifier ArtifactVerifier,
 	promoter ArtifactPromoter,
 ) (*Service, error) {
-	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || metadata == nil || verifier == nil || promoter == nil {
+	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || extractor == nil || metadata == nil || verifier == nil || promoter == nil {
 		return nil, ErrMissingPort
 	}
 	return &Service{
@@ -105,6 +113,7 @@ func NewService(
 		storage:    storage,
 		acquirer:   acquirer,
 		inspector:  inspector,
+		extractor:  extractor,
 		metadata:   metadata,
 		verifier:   verifier,
 		promoter:   promoter,
@@ -216,6 +225,13 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if err := plugin.Validate(); err != nil {
 		return fail("validate assembled Plugin", err)
 	}
+	extractedPath, err := s.extractor.Extract(ctx, staged.StagingPath)
+	if err != nil {
+		return fail("extract Plugin package", err)
+	}
+	if extractedPath != staged.StagingPath+"/package" {
+		return fail("validate extracted package location", installation.ErrRecordMismatch)
+	}
 
 	verified, err := s.verifier.Verify(ctx, staged.StagingPath, plugin.Clone())
 	if err != nil {
@@ -283,6 +299,10 @@ func failureCode(stage string) string {
 		return "PLATFORM_METADATA_RESOLUTION_FAILED"
 	case "match inspected Plugin identity":
 		return "PLUGIN_IDENTITY_MISMATCH"
+	case "extract Plugin package":
+		return "PACKAGE_EXTRACTION_FAILED"
+	case "validate extracted package location":
+		return "INVALID_EXTRACTION_LOCATION"
 	case "verify Plugin artifact":
 		return "ARTIFACT_VERIFICATION_FAILED"
 	case "record verified artifact":
