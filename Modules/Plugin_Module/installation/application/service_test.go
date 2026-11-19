@@ -108,11 +108,13 @@ func (i testInspector) Inspect(context.Context, string) (installation.InspectedP
 }
 
 type testExtractor struct {
-	err  error
+	err error
 	path string
+	order *[]string
 }
 
 func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, error) {
+	if e.order != nil { *e.order = append(*e.order, "extract") }
 	if e.err != nil {
 		return "", e.err
 	}
@@ -133,10 +135,12 @@ func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) 
 
 type testVerifier struct {
 	result installation.VerifiedArtifact
-	err    error
+	err error
+	order *[]string
 }
 
 func (v testVerifier) Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error) {
+	if v.order != nil { *v.order = append(*v.order, "verify") }
 	return v.result, v.err
 }
 
@@ -235,5 +239,22 @@ func TestCommitFailureLeavesPromotedOperationRecoverable(t *testing.T) {
 	}
 	if repo.markedFailed != "" {
 		t.Fatalf("PROMOTED operation must remain recoverable, got failure code %q", repo.markedFailed)
+	}
+}
+
+func TestInstallVerifiesArtifactBeforeExtraction(t *testing.T) {
+	repo := &testRepository{selectedErr: installation.ErrVersionNotFound}
+	plugin := validPlugin()
+	order := []string{}
+	service := newTestService(t, repo, testAcquirer{},
+		testInspector{pkg: installation.InspectedPackage{Manifest: plugin.Manifest}},
+		testVerifier{result: installation.VerifiedArtifact{FinalArtifactPath: "installed/example.plugin/1.2.0", DigestAlgorithm: "sha-256", DigestValue: "abc", VerificationPolicy: "policy-v1", ManifestJSON: `{"plugin":"opaque"}`}, order: &order},
+		testPromoter{})
+	service.extractor = testExtractor{order: &order}
+	if err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "release:1.2.0", Kind: installation.KindInstall}); err != nil {
+		t.Fatal(err)
+	}
+	if len(order) != 2 || order[0] != "verify" || order[1] != "extract" {
+		t.Fatalf("expected verification before extraction, got %#v", order)
 	}
 }
