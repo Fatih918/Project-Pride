@@ -39,6 +39,9 @@ jobs:
           go-version-file: Modules/Plugin_Module/go.mod
           cache: true
 
+      - name: Resolve and print module checksums
+        run: go mod download && cat go.sum
+
       - name: Show formatting differences
         run: gofmt -d .
 
