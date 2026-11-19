@@ -197,7 +197,7 @@ func TestCommitFailureLeavesPromotedOperationRecoverable(t *testing.T) {
 	repo := &testRepository{selectedErr: installation.ErrVersionNotFound, commitErr: errors.New("database unavailable")}
 	plugin := validPlugin()
 	verified := installation.VerifiedArtifact{FinalArtifactPath: "installed/example.plugin/1.2.0", DigestAlgorithm: "sha256", DigestValue: "abc", VerificationPolicy: "policy-v1", ManifestJSON: `{"plugin":"opaque"}`}
-	service := newTestService(t, repo, testAcquirer{}, testInspector{plugin: plugin}, testVerifier{result: verified}, testPromoter{})
+	service := newTestService(t, repo, testAcquirer{}, testInspector{pkg: installation.InspectedPackage{Manifest: plugin.Manifest, ManifestJSON: []byte(`{"plugin":"opaque"}`)}}, testVerifier{result: verified}, testPromoter{})
 	err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "release:1.2.0", Kind: installation.KindInstall})
 	if err == nil {
 		t.Fatal("expected commit failure")
