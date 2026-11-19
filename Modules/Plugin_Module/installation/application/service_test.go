@@ -108,13 +108,15 @@ func (i testInspector) Inspect(context.Context, string) (installation.InspectedP
 }
 
 type testExtractor struct {
-	err error
-	path string
+	err   error
+	path  string
 	order *[]string
 }
 
 func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, error) {
-	if e.order != nil { *e.order = append(*e.order, "extract") }
+	if e.order != nil {
+		*e.order = append(*e.order, "extract")
+	}
 	if e.err != nil {
 		return "", e.err
 	}
@@ -135,12 +137,14 @@ func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) 
 
 type testVerifier struct {
 	result installation.VerifiedArtifact
-	err error
-	order *[]string
+	err    error
+	order  *[]string
 }
 
 func (v testVerifier) Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error) {
-	if v.order != nil { *v.order = append(*v.order, "verify") }
+	if v.order != nil {
+		*v.order = append(*v.order, "verify")
+	}
 	return v.result, v.err
 }
 
