@@ -39,9 +39,9 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
 - Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
 - Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
-- Inspection streams decompressed entries and counts actual expanded bytes; extraction remains a separate operation.
+- Inspection and extraction remain separate components: inspection validates the complete package; the extractor then streams payload files into the same operation staging workspace.
 - A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
-- SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
+- SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
 - Install/update preconditions and Plugin identity/version validation.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
