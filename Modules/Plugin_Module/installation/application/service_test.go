@@ -99,12 +99,21 @@ func (a testAcquirer) Acquire(_ context.Context, _ string, target string) (insta
 }
 
 type testInspector struct {
-	plugin domain.Plugin
-	err    error
+	pkg installation.InspectedPackage
+	err error
 }
 
-func (i testInspector) Inspect(context.Context, string) (domain.Plugin, error) {
-	return i.plugin.Clone(), i.err
+func (i testInspector) Inspect(context.Context, string) (installation.InspectedPackage, error) {
+	return i.pkg, i.err
+}
+
+type testMetadataResolver struct {
+	metadata installation.PlatformMetadata
+	err      error
+}
+
+func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
+	return r.metadata, r.err
 }
 
 type testVerifier struct {
@@ -134,7 +143,7 @@ func validPlugin() domain.Plugin {
 
 func newTestService(t *testing.T, repo *testRepository, acquirer ArtifactAcquirer, inspector PackageInspector, verifier ArtifactVerifier, promoter ArtifactPromoter) *Service {
 	t.Helper()
-	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, verifier, promoter)
+	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}, verifier, promoter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +156,7 @@ func TestInstallCoordinatesSuccessfulCommit(t *testing.T) {
 	plugin := validPlugin()
 	manifest := `{"plugin":"opaque-to-application-layer"}`
 	verified := installation.VerifiedArtifact{FinalArtifactPath: "installed/example.plugin/1.2.0", DigestAlgorithm: "sha256", DigestValue: "abc", VerificationPolicy: "policy-v1", ManifestJSON: manifest}
-	service := newTestService(t, repo, testAcquirer{}, testInspector{plugin: plugin}, testVerifier{result: verified}, testPromoter{})
+	service := newTestService(t, repo, testAcquirer{}, testInspector{pkg: installation.InspectedPackage{Manifest: plugin.Manifest, ManifestJSON: []byte(`{"plugin":"opaque"}`)}}, testVerifier{result: verified}, testPromoter{})
 	err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "registry-release:opaque", Kind: installation.KindInstall})
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +197,7 @@ func TestCommitFailureLeavesPromotedOperationRecoverable(t *testing.T) {
 	repo := &testRepository{selectedErr: installation.ErrVersionNotFound, commitErr: errors.New("database unavailable")}
 	plugin := validPlugin()
 	verified := installation.VerifiedArtifact{FinalArtifactPath: "installed/example.plugin/1.2.0", DigestAlgorithm: "sha256", DigestValue: "abc", VerificationPolicy: "policy-v1", ManifestJSON: `{"plugin":"opaque"}`}
-	service := newTestService(t, repo, testAcquirer{}, testInspector{plugin: plugin}, testVerifier{result: verified}, testPromoter{})
+	service := newTestService(t, repo, testAcquirer{}, testInspector{pkg: installation.InspectedPackage{Manifest: plugin.Manifest, ManifestJSON: []byte(`{"plugin":"opaque"}`)}}, testVerifier{result: verified}, testPromoter{})
 	err := service.Install(context.Background(), Request{PluginID: plugin.ID, Version: "1.2.0", SourceReference: "release:1.2.0", Kind: installation.KindInstall})
 	if err == nil {
 		t.Fatal("expected commit failure")

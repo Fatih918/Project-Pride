@@ -51,7 +51,13 @@ type ArtifactAcquirer interface {
 // Plugin aggregate. It owns Manifest decoding; this service assumes no JSON
 // property names or package layout.
 type PackageInspector interface {
-	Inspect(context.Context, string) (domain.Plugin, error)
+	Inspect(context.Context, string) (installation.InspectedPackage, error)
+}
+
+// PlatformMetadataResolver supplies Marketplace/Registry-owned metadata. The
+// package Manifest is never allowed to authoritatively set these fields.
+type PlatformMetadataResolver interface {
+	Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error)
 }
 
 // ArtifactVerifier verifies integrity and authenticity under an explicitly
@@ -74,6 +80,7 @@ type Service struct {
 	storage    OperationStorage
 	acquirer   ArtifactAcquirer
 	inspector  PackageInspector
+	metadata   PlatformMetadataResolver
 	verifier   ArtifactVerifier
 	promoter   ArtifactPromoter
 	now        func() time.Time
@@ -85,10 +92,11 @@ func NewService(
 	storage OperationStorage,
 	acquirer ArtifactAcquirer,
 	inspector PackageInspector,
+	metadata PlatformMetadataResolver,
 	verifier ArtifactVerifier,
 	promoter ArtifactPromoter,
 ) (*Service, error) {
-	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || verifier == nil || promoter == nil {
+	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || metadata == nil || verifier == nil || promoter == nil {
 		return nil, ErrMissingPort
 	}
 	return &Service{
@@ -97,6 +105,7 @@ func NewService(
 		storage:    storage,
 		acquirer:   acquirer,
 		inspector:  inspector,
+		metadata:   metadata,
 		verifier:   verifier,
 		promoter:   promoter,
 		now:        func() time.Time { return time.Now().UTC() },
@@ -184,20 +193,29 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 		return fail("record staged artifact", err)
 	}
 
-	plugin, err := s.inspector.Inspect(ctx, staged.StagingPath)
+	inspected, err := s.inspector.Inspect(ctx, staged.StagingPath)
 	if err != nil {
 		return fail("inspect Plugin package", err)
 	}
-	if err := plugin.Validate(); err != nil {
-		return fail("validate inspected Plugin", err)
-	}
-	if plugin.ID != request.PluginID || plugin.Manifest.PluginID != request.PluginID || plugin.Manifest.Version != request.Version {
+	if inspected.Manifest.PluginID != request.PluginID || inspected.Manifest.Version != request.Version {
 		return fail("match inspected Plugin identity", ErrPluginMismatch)
 	}
-	if plugin.CreatedAt.IsZero() {
-		plugin.CreatedAt = now
+	platformMetadata, err := s.metadata.Resolve(ctx, request.PluginID, request.Version)
+	if err != nil {
+		return fail("resolve platform Plugin metadata", err)
 	}
-	plugin.UpdatedAt = s.now().UTC()
+	plugin := domain.Plugin{
+		ID:        inspected.Manifest.PluginID,
+		Manifest:  inspected.Manifest,
+		Type:      platformMetadata.Type,
+		State:     domain.PluginStateInstalled,
+		Protected: platformMetadata.Protected,
+		CreatedAt: now,
+		UpdatedAt: s.now().UTC(),
+	}
+	if err := plugin.Validate(); err != nil {
+		return fail("validate assembled Plugin", err)
+	}
 
 	verified, err := s.verifier.Verify(ctx, staged.StagingPath, plugin.Clone())
 	if err != nil {
@@ -259,8 +277,10 @@ func failureCode(stage string) string {
 		return "STAGING_RECORD_FAILED"
 	case "inspect Plugin package":
 		return "PACKAGE_INSPECTION_FAILED"
-	case "validate inspected Plugin":
+	case "validate assembled Plugin":
 		return "PLUGIN_VALIDATION_FAILED"
+	case "resolve platform Plugin metadata":
+		return "PLATFORM_METADATA_RESOLUTION_FAILED"
 	case "match inspected Plugin identity":
 		return "PLUGIN_IDENTITY_MISMATCH"
 	case "verify Plugin artifact":

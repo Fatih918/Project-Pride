@@ -35,6 +35,8 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Storage and SQLite repository tests.
 
 ### Installation application service
+- Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
+- A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
 - Install/update preconditions and Plugin identity/version validation.
