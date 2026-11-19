@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -89,4 +90,15 @@ func TestInspectRejectsCaseFoldCollision(t *testing.T) {
 	file := makeArchive(t, map[string]string{"plugin.json": validManifest, "package/Main": "one", "package/main": "two"})
 	inspector, _ := New(fileSource{file}, DefaultPolicy())
 	if _, err := inspector.Inspect(context.Background(), "temporary/op-1"); err == nil { t.Fatal("expected case-fold collision rejection") }
+}
+
+func TestLoadPolicyAcceptsExactPublishedPolicy(t *testing.T) {
+	data, err := json.Marshal(DefaultPolicy())
+	if err != nil { t.Fatal(err) }
+	if _, err := LoadPolicy(bytes.NewReader(data)); err != nil { t.Fatal(err) }
+}
+
+func TestLoadPolicyRejectsDuplicateAndTrailingJSON(t *testing.T) {
+	if _, err := LoadPolicy(strings.NewReader(`{"$schema":"a","$schema":"b"}`)); err == nil { t.Fatal("expected duplicate-key rejection") }
+	if _, err := LoadPolicy(strings.NewReader(`{} {}`)); err == nil { t.Fatal("expected trailing JSON rejection") }
 }

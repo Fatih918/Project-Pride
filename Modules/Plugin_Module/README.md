@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 7 — ZIP Installation Policy accepted.
+**Status:** Increment 8 — ZIP Package Inspection implemented; extraction pending.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -36,6 +36,8 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 ### Installation application service
 - Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
+- Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
+- Inspection streams decompressed entries and counts actual expanded bytes; extraction remains a separate operation.
 - A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
@@ -56,7 +58,6 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 ## Not implemented yet
 
-- Registry artifact-source resolution and package download.
 - Registry artifact-source resolution and package download.
 - ZIP installation policy v1.0.0 is accepted and versioned; secure ZIP extraction, concrete artifact verification, and atomic filesystem promotion adapters remain unimplemented.
 - Production Marketplace signing and remote trust-configuration service.

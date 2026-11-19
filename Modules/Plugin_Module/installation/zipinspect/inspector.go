@@ -75,12 +75,20 @@ func DefaultPolicy() Policy {
 // LoadPolicy loads the versioned policy instance. The accepted v1 values are
 // exact; a missing, malformed, or modified policy fails closed.
 func LoadPolicy(r io.Reader) (Policy, error) {
+	raw, err := io.ReadAll(io.LimitReader(r, (1<<20)+1))
+	if err != nil || len(raw) > 1<<20 {
+		return Policy{}, ErrInvalidPolicy
+	}
+	if err := rejectDuplicateJSONKeys(raw); err != nil {
+		return Policy{}, fmt.Errorf("%w: %v", ErrInvalidPolicy, err)
+	}
 	var p Policy
-	dec := json.NewDecoder(io.LimitReader(r, 1<<20))
-	if err := dec.Decode(&p); err != nil { return Policy{}, fmt.Errorf("%w: %v", ErrInvalidPolicy, err) }
-	if err := dec.Decode(new(any)); err != io.EOF { return Policy{}, ErrInvalidPolicy }
-	
-	if err := p.Validate(); err != nil { return Policy{}, err }
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return Policy{}, fmt.Errorf("%w: %v", ErrInvalidPolicy, err)
+	}
+	if err := p.Validate(); err != nil {
+		return Policy{}, err
+	}
 	return p, nil
 }
 
