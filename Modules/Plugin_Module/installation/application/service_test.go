@@ -107,11 +107,9 @@ func (i testInspector) Inspect(context.Context, string) (installation.InspectedP
 	return i.pkg, i.err
 }
 type testExtractor struct {
-
 	err error
 
 	path string
-
 }
 func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, error) {
 	if e.err != nil {
