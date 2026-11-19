@@ -34,3 +34,22 @@ The developer-owned Manifest uses snake_case, both schema_version and $schema, a
 ## 3. Explicit non-decisions
 
 This record does not approve or implement a production Marketplace signing service, production bootstrap key material, remote trust endpoint, numeric ZIP limits, Registry network client/downloader, ZIP extractor, signature verifier, startup recovery coordinator, public SDK lifecycle RPCs, Plugin Loader, Runtime, or execution. These require separate implementation work and review.
+
+## 4. Accepted ZIP resource policy
+
+PZIP-0001 — Plugin ZIP Installation Policy v1.0.0 is accepted. Its machine-readable instance is `schemas/zip-installation-policy.v1.json` and its JSON Schema is `schemas/zip-installation-policy.schema.json`.
+
+The mandatory limits are:
+
+| Limit | Accepted value |
+|---|---:|
+| Compressed archive | 100 MiB |
+| Total expanded content | 512 MiB |
+| Individual file | 128 MiB |
+| ZIP entries (files and directories) | 10,000 |
+| Directory depth | 32 components |
+| Per-entry compression ratio | 100:1 |
+| Normalized UTF-8 path length | 240 bytes |
+| Parser metadata allocation budget | 16 MiB |
+
+The definitions, byte-counting rules, path-depth semantics, ratio handling, metadata budget, and fail-closed behavior are normative in PZIP-0001. These decisions unblock implementation of a bounded ZIP inspector/extractor; they do not approve a production installer or relax any PTS-0004 structural/security rule.
