@@ -1,8 +1,20 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 11 — bounded ZIP inspection/extraction, signed artifact verification, and persistent trust-sequence storage implemented.
+**Status:** Increment 12 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, and bounded HTTP artifact acquisition implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
+
+## Increment 12 — Registry artifact acquisition
+
+- Added an SDK-neutral `DescriptorResolver` port. It resolves an opaque immutable `SourceReference` into the exact signed Marketplace descriptor; the application service does not parse Registry documents.
+- Added `installation/acquisition.HTTPArtifactAcquirer` to validate descriptor routing fields and download the exact declared ZIP byte length.
+- Artifact downloads require HTTPS and an exact configured hostname allowlist. IP literals, non-443 ports, user-info, fragments, redirects, proxy use, and non-public DNS resolutions are rejected.
+- HTTP uses TLS 1.2 or newer, bounded timeouts and response headers, and context-aware streaming.
+- Compressed artifact size is bounded by PZIP-0001's 100 MiB maximum. Declared size and actual bytes must match exactly.
+- Partial artifact files are removed after stream, size, sync, or cancellation failures.
+- The original descriptor bytes are preserved in `StagedArtifact.DescriptorJSON`; acquisition does not claim to authenticate it. The existing artifact verifier remains responsible for Ed25519/JCS signature and SHA-256 verification.
+- Added tests for successful acquisition, duplicate JSON keys, unapproved hosts, oversized artifacts, size mismatches, redirects, resolver errors, cancellation, and unsafe configuration.
+- The `DescriptorResolver` remains an injected port: a production Official Registry network client is not included because the repository has not yet approved a Registry API/endpoint contract.
 
 ## Implemented
 
@@ -28,54 +40,29 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Local `Plugin_Storage` layout for installed artifacts, plugin data, cache, temporary files, and quarantine.
 - Validated path helpers with traversal and symlink-containment checks.
 - Operation-scoped temporary and quarantine path resolution, plus exclusive private staging-directory creation.
-- Root-confined filesystem adapter for operation workspaces and exclusive `artifact.zip` creation/read access.
+- Root-confined filesystem adapter for operation workspaces and exclusive `artifact.zip` creation/read/removal.
 - Canonical `Plugin_Storage`-relative path generation and safe resolution to absolute OS paths; persisted paths never depend on the process working directory.
 - SQLite-backed implementation of the existing `registry.Repository` contract using `modernc.org/sqlite`.
 - Versioned schema initialization, deterministic listing, context-aware operations, JSON persistence, and repository error mapping.
-- Storage and SQLite repository tests.
+- SQLite installation journal and installed-version persistence, plus monotonic trust-sequence storage.
 
 ### Installation application service
 - Package inspection returns developer-owned Manifest data separately from platform-owned Plugin type, state, capabilities, and permission metadata.
-- Bounded ZIP inspector performs classic-ZIP preflight, ZIP64 rejection, path/type/entry validation, duplicate-key-safe Manifest decoding, and PZIP-0001 resource checks.
-- Secure ZIP extractor revalidates the staged archive, streams only `package/` payload files, enforces actual per-file and cumulative byte limits, and removes partial output on failure.
-- Artifact verifier validates the versioned Registry descriptor, checks Plugin/version/media type/HTTPS locator, verifies Ed25519 signatures over RFC 8785 JCS canonical payloads, and hashes the exact staged ZIP with SHA-256.
-- Trust resolver authenticates remote trust configurations against distribution-provisioned Ed25519 bootstrap keys, enforces key validity/revocation, and delegates monotonic sequence/equivocation protection to an atomic persistence port.\n- SQLite schema v3 persists the accepted trust sequence and raw-configuration SHA-256 digest; a single conditional UPSERT atomically rejects rollback/equivocation and permits exact replay.
-- Installation orchestration verifies before extraction and verifies again after extraction before recording VERIFIED, reducing the chance that a changed staged archive is promoted.
-- Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths.
-- Storage adapter creates extraction directories and files exclusively through its `os.Root` confinement; output files use private permissions and never overwrite existing files.
-- Inspection and extraction remain separate components: inspection validates the complete package; the extractor then streams payload files into the same operation staging workspace.
-- A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author these fields.
-- SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
-- Explicit operation-storage port; acquisition and promotion receive canonical relative paths and resolve them only through the storage adapter.
-- Install/update preconditions and Plugin identity/version validation.
-- Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
-- Unit tests for successful installation, pre-promotion failure, update preconditions, and recoverable commit failure.
-
-## Architectural boundaries
-
-- Domain, registry, discovery, and installation application packages do not depend on generated Protobuf types or the Plugin SDK.
-- SDK integration dependency is isolated in `sdkadapter/go.mod`.
-- The SDK adapter contains translation logic only; it does not access repositories directly or implement authorization, capability selection, lifecycle, loading, or execution.
-- Manifest identity/descriptive fields remain separate from platform/Marketplace-owned capability and permission metadata.
-- Permission IDs are metadata only; authorization remains outside this module.
-- Core owns capability matching and candidate selection.
-- SQLite stores structured metadata; Plugin package files belong in local `Plugin_Storage`.
-- The application service treats Registry source references and package/verification formats as opaque adapter contracts; it does not invent unresolved wire formats or trust policy.
+- Bounded ZIP inspector enforces PZIP-0001 and validates Manifest/package structure.
+- Secure ZIP extractor streams only `package/` payload files through confined storage.
+- Artifact verifier validates descriptor schema, Ed25519/JCS signature, SHA-256 digest, and trust configuration.
+- Installation orchestration verifies before extraction and again afterward, then delegates promotion and atomic persistence through injected ports.
+- Operation paths remain canonical and relative to `Plugin_Storage`; SDK and domain packages do not depend on generated Protobuf types.
 
 ## Not implemented yet
 
-- Registry artifact-source resolution and package download, including production population of `StagedArtifact.DescriptorJSON`.
-- ZIP installation policy v1.0.0, bounded ZIP inspection, confined ZIP extraction, and cryptographic verification primitives are implemented; production Registry acquisition, composition wiring, and atomic filesystem promotion remain unimplemented.
+- Production Official Registry descriptor resolver and its authenticated API contract.
 - Production Marketplace signing and remote trust-configuration service.
-- Production trust-configuration transport and distribution bootstrap-key provisioning.
-- Production composition-root wiring for the artifact verifier, trust resolver, and final-path adapter.
-- Plugin Manifest and Registry artifact descriptor schemas are specified; the ZIP inspector and artifact descriptor verifier implement the corresponding validation paths.
-- Filesystem promotion adapter and startup recovery coordinator.
-- Uninstall and destructive cleanup.
-- Plugin Loader, lifecycle transitions, Runtime, and execution.
-- Permission authorization.
+- Distribution bootstrap-key provisioning and production composition-root wiring.
+- Filesystem atomic promotion adapter and startup recovery coordinator.
+- Public SDK lifecycle RPCs, Plugin Loader, Runtime, execution, authorization, uninstall, and destructive cleanup.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification primitives are available, but production installation remains disabled until the Registry acquisition adapter supplies signed descriptors, the trust sequence store and bootstrap-key provisioning are wired, and filesystem promotion/recovery are implemented.
+Production installation remains disabled. The acquisition adapter is a bounded transport component, not proof that a complete production installation pipeline is ready. A production resolver, trust/bootstrap wiring, promotion, and startup recovery are still required.
 
 ## Checks
 
@@ -95,5 +82,4 @@ go test ./...
 go vet ./...
 ```
 
-
-The accepted PZIP-0001 policy fixes the ZIP processing limits: 100 MiB compressed archive, 512 MiB total expanded bytes, 128 MiB per file, 10,000 entries, directory depth 32, per-entry compression ratio 100:1, normalized path length 240 bytes, and 16 MiB parser metadata budget. The policy does not itself implement or enable extraction.
+PZIP-0001 limits: 100 MiB compressed archive, 512 MiB expanded content, 128 MiB per file, 10,000 ZIP entries, depth 32, 100:1 per-entry compression ratio, 240-byte normalized UTF-8 paths, and 16 MiB parser metadata.
