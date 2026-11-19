@@ -109,7 +109,7 @@ func (i testInspector) Inspect(context.Context, string) (installation.InspectedP
 
 type testMetadataResolver struct {
 	metadata installation.PlatformMetadata
-	err error
+	err      error
 }
 
 func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
