@@ -134,8 +134,9 @@ func (i *Inspector) Inspect(ctx context.Context, stagingPath string) (installati
 	if err != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: parse ZIP directory: %v", ErrInvalidArchive, err) }
 	if len(reader.File) != len(entries) { return installation.InspectedPackage{}, ErrInvalidArchive }
 
-	var manifestFile *zip.File
+	var manifestBytes []byte
 	files := make(map[string]struct{}, len(entries))
+	var actualExpanded uint64
 	for index, entry := range entries {
 		if err := ctx.Err(); err != nil { return installation.InspectedPackage{}, err }
 		zf := reader.File[index]
@@ -143,30 +144,54 @@ func (i *Inspector) Inspect(ctx context.Context, stagingPath string) (installati
 			uint64(zf.CompressedSize64) != entry.compressed || uint64(zf.UncompressedSize64) != entry.expanded {
 			return installation.InspectedPackage{}, fmt.Errorf("%w: central directory mismatch", ErrInvalidArchive)
 		}
+		files[entry.normalized] = struct{}{}
+		if entry.directory { continue }
 		rc, openErr := zf.Open()
 		if openErr != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: invalid local header for %q: %v", ErrInvalidArchive, entry.normalized, openErr) }
-		if closeErr := rc.Close(); closeErr != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: close ZIP entry: %v", ErrInvalidArchive, closeErr) }
-		files[entry.normalized] = struct{}{}
+		var content []byte
+		var actual uint64
 		if entry.normalized == "plugin.json" {
-			if entry.directory || manifestFile != nil { return installation.InspectedPackage{}, ErrInvalidManifest }
-			manifestFile = zf
+			content, actual, err = readEntry(ctx, rc, true, i.policy.Limits.MaxSingleFileBytes)
+			if err == nil { manifestBytes = content }
+		} else {
+			_, actual, err = readEntry(ctx, rc, false, i.policy.Limits.MaxSingleFileBytes)
 		}
+		closeErr := rc.Close()
+		if err != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: read entry %q: %v", ErrInvalidArchive, entry.normalized, err) }
+		if closeErr != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: close entry %q: %v", ErrInvalidArchive, entry.normalized, closeErr) }
+		if actual != entry.expanded { return installation.InspectedPackage{}, fmt.Errorf("%w: expanded size mismatch for %q", ErrInvalidArchive, entry.normalized) }
+		if actualExpanded > ^uint64(0)-actual { return installation.InspectedPackage{}, ErrInvalidArchive }
+		actualExpanded += actual
+		if actualExpanded > i.policy.Limits.MaxTotalExpandedBytes { return installation.InspectedPackage{}, fmt.Errorf("%w: actual expanded bytes exceed policy", ErrInvalidArchive) }
 	}
-	if manifestFile == nil { return installation.InspectedPackage{}, fmt.Errorf("%w: root plugin.json is required", ErrInvalidManifest) }
-	manifestReader, err := manifestFile.Open()
-	if err != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: open plugin.json: %v", ErrInvalidManifest, err) }
-	manifestBytes, readErr := io.ReadAll(io.LimitReader(manifestReader, int64(i.policy.Limits.MaxSingleFileBytes)+1))
-	closeErr := manifestReader.Close()
-	if readErr != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: read plugin.json: %v", ErrInvalidManifest, readErr) }
-	if closeErr != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: close plugin.json: %v", ErrInvalidManifest, closeErr) }
-	if uint64(len(manifestBytes)) > i.policy.Limits.MaxSingleFileBytes { return installation.InspectedPackage{}, ErrInvalidManifest }
+	if manifestBytes == nil { return installation.InspectedPackage{}, fmt.Errorf("%w: root plugin.json is required", ErrInvalidManifest) }
 	manifest, err := decodeManifest(manifestBytes)
 	if err != nil { return installation.InspectedPackage{}, err }
 	entryPoint, err := normalizeEntry(manifest.EntryPoint, false, i.policy)
 	if err != nil { return installation.InspectedPackage{}, fmt.Errorf("%w: invalid entry_point", ErrInvalidManifest) }
 	if _, ok := files["package/"+entryPoint]; !ok { return installation.InspectedPackage{}, fmt.Errorf("%w: entry_point does not exist under package/", ErrInvalidManifest) }
 	_ = centralOffset
-	return installation.InspectedPackage{Manifest: manifest, ManifestJSON: append([]byte(nil), manifestBytes...), EntryCount: len(entries), ExpandedBytes: expanded}, nil
+	_ = expanded
+	return installation.InspectedPackage{Manifest: manifest, ManifestJSON: append([]byte(nil), manifestBytes...), EntryCount: len(entries), ExpandedBytes: actualExpanded}, nil
+}
+
+func readEntry(ctx context.Context, reader io.Reader, capture bool, maximum uint64) ([]byte, uint64, error) {
+	var output bytes.Buffer
+	buffer := make([]byte, 32*1024)
+	var total uint64
+	for {
+		if err := ctx.Err(); err != nil { return nil, total, err }
+		n, err := reader.Read(buffer)
+		if n > 0 {
+			if total > ^uint64(0)-uint64(n) || total+uint64(n) > maximum { return nil, total, ErrInvalidArchive }
+			total += uint64(n)
+			if capture { if _, writeErr := output.Write(buffer[:n]); writeErr != nil { return nil, total, writeErr } }
+		}
+		if err == io.EOF { break }
+		if err != nil { return nil, total, err }
+		if n == 0 { return nil, total, io.ErrNoProgress }
+	}
+	return output.Bytes(), total, nil
 }
 
 func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint64, uint64, error) {
@@ -213,6 +238,7 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		extraLen := int(binary.LittleEndian.Uint16(h[30:32]))
 		commentLen := int(binary.LittleEndian.Uint16(h[32:34]))
 		diskStart := binary.LittleEndian.Uint16(h[34:36])
+		creatorOS := binary.LittleEndian.Uint16(h[4:6]) >> 8
 		external := binary.LittleEndian.Uint32(h[38:42])
 		crc32 := binary.LittleEndian.Uint32(h[16:20])
 		localOffset := uint64(binary.LittleEndian.Uint32(h[42:46]))
@@ -236,7 +262,7 @@ func preflight(file *os.File, size uint64, policy Policy) ([]centralEntry, uint6
 		seen[folded] = struct{}{}
 		modeType := (external >> 16) & 0170000
 		if modeType != 0 && modeType != 0100000 && modeType != 0040000 { return nil, 0, 0, ErrUnsafeEntry }
-		if external&0x00000400 != 0 || (external&0x10 != 0) != directory { return nil, 0, 0, ErrUnsafeEntry }
+		if external&0x00000400 != 0 || ((creatorOS == 0 || creatorOS == 10) && (external&0x10 != 0) != directory) { return nil, 0, 0, ErrUnsafeEntry }
 		if modeType == 0040000 && !directory { return nil, 0, 0, ErrUnsafeEntry }
 		if modeType == 0100000 && directory { return nil, 0, 0, ErrUnsafeEntry }
 		if directory && (compressed != 0 || uncompressed != 0) { return nil, 0, 0, ErrUnsafeEntry }
