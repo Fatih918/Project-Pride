@@ -1,0 +1,19 @@
+{
+  "$schema": "urn:pride:plugin-zip-installation-policy:1",
+  "schema_version": "1.0.0",
+  "policy_id": "pride.plugin.zip-installation",
+  "package_format": {
+    "archive_format": "zip",
+    "media_type": "application/vnd.pride.plugin+zip"
+  },
+  "limits": {
+    "max_compressed_archive_bytes": 104857600,
+    "max_total_expanded_bytes": 536870912,
+    "max_single_file_bytes": 134217728,
+    "max_entry_count": 10000,
+    "max_directory_depth": 32,
+    "max_compression_ratio": 100,
+    "max_path_length_bytes": 240,
+    "max_metadata_allocation_bytes": 16777216
+  }
+}
