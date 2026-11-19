@@ -59,7 +59,7 @@ Exactly one plugin.json MUST exist at the archive root. Plugin payload files MUS
 
 Version 1 permits only regular files and directories. The extractor MUST reject absolute paths, drive-qualified paths, parent traversal, backslash ambiguity, duplicate normalized paths, case-folding collisions, symlink or special-file external attributes, encrypted entries, unsupported compression methods, and entries outside the root Manifest/package layout. ZIP external attributes indicating links, sockets, FIFOs, devices, or other non-regular entries MUST be rejected.
 
-The extractor MUST enforce versioned configurable limits for compressed archive bytes, expanded bytes, entry count, individual file size, path length, nesting depth, compression ratio, and metadata allocation. Numeric limits are published in the accepted versioned policy `docs/Plugin ZIP Installation Policy.md` (PZIP-0001) and machine-readable instance `schemas/zip-installation-policy.v1.json`. A production extractor MUST enforce that policy and MUST fail closed when it is unavailable or invalid. Missing limits are a fail-closed configuration error. Extraction MUST stream data and MUST verify actual bytes written rather than trusting ZIP header sizes.
+The extractor MUST enforce versioned configurable limits for compressed archive bytes, expanded bytes, entry count, individual file size, path length, nesting depth, compression ratio, and metadata allocation. Numeric limits MUST be published in a versioned installation policy before a production extractor is enabled. Missing limits are a fail-closed configuration error. Extraction MUST stream data and MUST verify actual bytes written rather than trusting ZIP header sizes.
 
 Extraction occurs only inside the operation-scoped staging directory. Every output path MUST be resolved through the Plugin storage adapter and checked for containment. Promotion is forbidden until descriptor signature, byte length, SHA-256 digest, ZIP structure, extraction policy, Manifest validity, and identity/version consistency all pass.
 
@@ -108,7 +108,3 @@ Descriptor, Manifest, and trust configuration have independent schema_version va
 The application service remains SDK-neutral. Acquisition, ZIP inspection/extraction, digest/signature verification, and trust configuration are injected adapters/components. Filesystem paths are resolved only by the storage adapter. This specification does not introduce public SDK lifecycle RPCs.
 
 Production installation remains disabled until required adapters and the numeric ZIP installation policy are implemented and tested.
-
-## 9. Versioned ZIP installation policy
-
-PZIP-0001 defines the mandatory numeric resource limits for version 1 ZIP inspection and extraction. Its accepted version is 1.0.0. The machine-readable instance is `schemas/zip-installation-policy.v1.json`, validated by `schemas/zip-installation-policy.schema.json`. Implementations MUST enforce the exact policy semantics and values; missing or invalid policy configuration is a fail-closed error. Changing limits or enforcement semantics requires an explicitly reviewed policy version. PZIP-0001 does not enable production installation until the parser, extractor, verifier, and recovery boundaries are implemented and tested.

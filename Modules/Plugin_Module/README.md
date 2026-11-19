@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 7 — ZIP Installation Policy accepted.
+**Status:** Increment 6 — Installation Application Service foundation.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -56,7 +56,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 - Registry artifact-source resolution and package download.
 - Registry artifact-source resolution and package download.
-- ZIP installation policy v1.0.0 is accepted and versioned; ZIP inspection/extraction, concrete artifact verification, and atomic filesystem promotion adapters remain unimplemented.
+- ZIP extraction, concrete artifact verification, and atomic filesystem promotion adapters.
 - Production Marketplace signing and remote trust-configuration service.
 - Plugin Manifest JSON Schema and Registry artifact descriptor schemas are specified, but production parsers/verifiers are not yet implemented.
 - Filesystem promotion adapter and startup recovery coordinator.
@@ -83,6 +83,3 @@ gofmt -w .
 go test ./...
 go vet ./...
 ```
-
-
-The accepted PZIP-0001 policy fixes the ZIP processing limits: 100 MiB compressed archive, 512 MiB total expanded bytes, 128 MiB per file, 10,000 entries, directory depth 32, per-entry compression ratio 100:1, normalized path length 240 bytes, and 16 MiB parser metadata budget. The policy does not itself implement or enable extraction.

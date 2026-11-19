@@ -33,7 +33,7 @@ The developer-owned Manifest uses snake_case, both schema_version and $schema, a
 
 ## 3. Explicit non-decisions
 
-This record does not approve or implement a production Marketplace signing service, production bootstrap key material, remote trust endpoint, numeric ZIP limits, Registry network client/downloader, ZIP extractor, signature verifier, startup recovery coordinator, public SDK lifecycle RPCs, Plugin Loader, Runtime, or execution. These require separate implementation work and review.
+This record does not approve or implement a production Marketplace signing service, production bootstrap key material, remote trust endpoint, Registry network client/downloader, ZIP extractor, signature verifier, startup recovery coordinator, public SDK lifecycle RPCs, Plugin Loader, Runtime, or execution. These require separate implementation work and review. Numeric ZIP resource limits are accepted separately by PZIP-0001; acceptance of those limits does not implement the extractor.
 
 ## 4. Accepted ZIP resource policy
 
