@@ -42,6 +42,7 @@ func (a *Adapter) CreateExtractionDirectory(ctx context.Context, workspace, rela
 	if !strings.HasPrefix(relativePath, "package/") {
 		return ErrInvalidExtractionPath
 	}
+
 	packageRoot := path.Join(workspace, "package")
 	rootInfo, err := a.root.Lstat(filepath.FromSlash(packageRoot))
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 {
@@ -122,8 +123,11 @@ func (a *Adapter) RemoveExtractionDirectory(ctx context.Context, workspace, rela
 }
 
 func validateExtractionRelativePath(value string) error {
-	if value == "" || !strings.HasPrefix(value, "package/") || strings.Contains(value, "\\") || strings.ContainsRune(value, 0) ||
-		strings.HasPrefix(value, "/") || path.Clean(value) != value { return ErrInvalidExtractionPath }
+	if value == "" || !strings.HasPrefix(value, "package/") ||
+		strings.Contains(value, "\\") || strings.ContainsRune(value, 0) ||
+		strings.HasPrefix(value, "/") || path.Clean(value) != value {
+		return ErrInvalidExtractionPath
+	}
 	for _, part := range strings.Split(value, "/") {
 		if part == "" || part == "." || part == ".." || strings.Contains(part, ":") {
 			return ErrInvalidExtractionPath
