@@ -106,6 +106,7 @@ type testInspector struct {
 func (i testInspector) Inspect(context.Context, string) (installation.InspectedPackage, error) {
 	return i.pkg, i.err
 }
+
 type testExtractor struct {
 	err error
 
