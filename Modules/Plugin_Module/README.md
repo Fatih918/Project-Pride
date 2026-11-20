@@ -99,7 +99,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are implemented.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are wired into the production host.
 
 The detailed deployment boundary is in `docs/Trust Configuration Transport and Bootstrap-Key Provisioning.md`.
 
