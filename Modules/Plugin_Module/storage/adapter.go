@@ -110,24 +110,32 @@ func (a *Adapter) CreateArtifactFile(ctx context.Context, stagingPath string) (*
 }
 
 // OpenArtifactFile opens the acquired ZIP as a regular read-only file.
-func (a *Adapter) OpenArtifactFile(ctx context.Context, stagingPath string) (*os.File, error) {
+func (a *Adapter) OpenArtifactFile(ctx context.Context, artifactDirectory string) (*os.File, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := a.validateOperationWorkspace(stagingPath); err != nil {
-		return nil, err
+	if strings.HasPrefix(artifactDirectory, "temporary/") {
+		if err := a.validateOperationWorkspace(artifactDirectory); err != nil {
+			return nil, err
+		}
+	} else if strings.HasPrefix(artifactDirectory, "installed/") {
+		if err := a.validateInstalledArtifactDirectory(artifactDirectory); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, ErrInvalidPath
 	}
-	filePath := path.Join(stagingPath, OperationArtifactFileName)
+	filePath := path.Join(artifactDirectory, OperationArtifactFileName)
 	info, err := a.root.Lstat(filepath.FromSlash(filePath))
 	if err != nil {
-		return nil, fmt.Errorf("inspect staged Plugin artifact: %w", err)
+		return nil, fmt.Errorf("inspect Plugin artifact: %w", err)
 	}
 	if !info.Mode().IsRegular() {
 		return nil, ErrInvalidPath
 	}
 	file, err := a.root.OpenFile(filepath.FromSlash(filePath), os.O_RDONLY, 0)
 	if err != nil {
-		return nil, fmt.Errorf("open staged Plugin artifact: %w", err)
+		return nil, fmt.Errorf("open Plugin artifact: %w", err)
 	}
 	return file, nil
 }
