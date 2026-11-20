@@ -19,12 +19,13 @@ The host must execute these steps in order:
 5. Construct the ZIP package inspector/extractor and artifact verifier using the approved PZIP-0001 policy and the production trust resolver.
 6. Construct the trusted platform metadata resolver. It must return platform-owned Plugin type/protected metadata; never derive these fields from developer-controlled Manifest JSON.
 7. Construct the recovery coordinator with the real operation repository, Plugin registry repository, confined quarantine storage, package inspector, platform metadata resolver, and artifact verifier.
-8. Acquire the host's cross-process startup/recovery exclusion mechanism.
-9. Call `startup.Initialize(ctx, recoverer, pluginRepository)`.
-10. Publish the discovery service and mark Plugin discovery ready only after initialization succeeds. Keep discovery and Plugin execution unavailable on any error.
-11. Release the startup exclusion only after recovery and readiness publication have completed. The host must prevent a second process from racing the recovery window.
+8. Ensure the canonical Plugin_Storage directory exists and acquire `startup.AcquireRecoveryLock(ctx, layout.StartupRecoveryLockPath())`.
+9. Retain the returned lock handle for the entire lifetime of the Plugin subsystem, not merely until recovery completes. This prevents a second process from recovering an operation while the first process is actively installing or updating a Plugin.
+10. Call `startup.Initialize(ctx, recoverer, pluginRepository)`.
+11. Publish the discovery service and mark Plugin discovery ready only after initialization succeeds. Keep discovery and Plugin execution unavailable on any error.
+12. During shutdown, stop accepting new Plugin operations, wait for in-flight operations to finish, close Module dependencies, and then release the recovery lock. On initialization failure, close constructed dependencies and release the lock.
 
-The current `startup.Initialize` implements step 9's fail-closed ordering only. It does not acquire a cross-process lock, create dependencies, or publish application readiness.
+`startup.Initialize` implements the fail-closed discovery ordering. `startup.AcquireRecoveryLock` provides the process-shared advisory lock; the host remains responsible for acquiring it before initialization and retaining it until Plugin subsystem shutdown.
 
 ## 3. Required production dependencies
 
@@ -51,20 +52,13 @@ No production URL, credential, bootstrap key, Marketplace signer, or authenticat
 
 ## 5. Cross-process coordination
 
-Until a cross-process recovery lease/lock is implemented and verified, the host must guarantee that only one process can perform Plugin startup recovery against a given Plugin_Storage root and SQLite database at a time.
+The host must hold the cross-process recovery lock for the full lifetime of the Plugin subsystem. Serializing only the recovery call is insufficient: another process must not recover the first process's live PREPARING/STAGED installation operation.
 
 An in-process mutex is insufficient. A process-local flag, PID file without robust stale-owner handling, or SQLite connection pool setting is not a cross-process exclusion mechanism.
 
-The chosen mechanism must:
-- be scoped to the canonical Plugin data root/database identity;
-- prevent two hosts from running recovery concurrently;
-- be acquired before calling `startup.Initialize`;
-- be released on success, failure, cancellation, and process shutdown;
-- handle abnormal process termination without permanently blocking future startup;
-- define behavior for unsupported/network filesystems;
-- have concurrency, crash-release, and stale-owner tests.
+The Module exposes `startup.AcquireRecoveryLock` and `Layout.StartupRecoveryLockPath`. The lock is an OS advisory lock on a persistent file scoped to the canonical Plugin_Storage root. It is released on explicit close or automatically by the operating system when the process exits abnormally. The lock file itself must never be deleted while processes may use the storage root.
 
-The Module currently does not provide this mechanism. Until it does, single-process startup is an explicit deployment constraint, not an optional recommendation.
+The lock is supported on Linux, macOS, and Windows. Other operating systems fail closed. It requires a local filesystem with reliable advisory file-lock semantics; network filesystems and shared folders are unsupported unless their locking behavior is independently validated. The host must acquire the lock before `startup.Initialize` and retain it until Plugin subsystem shutdown. An in-process mutex or a PID file is not a substitute.
 
 ## 6. Shutdown and resource ownership
 
