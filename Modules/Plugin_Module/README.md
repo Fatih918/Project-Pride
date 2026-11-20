@@ -41,8 +41,8 @@ The production host boundary and required startup ordering are specified in [Plu
 - Recovery errors fail closed: the function returns no discovery service, preventing callers using this entry point from exposing Plugins with unreconciled installation state.
 - The host retains ownership of repository/storage lifetimes and must close resources if initialization fails.
 - `startup.AcquireRecoveryLock` provides an OS advisory lock on the persistent `Plugin_Storage/startup-recovery.lock` file (Linux, macOS, and Windows); it waits with context cancellation and is released on close or process termination. The host must retain the lock for the full Plugin subsystem lifetime so a second process cannot recover another process's active installation operation.
-- The lock requires a local filesystem with reliable advisory-lock semantics. Network/shared filesystems and unsupported operating systems fail closed or remain unsupported; the host must not delete the persistent lock file.
-- This is a Module-level startup boundary, not a production executable or Core composition root; the host must still wire real dependencies and serialize competing process startups until cross-process recovery coordination is implemented.
+- The lock requires a local filesystem with reliable advisory-lock semantics. Network/shared filesystems must not be used unless their locking behavior is independently validated; unsupported operating systems fail closed. The host must not delete the persistent lock file.
+- This is a Module-level startup boundary, not a production executable or Core composition root; the production host must still wire real dependencies, acquire `startup.AcquireRecoveryLock` before initialization, and retain it until Plugin subsystem shutdown.
 
 ### SDK discovery integration
 - A separate `sdkadapter` Go module implements `pride-plugin-sdk/server.DiscoveryPort`.
