@@ -50,6 +50,7 @@ type InstallationOperation struct {
 	StagingPath        string
 	FinalArtifactPath  string
 	SourceReference    string
+	DescriptorJSON     string
 	DigestAlgorithm    string
 	DigestValue        string
 	VerificationPolicy string
