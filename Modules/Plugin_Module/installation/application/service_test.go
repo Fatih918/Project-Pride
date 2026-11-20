@@ -93,9 +93,9 @@ func (a testAcquirer) Acquire(_ context.Context, _ string, target string) (insta
 		return installation.StagedArtifact{}, a.err
 	}
 	if a.path != "" {
-		return installation.StagedArtifact{StagingPath: a.path}, nil
+		return installation.StagedArtifact{StagingPath: a.path, DescriptorJSON: []byte(`{"schema_version":"1.0.0"}`)}, nil
 	}
-	return installation.StagedArtifact{StagingPath: target}, nil
+	return installation.StagedArtifact{StagingPath: target, DescriptorJSON: []byte(`{"schema_version":"1.0.0"}`)}, nil
 }
 
 type testInspector struct {
