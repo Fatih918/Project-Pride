@@ -30,7 +30,7 @@ func completeInstallation(t *testing.T, repository *Repository, operation instal
 	}
 	staging := "temporary/" + string(operation.OperationID)
 	finalPath := "installed/" + string(plugin.ID) + "/" + plugin.Manifest.Version
-	if err := repository.RecordStaged(ctx, operation.OperationID, installation.StagedArtifact{StagingPath: staging}); err != nil {
+	if err := repository.RecordStaged(ctx, operation.OperationID, installation.StagedArtifact{StagingPath: staging, DescriptorJSON: []byte(`{"schema_version":"1.0.0"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := json.Marshal(plugin.Manifest)
@@ -108,7 +108,7 @@ func TestInstallationUpdateSwitchesSelectionOnlyAtCommit(t *testing.T) {
 	if err := repository.BeginOperation(ctx, op2); err != nil {
 		t.Fatal(err)
 	}
-	if err := repository.RecordStaged(ctx, op2.OperationID, installation.StagedArtifact{StagingPath: "temporary/op-update-2"}); err != nil {
+	if err := repository.RecordStaged(ctx, op2.OperationID, installation.StagedArtifact{StagingPath: "temporary/op-update-2", DescriptorJSON: []byte(`{"schema_version":"1.0.0"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := json.Marshal(second.Manifest)
@@ -163,7 +163,7 @@ func TestInstallationCommitMismatchDoesNotChangeSelection(t *testing.T) {
 	if err := repository.BeginOperation(context.Background(), op2); err != nil {
 		t.Fatal(err)
 	}
-	if err := repository.RecordStaged(context.Background(), op2.OperationID, installation.StagedArtifact{StagingPath: "temporary/op-atomic-2"}); err != nil {
+	if err := repository.RecordStaged(context.Background(), op2.OperationID, installation.StagedArtifact{StagingPath: "temporary/op-atomic-2", DescriptorJSON: []byte(`{"schema_version":"1.0.0"}`)}); err != nil {
 		t.Fatal(err)
 	}
 	manifest, _ := json.Marshal(second.Manifest)
