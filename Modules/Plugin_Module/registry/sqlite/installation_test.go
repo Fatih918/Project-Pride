@@ -329,7 +329,6 @@ func TestInstallationContextCancellation(t *testing.T) {
 	}
 }
 
-
 func TestSchemaV3MigrationAddsDescriptorWithoutDroppingOperationRows(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "schema-v3.sqlite")
 	db, err := sql.Open("sqlite", path)
