@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 15 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, bounded HTTP artifact acquisition, bounded HTTPS trust transport, confined filesystem promotion, and durable recovery verification evidence implemented.
+**Status:** Increment 16 — bounded ZIP inspection/extraction, signed artifact verification, durable recovery evidence, confined promotion/quarantine, and an installation recovery coordinator implemented; production startup wiring remains pending.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -65,7 +65,11 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Confined filesystem promotion adapter atomically renames the complete verified operation workspace from `temporary/<operation-id>` to `installed/<plugin-id>/<version>` on the same Plugin_Storage filesystem; validates canonical paths and staged contents, and rejects an existing destination.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
-- SQLite schema v4 persists the exact signed Registry artifact descriptor bytes with each STAGED operation (bounded to 1 MiB), so a future recovery coordinator can repeat signature, trust-key, descriptor, and artifact-digest verification after restart.
+- SQLite schema v4 persists the exact signed Registry artifact descriptor bytes with each STAGED operation (bounded to 1 MiB), allowing recovery to repeat signature, trust-key, descriptor, and artifact-digest verification after restart.
+- Startup recovery coordinator reconciles PREPARING/STAGED/VERIFIED operations by quarantining their incomplete workspaces and marking them rolled back; it never resumes untrusted partial staging.
+- PROMOTED recovery reopens the final artifact through the confined storage adapter, re-inspects the ZIP/Manifest, resolves platform metadata, repeats descriptor/signature/digest verification, compares persisted verification evidence, and atomically completes the installation commit.
+- Missing descriptor evidence and definitive package/cryptographic failures fail closed and quarantine the uncommitted artifact; transient trust/metadata or database failures leave PROMOTED operations retryable.
+- Confined artifact reads now support both temporary workspaces and installed-version directories; quarantine moves are operation-scoped, root-confined, no-overwrite, and idempotent after a completed move.
 
 ## Architectural boundaries
 
@@ -84,7 +88,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Production Marketplace signing and remote trust-configuration service.
 - Actual distribution bootstrap public-key value and release/build provisioning.
 - Production composition-root wiring for the Registry resolver, trust source, bootstrap keys, artifact verifier, and final-path adapter.
-- Startup recovery coordinator and idempotent reconciliation of incomplete installation operations; descriptor evidence is now durable, but final-artifact revalidation and safe reconciliation are still pending.
+- Production startup composition and invocation of the recovery coordinator before plugin discovery/execution; the coordinator exists but is not wired into an application startup path.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
