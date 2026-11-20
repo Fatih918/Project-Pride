@@ -170,8 +170,8 @@ func (r *Repository) CommitInstallation(ctx context.Context, id installation.Ope
 	if err != nil {
 		return fmt.Errorf("%w: encode Plugin Manifest", installation.ErrInvalidRecord)
 	}
-	var suppliedManifest domain.Manifest
-	if err := json.Unmarshal([]byte(version.ManifestJSON), &suppliedManifest); err != nil || !reflect.DeepEqual(suppliedManifest, plugin.Manifest) {
+	suppliedManifest, err := decodeManifestJSON([]byte(version.ManifestJSON))
+	if err != nil || !reflect.DeepEqual(suppliedManifest, plugin.Manifest) {
 		return installation.ErrRecordMismatch
 	}
 
@@ -196,8 +196,8 @@ func (r *Repository) CommitInstallation(ctx context.Context, id installation.Ope
 		op.VerificationPolicy != version.VerificationPolicy || op.ManifestJSON == "" {
 		return installation.ErrRecordMismatch
 	}
-	var verifiedManifest domain.Manifest
-	if err := json.Unmarshal([]byte(op.ManifestJSON), &verifiedManifest); err != nil || !reflect.DeepEqual(verifiedManifest, plugin.Manifest) {
+	verifiedManifest, err := decodeManifestJSON([]byte(op.ManifestJSON))
+	if err != nil || !reflect.DeepEqual(verifiedManifest, plugin.Manifest) {
 		return installation.ErrRecordMismatch
 	}
 	version.ManifestJSON = string(manifestJSON)
@@ -252,6 +252,53 @@ func (r *Repository) CommitInstallation(ctx context.Context, id installation.Ope
 		return fmt.Errorf("%w: commit installation transaction", installation.ErrPersistence)
 	}
 	return nil
+}
+
+// decodeManifestJSON accepts the versioned snake_case package Manifest
+// representation as well as the legacy encoding/json representation used by
+// earlier registry records. The package inspector remains responsible for
+// schema validation; this adapter only maps persisted evidence to the domain
+// value used for exact record comparison.
+func decodeManifestJSON(data []byte) (domain.Manifest, error) {
+	var dto struct {
+		PluginID            string   `json:"plugin_id"`
+		Name                string   `json:"name"`
+		Version             string   `json:"version"`
+		Description         string   `json:"description"`
+		Author              string   `json:"author"`
+		License             string   `json:"license"`
+		EntryPoint          string   `json:"entry_point"`
+		MinimumPRIDEVersion string   `json:"minimum_pride_version"`
+		Homepage            string   `json:"homepage"`
+		DocumentationURL    string   `json:"documentation_url"`
+		RepositoryURL       string   `json:"repository_url"`
+		IssueTrackerURL     string   `json:"issue_tracker_url"`
+		Keywords            []string `json:"keywords"`
+		Screenshots         []string `json:"screenshots"`
+		Category            string   `json:"category"`
+		Icon                string   `json:"icon"`
+		ChangelogURL        string   `json:"changelog_url"`
+	}
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return domain.Manifest{}, err
+	}
+	if dto.PluginID != "" {
+		return domain.Manifest{
+			PluginID: domain.PluginID(dto.PluginID), Name: dto.Name, Version: dto.Version,
+			Description: dto.Description, Author: dto.Author, License: dto.License,
+			EntryPoint: dto.EntryPoint, MinimumPRIDEVersion: dto.MinimumPRIDEVersion,
+			Homepage: dto.Homepage, DocumentationURL: dto.DocumentationURL,
+			RepositoryURL: dto.RepositoryURL, IssueTrackerURL: dto.IssueTrackerURL,
+			Keywords: dto.Keywords, Screenshots: dto.Screenshots, Category: dto.Category,
+			Icon: dto.Icon, ChangelogURL: dto.ChangelogURL,
+		}, nil
+	}
+
+	var legacy domain.Manifest
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return domain.Manifest{}, err
+	}
+	return legacy, nil
 }
 
 func (r *Repository) GetOperation(ctx context.Context, id installation.OperationID) (installation.InstallationOperation, error) {
