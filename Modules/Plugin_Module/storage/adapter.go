@@ -146,6 +146,10 @@ func (a *Adapter) validateOperationWorkspace(stagingPath string) error {
 	if _, err := a.layout.ResolvePluginStoragePath(stagingPath); err != nil {
 		return err
 	}
+	parentInfo, err := a.root.Lstat("temporary")
+	if err != nil || !parentInfo.IsDir() || parentInfo.Mode()&fs.ModeSymlink != 0 {
+		return ErrInvalidOperationWorkspace
+	}
 	info, err := a.root.Lstat(filepath.FromSlash(stagingPath))
 	if err != nil {
 		return fmt.Errorf("inspect operation workspace: %w", err)
