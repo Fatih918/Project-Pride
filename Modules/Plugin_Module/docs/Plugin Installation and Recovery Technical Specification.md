@@ -302,7 +302,7 @@ Minimum recovery behavior:
 
 Recovery must be idempotent. Re-running it after a crash must not duplicate installed records, overwrite a version, or select an unverified artifact.
 
-A journal record alone is not proof that an artifact still matches its previously verified bytes. Recovery must re-check the artifact against the recorded digest and approved policy before completing a commit.
+A journal record alone is not proof that an artifact still matches its previously verified bytes. Recovery must re-check the artifact against the recorded digest and approved policy before completing a commit. The STAGED transition therefore persists the exact signed artifact descriptor bytes (maximum 1 MiB) alongside the staging path. Recovery must pass those exact bytes back through the existing descriptor validator, RFC 8785 canonicalization, trust-key resolver, Ed25519 signature verification, and SHA-256 artifact hashing; it must not reconstruct or reserialize the signed descriptor from parsed fields. Legacy/incomplete journal rows without descriptor evidence must fail closed and must never be auto-committed.
 
 ## 13. Quarantine and Failure Handling
 

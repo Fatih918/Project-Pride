@@ -15,7 +15,7 @@ import (
 )
 
 const operationColumns = `operation_id, plugin_id, target_version, operation_kind, phase,
-	staging_path, final_artifact_path, source_reference, digest_algorithm, digest_value,
+	staging_path, final_artifact_path, source_reference, descriptor_json, digest_algorithm, digest_value,
 	verification_policy, manifest_json, failure_code, created_at, updated_at`
 
 func (r *Repository) BeginOperation(ctx context.Context, operation installation.InstallationOperation) error {
@@ -27,9 +27,9 @@ func (r *Repository) BeginOperation(ctx context.Context, operation installation.
 	}
 	_, err := r.db.ExecContext(ctx, `INSERT INTO plugin_installation_operations (
 		operation_id, plugin_id, target_version, operation_kind, phase, staging_path,
-		final_artifact_path, source_reference, digest_algorithm, digest_value,
+		final_artifact_path, source_reference, descriptor_json, digest_algorithm, digest_value,
 		verification_policy, manifest_json, failure_code, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
+	) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
 		string(operation.OperationID), string(operation.PluginID), operation.TargetVersion,
 		string(operation.Kind), string(operation.Phase), nullableString(operation.StagingPath),
 		operation.SourceReference, formatTime(operation.CreatedAt), formatTime(operation.UpdatedAt))
@@ -49,8 +49,12 @@ func (r *Repository) RecordStaged(ctx context.Context, id installation.Operation
 	if err := validateOperationPath(staged.StagingPath, "temporary"); err != nil {
 		return err
 	}
+	if len(staged.DescriptorJSON) == 0 || len(staged.DescriptorJSON) > 1<<20 || !json.Valid(staged.DescriptorJSON) {
+		return fmt.Errorf("%w: staged artifact descriptor must be valid JSON within 1 MiB", installation.ErrInvalidRecord)
+	}
 	return r.transition(ctx, id, installation.PhasePreparing, installation.PhaseStaged,
-		`staging_path = ?, updated_at = ?`, staged.StagingPath, formatTime(time.Now().UTC()))
+		`staging_path = ?, descriptor_json = ?, updated_at = ?`,
+		staged.StagingPath, string(staged.DescriptorJSON), formatTime(time.Now().UTC()))
 }
 
 func (r *Repository) RecordVerified(ctx context.Context, id installation.OperationID, verified installation.VerifiedArtifact) error {
@@ -386,15 +390,16 @@ func (r *Repository) GetSelectedVersion(ctx context.Context, pluginID domain.Plu
 func scanOperation(row scanner) (installation.InstallationOperation, error) {
 	var o installation.InstallationOperation
 	var id, pluginID, kind, phase string
-	var staging, final, digestAlgorithm, digestValue, policy, manifest, failure sql.NullString
+	var staging, final, descriptor, digestAlgorithm, digestValue, policy, manifest, failure sql.NullString
 	var created, updated string
 	err := row.Scan(&id, &pluginID, &o.TargetVersion, &kind, &phase, &staging, &final, &o.SourceReference,
-		&digestAlgorithm, &digestValue, &policy, &manifest, &failure, &created, &updated)
+		&descriptor, &digestAlgorithm, &digestValue, &policy, &manifest, &failure, &created, &updated)
 	if err != nil {
 		return o, err
 	}
 	o.OperationID, o.PluginID, o.Kind, o.Phase = installation.OperationID(id), domain.PluginID(pluginID), installation.Kind(kind), installation.Phase(phase)
 	o.StagingPath, o.FinalArtifactPath = staging.String, final.String
+	o.DescriptorJSON = descriptor.String
 	o.DigestAlgorithm, o.DigestValue, o.VerificationPolicy, o.ManifestJSON, o.FailureCode = digestAlgorithm.String, digestValue.String, policy.String, manifest.String, failure.String
 	o.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
 	if err != nil {
