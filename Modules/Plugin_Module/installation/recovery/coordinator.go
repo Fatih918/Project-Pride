@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"pride-plugin-module/domain"
@@ -134,6 +135,9 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 
 	inspected, err := c.inspector.Inspect(ctx, operation.FinalArtifactPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return quarantineAndFail(failureInvalidPackage, err)
+		}
 		if errors.Is(err, zipinspect.ErrInvalidArchive) ||
 			errors.Is(err, zipinspect.ErrInvalidManifest) ||
 			errors.Is(err, zipinspect.ErrUnsafeEntry) ||
