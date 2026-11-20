@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 16 — bounded ZIP inspection/extraction, signed artifact verification, durable recovery evidence, confined promotion/quarantine, and an installation recovery coordinator implemented; production startup wiring remains pending.
+**Status:** Increment 17 — bounded ZIP installation, signed artifact verification, durable recovery, and a fail-closed startup recovery gate implemented; production startup wiring remains pending.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -33,6 +33,12 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 ### Discovery application service
 - Five read-only queries: list, get, find by exact capability ID, get metadata, and get operational state.
 - Type and state filters, deterministic Plugin ID ordering, opaque versioned pagination tokens, and context/error propagation.
+
+### Startup recovery gate
+- `startup.Initialize` runs the installation recovery coordinator before constructing and returning the read-only discovery service.
+- Recovery errors fail closed: the function returns no discovery service, preventing callers using this entry point from exposing Plugins with unreconciled installation state.
+- The host retains ownership of repository/storage lifetimes and must close resources if initialization fails.
+- This is a Module-level startup boundary, not a production executable or Core composition root; the host must still wire real dependencies and serialize competing process startups until cross-process recovery coordination is implemented.
 
 ### SDK discovery integration
 - A separate `sdkadapter` Go module implements `pride-plugin-sdk/server.DiscoveryPort`.
@@ -88,12 +94,12 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Production Marketplace signing and remote trust-configuration service.
 - Actual distribution bootstrap public-key value and release/build provisioning.
 - Production composition-root wiring for the Registry resolver, trust source, bootstrap keys, artifact verifier, and final-path adapter.
-- Production startup composition and invocation of the recovery coordinator before plugin discovery/execution; the coordinator exists but is not wired into an application startup path.
+- Production Core/application composition and invocation of `startup.Initialize` before plugin discovery/execution; the Module-level gate exists but no production executable or composition root currently wires it.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are implemented.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are wired into the production host.
 
 The detailed deployment boundary is in `docs/Trust Configuration Transport and Bootstrap-Key Provisioning.md`.
 
