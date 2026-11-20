@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 14 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, bounded HTTP artifact acquisition, bounded HTTPS trust transport, and confined filesystem promotion implemented.
+**Status:** Increment 15 — bounded ZIP inspection/extraction, signed artifact verification, persistent trust-sequence storage, bounded HTTP artifact acquisition, bounded HTTPS trust transport, confined filesystem promotion, and durable recovery verification evidence implemented.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -65,6 +65,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Confined filesystem promotion adapter atomically renames the complete verified operation workspace from `temporary/<operation-id>` to `installed/<plugin-id>/<version>` on the same Plugin_Storage filesystem; validates canonical paths and staged contents, and rejects an existing destination.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
+- SQLite schema v4 persists the exact signed Registry artifact descriptor bytes with each STAGED operation (bounded to 1 MiB), so a future recovery coordinator can repeat signature, trust-key, descriptor, and artifact-digest verification after restart.
 
 ## Architectural boundaries
 
@@ -83,7 +84,7 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 - Production Marketplace signing and remote trust-configuration service.
 - Actual distribution bootstrap public-key value and release/build provisioning.
 - Production composition-root wiring for the Registry resolver, trust source, bootstrap keys, artifact verifier, and final-path adapter.
-- Startup recovery coordinator and idempotent reconciliation of incomplete installation operations.
+- Startup recovery coordinator and idempotent reconciliation of incomplete installation operations; descriptor evidence is now durable, but final-artifact revalidation and safe reconciliation are still pending.
 - Uninstall and destructive cleanup.
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
