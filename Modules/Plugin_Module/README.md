@@ -4,6 +4,8 @@
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
+The production host boundary and required startup ordering are specified in [Plugin Module Production Host Integration Contract](docs/Plugin%20Module%20Production%20Host%20Integration%20Contract.md). The contract is not evidence that production composition is implemented.
+
 ## Increment 13 — Trust configuration transport
 
 - Added `artifactverify.HTTPTrustConfigurationSource` for a distribution-configured HTTPS endpoint; no Marketplace endpoint or authentication protocol is invented.
