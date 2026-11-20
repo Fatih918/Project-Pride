@@ -78,15 +78,15 @@ func newRecoveryIntegrationEnvironment(t *testing.T) *recoveryIntegrationEnviron
 func integrationManifestJSON(t *testing.T) []byte {
 	t.Helper()
 	manifest := map[string]any{
-		"$schema": "urn:pride:plugin-manifest:1",
-		"schema_version": "1.0.0",
-		"plugin_id": "sample.plugin",
-		"name": "Sample Plugin",
-		"version": "1.0.0",
-		"description": "Recovery integration fixture",
-		"author": "PRIDE",
-		"license": "MIT",
-		"entry_point": "main.js",
+		"$schema":               "urn:pride:plugin-manifest:1",
+		"schema_version":        "1.0.0",
+		"plugin_id":             "sample.plugin",
+		"name":                  "Sample Plugin",
+		"version":               "1.0.0",
+		"description":           "Recovery integration fixture",
+		"author":                "PRIDE",
+		"license":               "MIT",
+		"entry_point":           "main.js",
 		"minimum_pride_version": "1.0.0",
 	}
 	raw, err := json.Marshal(manifest)
@@ -145,15 +145,15 @@ func createIntegrationPackage(t *testing.T, env *recoveryIntegrationEnvironment,
 
 func integrationOperation(operationID, stagingPath string, now time.Time) installation.InstallationOperation {
 	return installation.InstallationOperation{
-		OperationID: installation.OperationID(operationID),
-		PluginID: "sample.plugin",
-		TargetVersion: "1.0.0",
-		Kind: installation.KindInstall,
-		Phase: installation.PhasePreparing,
-		StagingPath: stagingPath,
+		OperationID:     installation.OperationID(operationID),
+		PluginID:        "sample.plugin",
+		TargetVersion:   "1.0.0",
+		Kind:            installation.KindInstall,
+		Phase:           installation.PhasePreparing,
+		StagingPath:     stagingPath,
 		SourceReference: "registry:sample.plugin:1.0.0",
-		CreatedAt: now,
-		UpdatedAt: now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 }
 
@@ -220,11 +220,11 @@ func TestRecoveryIntegrationSQLiteAndFilesystemCommitsPromotedArtifact(t *testin
 		t.Fatal(err)
 	}
 	verified := installation.VerifiedArtifact{
-		FinalArtifactPath: finalRelative,
-		DigestAlgorithm: "sha-256",
-		DigestValue: "integration-digest",
+		FinalArtifactPath:  finalRelative,
+		DigestAlgorithm:    "sha-256",
+		DigestValue:        "integration-digest",
 		VerificationPolicy: "integration-policy-v1",
-		ManifestJSON: string(manifestJSON),
+		ManifestJSON:       string(manifestJSON),
 	}
 	if err := env.repo.RecordVerified(ctx, op.OperationID, verified); err != nil {
 		t.Fatal(err)
@@ -235,7 +235,7 @@ func TestRecoveryIntegrationSQLiteAndFilesystemCommitsPromotedArtifact(t *testin
 
 	coordinator, err := New(env.repo, env.repo, env.storage, env.inspect,
 		integrationMetadataResolver{metadata: installation.PlatformMetadata{
-			Type: domain.PluginTypePassive,
+			Type:      domain.PluginTypePassive,
 			Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}},
 		}},
 		integrationArtifactVerifier{finalPath: finalRelative, digest: verified.DigestValue, policy: verified.VerificationPolicy})
