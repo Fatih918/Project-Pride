@@ -292,9 +292,9 @@ Minimum recovery behavior:
 
 | Journal / filesystem condition | Required behavior |
 |---|---|
-| PREPARING or STAGED, no final artifact | Remove or quarantine incomplete temporary data; mark rolled back |
-| VERIFIED, staging exists, final absent | Revalidate staged artifact against persisted digest/policy before promotion; otherwise roll back |
-| PROMOTED, final exists, no installed DB record | Reverify final artifact and complete the final DB transaction only if all persisted evidence remains valid; otherwise move to quarantine or remove safely and roll back |
+| PREPARING, STAGED, or VERIFIED | Quarantine the operation-scoped temporary workspace and mark rolled back; recovery does not resume partially completed staging |
+
+| PROMOTED, final exists, no installed DB record | Reinspect the final ZIP/Manifest, resolve trusted platform metadata, reverify the exact persisted descriptor/signature/digest, compare persisted evidence, then atomically commit; quarantine and fail on definitive integrity failures; leave transient dependency/database failures retryable |
 | PROMOTED, final missing | Do not register the Plugin; mark operation failed and preserve previous selected version |
 | COMMITTED, final artifact missing | Mark installation inconsistent/unavailable; never claim the artifact is healthy |
 | Unreferenced final version directory | Do not auto-register it; quarantine or leave for a separately defined reconciliation policy |
@@ -302,7 +302,7 @@ Minimum recovery behavior:
 
 Recovery must be idempotent. Re-running it after a crash must not duplicate installed records, overwrite a version, or select an unverified artifact.
 
-A journal record alone is not proof that an artifact still matches its previously verified bytes. Recovery must re-check the artifact against the recorded digest and approved policy before completing a commit. The STAGED transition therefore persists the exact signed artifact descriptor bytes (maximum 1 MiB) alongside the staging path. Recovery must pass those exact bytes back through the existing descriptor validator, RFC 8785 canonicalization, trust-key resolver, Ed25519 signature verification, and SHA-256 artifact hashing; it must not reconstruct or reserialize the signed descriptor from parsed fields. Legacy/incomplete journal rows without descriptor evidence must fail closed and must never be auto-committed.
+A journal record alone is not proof that an artifact still matches its previously verified bytes. Recovery must re-check the artifact against the recorded digest and approved policy before completing a commit. The STAGED transition therefore persists the exact signed artifact descriptor bytes (maximum 1 MiB) alongside the staging path. Recovery must pass those exact bytes back through the existing descriptor validator, RFC 8785 canonicalization, trust-key resolver, Ed25519 signature verification, and SHA-256 artifact hashing; it must not reconstruct or reserialize the signed descriptor from parsed fields. Legacy/incomplete journal rows without descriptor evidence must fail closed and must never be auto-committed. The recovery coordinator now implements this conservative policy: PREPARING, STAGED, and VERIFIED operations are quarantined and rolled back rather than resumed; PROMOTED operations are re-inspected and reverified from the final installed path before the atomic commit. Definitive package/descriptor/signature/digest failures are quarantined and marked FAILED. Transient trust/metadata or persistence failures leave the PROMOTED journal entry retryable. The coordinator is not yet wired into the production startup composition, which must invoke it before plugin discovery or execution.
 
 ## 13. Quarantine and Failure Handling
 
