@@ -85,6 +85,10 @@ func (a *Adapter) ensureInstalledPluginDirectory(relativePath string) error {
 	if relativePath == "" || !strings.HasPrefix(relativePath, "installed/") {
 		return ErrInvalidPath
 	}
+	installedInfo, err := a.root.Lstat("installed")
+	if err != nil || !installedInfo.IsDir() || installedInfo.Mode()&fs.ModeSymlink != 0 {
+		return ErrInvalidPath
+	}
 	info, err := a.root.Lstat(filepath.FromSlash(relativePath))
 	if errors.Is(err, os.ErrNotExist) {
 		if err := a.root.Mkdir(filepath.FromSlash(relativePath), 0o700); err != nil && !errors.Is(err, os.ErrExist) {
