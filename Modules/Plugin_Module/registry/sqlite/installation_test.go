@@ -328,3 +328,101 @@ func TestInstallationContextCancellation(t *testing.T) {
 		t.Fatalf("canceled GetSelectedVersion = %v", err)
 	}
 }
+
+
+func TestSchemaV3MigrationAddsDescriptorWithoutDroppingOperationRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "schema-v3.sqlite")
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`CREATE TABLE plugin_installation_operations (
+		operation_id TEXT PRIMARY KEY NOT NULL,
+		plugin_id TEXT NOT NULL,
+		target_version TEXT NOT NULL,
+		operation_kind TEXT NOT NULL,
+		phase TEXT NOT NULL,
+		staging_path TEXT,
+		final_artifact_path TEXT,
+		source_reference TEXT NOT NULL,
+		digest_algorithm TEXT,
+		digest_value TEXT,
+		verification_policy TEXT,
+		manifest_json TEXT,
+		failure_code TEXT,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO plugin_installation_operations
+		(operation_id, plugin_id, target_version, operation_kind, phase, source_reference, created_at, updated_at)
+		VALUES ('legacy-op', 'plugin.legacy', '1.0.0', 'INSTALL', 'PREPARING', 'release:legacy', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("PRAGMA user_version = 3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	repository, err := New(context.Background(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer repository.Close()
+
+	var version int
+	if err := repository.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version != 4 {
+		t.Fatalf("schema version = %d, want 4", version)
+	}
+	var descriptorColumn int
+	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('plugin_installation_operations')
+		WHERE name = 'descriptor_json'`).Scan(&descriptorColumn); err != nil {
+		t.Fatal(err)
+	}
+	if descriptorColumn != 1 {
+		t.Fatalf("descriptor_json column count = %d, want 1", descriptorColumn)
+	}
+	var operationID string
+	var descriptor sql.NullString
+	if err := repository.db.QueryRow("SELECT operation_id, descriptor_json FROM plugin_installation_operations WHERE operation_id = 'legacy-op'").Scan(&operationID, &descriptor); err != nil {
+		t.Fatal(err)
+	}
+	if operationID != "legacy-op" || descriptor.Valid {
+		t.Fatalf("legacy operation was not preserved as evidence-incomplete: id=%q descriptor=%#v", operationID, descriptor)
+	}
+}
+
+func TestRecordStagedRequiresBoundedJSONDescriptor(t *testing.T) {
+	repository, _ := openTestRepository(t)
+	ctx := context.Background()
+	op := validOperation("op-descriptor-validation", "plugin.descriptor", "1.0.0", time.Now().UTC())
+	if err := repository.BeginOperation(ctx, op); err != nil {
+		t.Fatal(err)
+	}
+	for _, descriptor := range [][]byte{
+		nil,
+		[]byte("{"),
+		make([]byte, (1<<20)+1),
+	} {
+		err := repository.RecordStaged(ctx, op.OperationID, installation.StagedArtifact{
+			StagingPath: "temporary/op-descriptor-validation", DescriptorJSON: descriptor,
+		})
+		if !errors.Is(err, installation.ErrInvalidRecord) {
+			t.Fatalf("invalid descriptor error = %v, want ErrInvalidRecord", err)
+		}
+	}
+	persisted, err := repository.GetOperation(ctx, op.OperationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if persisted.Phase != installation.PhasePreparing || persisted.DescriptorJSON != "" {
+		t.Fatalf("invalid descriptor changed operation state: %#v", persisted)
+	}
+}
