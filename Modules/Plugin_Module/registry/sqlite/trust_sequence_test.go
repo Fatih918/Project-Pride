@@ -88,6 +88,10 @@ func TestTrustSequenceSchemaMigrationFromVersionTwo(t *testing.T) {
 	if _, err := repository.db.Exec("DROP TABLE plugin_trust_configuration_state"); err != nil {
 		t.Fatal(err)
 	}
+	// Recreate the actual v2 schema shape: v2 predates descriptor_json.
+	if _, err := repository.db.Exec("ALTER TABLE plugin_installation_operations DROP COLUMN descriptor_json"); err != nil {
+		t.Fatalf("remove v4-only descriptor column from v2 fixture: %v", err)
+	}
 	if _, err := repository.db.Exec("PRAGMA user_version = 2"); err != nil {
 		t.Fatal(err)
 	}
@@ -104,8 +108,16 @@ func TestTrustSequenceSchemaMigrationFromVersionTwo(t *testing.T) {
 	if err := migrated.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != 3 {
-		t.Fatalf("schema version = %d, want 3", version)
+	if version != schemaVersion {
+		t.Fatalf("schema version = %d, want %d", version, schemaVersion)
+	}
+	var descriptorColumn int
+	if err := migrated.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('plugin_installation_operations')
+		WHERE name = 'descriptor_json'`).Scan(&descriptorColumn); err != nil {
+		t.Fatal(err)
+	}
+	if descriptorColumn != 1 {
+		t.Fatalf("descriptor_json column count = %d, want 1", descriptorColumn)
 	}
 	if err := migrated.AcceptTrustConfiguration(context.Background(), 1, sha256.Sum256([]byte("v3"))); err != nil {
 		t.Fatalf("trust table unavailable after migration: %v", err)
