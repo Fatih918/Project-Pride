@@ -78,6 +78,9 @@ func TestInstallationCommitAndReopen(t *testing.T) {
 	if persistedOperation.Phase != installation.PhaseCommitted {
 		t.Fatalf("phase = %s", persistedOperation.Phase)
 	}
+	if persistedOperation.DescriptorJSON != `{"schema_version":"1.0.0"}` {
+		t.Fatalf("descriptor evidence was not persisted: %q", persistedOperation.DescriptorJSON)
+	}
 	if err := repository.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -295,8 +298,8 @@ func TestInstallationSchemaMigrationPreservesExistingPlugins(t *testing.T) {
 	if err := repository.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != 3 {
-		t.Fatalf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Fatalf("schema version = %d, want 4", version)
 	}
 	var tableCount int
 	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master
