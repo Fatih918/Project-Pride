@@ -147,7 +147,6 @@ func (a *Adapter) DeleteQuarantineOperation(ctx context.Context, operationID str
 	return nil
 }
 
-
 // readQuarantineDirectory opens a directory through the confined root and
 // reads its entries from the resulting directory handle.
 func (a *Adapter) readQuarantineDirectory(relative string) ([]fs.DirEntry, error) {
