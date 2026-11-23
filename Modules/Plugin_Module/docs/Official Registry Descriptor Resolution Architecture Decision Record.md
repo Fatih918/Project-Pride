@@ -21,7 +21,16 @@ Adopt a versioned, provider-neutral Registry release reference containing:
 - Plugin ID;
 - immutable release ID.
 
-The reference is an identifier, never a URL. It must not contain a hostname, arbitrary path, query credential, token, or caller-selected endpoint. Mutable aliases such as `latest`, branches, and unqualified tags are not valid immutable release IDs. The exact textual grammar will be defined by the parser contract before implementation.
+The reference is an identifier, never a URL. It must not contain a hostname, arbitrary path, query credential, token, or caller-selected endpoint. Mutable aliases such as `latest`, branches, and unqualified tags are not valid immutable release IDs. The canonical textual grammar is:
+
+`pride-registry:v1/{namespace}/{plugin-id}/{release-id}`
+
+- `namespace`: 1–63 lowercase ASCII characters; starts with a letter; remaining characters are lowercase letters, digits, or hyphens; cannot end with a hyphen.
+- `plugin-id`: 1–255 lowercase ASCII letters, digits, periods, underscores, or hyphens; cannot start or end with punctuation.
+- `release-id`: 1–128 ASCII letters, digits, periods, underscores, or hyphens; cannot start or end with a period. The aliases `latest`, `stable`, and `current` are rejected case-insensitively.
+- Components are separated by literal `/`; percent encoding, URL syntax, query/fragment data, whitespace, backslashes, and extra path segments are rejected.
+
+The parser enforces syntax only. The Registry service MUST guarantee that each issued release ID is immutable and MUST NOT resolve mutable aliases through this route.
 
 ### R2 — Registry endpoint configuration
 
@@ -93,7 +102,7 @@ The exact raw descriptor bytes must pass unchanged from resolver to verifier and
 
 ## Go boundary
 
-Keep the application-facing port SDK-neutral. The current `DescriptorResolver.ResolveDescriptor(context.Context, string) ([]byte, error)` shape may be retained only if the source reference carries all expected identity fields unambiguously. Otherwise, replace it with a typed resolution request before implementing the HTTP adapter. The HTTP adapter receives endpoint configuration, token provider, bounded transport, and parser dependencies; it does not access Plugin storage or SQLite.
+Keep the application-facing port SDK-neutral. The descriptor resolver uses a typed `DescriptorResolutionRequest` carrying the parsed release reference, expected Plugin ID, and expected version. The HTTP artifact acquirer constructs this request from the installation request and passes it to the Registry adapter. The HTTP adapter receives endpoint configuration, token provider, bounded transport, and parser dependencies; it does not access Plugin storage or SQLite.
 
 ## Consequences
 
@@ -105,10 +114,10 @@ Keep the application-facing port SDK-neutral. The current `DescriptorResolver.Re
 ## Implementation acceptance criteria
 
 1. Strict parser and canonical representation for the versioned Registry release reference.
-2. Typed resolution request carrying expected Plugin ID, version, and immutable release ID where not fully encoded in the reference.
-3. Host-configured namespace-to-origin mapping and token-provider port.
-4. Hardened HTTPS resolver with redirects/proxies disabled and bounded response handling.
-5. Typed error mapping and context cancellation propagation.
+2. Typed resolution request carrying expected Plugin ID, version, namespace, and immutable release ID.
+3. Host-configured namespace-to-origin mapping and host-owned audience-scoped token-provider port.
+4. Hardened HTTPS resolver with TLS 1.2+, redirects/proxies disabled, all DNS answers validated, and bounded response handling.
+5. Typed error mapping and context cancellation propagation; no hidden retries.
 6. Exact raw descriptor preservation and identity checks before artifact download.
-7. Tests for authn/authz, not found/conflict, 429/5xx, redirects, wrong origin, private/mixed DNS answers, malformed/duplicate/oversized JSON, identity mismatch, timeout/cancellation, and credential non-disclosure.
+7. Tests for authentication/authorization, not found/conflict, 429/5xx, redirects, wrong origin, private/mixed DNS answers, malformed/duplicate/oversized JSON, identity mismatch, timeout/cancellation, and credential non-disclosure.
 8. No changes to Marketplace Ed25519 signing semantics or public SDK lifecycle APIs.
