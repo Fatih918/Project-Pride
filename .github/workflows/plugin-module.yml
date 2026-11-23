@@ -51,6 +51,38 @@ jobs:
       - name: Run vet
         run: go vet ./...
 
+  verify-startup-lock-platforms:
+    name: verify-startup-lock (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: Modules/Plugin_Module
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: Modules/Plugin_Module/go.mod
+          cache: true
+
+      - name: Check formatting
+        shell: bash
+        run: test -z "$(gofmt -l startup)"
+
+      - name: Run startup and cross-process lock tests
+        run: go test -count=1 ./startup
+
+      - name: Run startup vet
+        run: go vet ./startup
+
   verify-sdk-adapter:
     runs-on: ubuntu-latest
     defaults:

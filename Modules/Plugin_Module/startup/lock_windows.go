@@ -34,8 +34,14 @@ func openPlatformLockFile(path string) (*os.File, error) {
 	if err := windows.GetFileInformationByHandle(handle, &info); err != nil {
 		return fail(err)
 	}
-	if info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 ||
-		windows.GetFileType(handle) != windows.FILE_TYPE_DISK {
+	if info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DIRECTORY) != 0 {
+		return fail(ErrInvalidRecoveryLockPath)
+	}
+	fileType, err := windows.GetFileType(handle)
+	if err != nil {
+		return fail(err)
+	}
+	if fileType != windows.FILE_TYPE_DISK {
 		return fail(ErrInvalidRecoveryLockPath)
 	}
 	return os.NewFile(uintptr(handle), path), nil
