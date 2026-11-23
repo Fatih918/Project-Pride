@@ -188,7 +188,7 @@ func NewHTTPRegistryDescriptorResolver(config RegistryResolverConfig, tokens Reg
 func parseRegistryOrigin(raw string) (*url.URL, error) {
 	parsed, err := url.Parse(raw)
 	if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" ||
-		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" ||
 		(parsed.Path != "" && parsed.Path != "/") ||
 		(parsed.Port() != "" && parsed.Port() != "443") {
 		return nil, ErrRegistryConfiguration
@@ -328,8 +328,17 @@ func validBearerToken(value string) bool {
 	if value == "" || len(value) > 8192 {
 		return false
 	}
+	paddingStarted := false
 	for _, r := range value {
-		if r <= 0x20 || r >= 0x7f {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
+			r == '-' || r == '.' || r == '_' || r == '~' || r == '+' || r == '/':
+			if paddingStarted {
+				return false
+			}
+		case r == '=':
+			paddingStarted = true
+		default:
 			return false
 		}
 	}
