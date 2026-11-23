@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"pride-plugin-module/domain"
 	"pride-plugin-module/installation"
 )
 
@@ -31,13 +32,6 @@ var (
 	ErrArtifactSize      = errors.New("downloaded artifact size does not match descriptor")
 	ErrUnexpectedStatus  = errors.New("artifact host returned an unexpected HTTP status")
 )
-
-// DescriptorResolver resolves an opaque immutable source reference to the
-// exact signed Marketplace descriptor. It must not return an unsigned or
-// locally synthesized descriptor.
-type DescriptorResolver interface {
-	ResolveDescriptor(context.Context, string) ([]byte, error)
-}
 
 // ArtifactFileStore exposes only the confined artifact-file operations needed
 // by acquisition. Implementations must create exclusively below stagingPath.
@@ -66,6 +60,8 @@ type HTTPArtifactAcquirer struct {
 type artifactDescriptor struct {
 	Schema        string `json:"$schema"`
 	SchemaVersion string `json:"schema_version"`
+	PluginID      string `json:"plugin_id"`
+	Version       string `json:"version"`
 	ReleaseID     string `json:"release_id"`
 	DownloadURI   string `json:"download_uri"`
 	MediaType     string `json:"media_type"`
@@ -141,15 +137,23 @@ func newHTTPArtifactAcquirer(resolver DescriptorResolver, files ArtifactFileStor
 // Acquire resolves the source reference, downloads exactly the descriptor's
 // declared ZIP size, and stores both descriptor and bytes in the operation
 // workspace. Signature and digest verification remain the verifier's job.
-func (a *HTTPArtifactAcquirer) Acquire(ctx context.Context, sourceReference, stagingPath string) (installation.StagedArtifact, error) {
+func (a *HTTPArtifactAcquirer) Acquire(ctx context.Context, sourceReference string, expectedPluginID domain.PluginID, expectedVersion, stagingPath string) (installation.StagedArtifact, error) {
 	if a == nil || a.resolver == nil || a.files == nil || a.client == nil ||
-		strings.TrimSpace(sourceReference) == "" || strings.TrimSpace(stagingPath) == "" {
+		strings.TrimSpace(sourceReference) == "" || strings.TrimSpace(string(expectedPluginID)) == "" || strings.TrimSpace(expectedVersion) == "" || strings.TrimSpace(stagingPath) == "" {
 		return installation.StagedArtifact{}, ErrInvalidDescriptor
 	}
 	if err := ctx.Err(); err != nil {
 		return installation.StagedArtifact{}, err
 	}
-	descriptorJSON, err := a.resolver.ResolveDescriptor(ctx, sourceReference)
+	reference, err := ParseRegistryReleaseReference(sourceReference)
+	if err != nil {
+		return installation.StagedArtifact{}, err
+	}
+	resolution, err := NewDescriptorResolutionRequest(reference, expectedPluginID, expectedVersion)
+	if err != nil {
+		return installation.StagedArtifact{}, err
+	}
+	descriptorJSON, err := a.resolver.ResolveDescriptor(ctx, resolution)
 	if err != nil {
 		return installation.StagedArtifact{}, fmt.Errorf("resolve Marketplace artifact descriptor: %w", err)
 	}
@@ -162,6 +166,9 @@ func (a *HTTPArtifactAcquirer) Acquire(ctx context.Context, sourceReference, sta
 	var descriptor artifactDescriptor
 	if err := json.Unmarshal(descriptorJSON, &descriptor); err != nil {
 		return installation.StagedArtifact{}, fmt.Errorf("%w: %v", ErrInvalidDescriptor, err)
+	}
+	if descriptor.PluginID != string(expectedPluginID) || descriptor.Version != expectedVersion || descriptor.ReleaseID != reference.ReleaseID {
+		return installation.StagedArtifact{}, ErrRegistryIdentity
 	}
 	artifactURL, err := a.validateDescriptor(descriptor)
 	if err != nil {

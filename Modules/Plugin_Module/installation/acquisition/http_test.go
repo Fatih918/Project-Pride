@@ -11,10 +11,10 @@ import (
 	"testing"
 )
 
-type descriptorResolverFunc func(context.Context, string) ([]byte, error)
+type descriptorResolverFunc func(context.Context, DescriptorResolutionRequest) ([]byte, error)
 
-func (f descriptorResolverFunc) ResolveDescriptor(ctx context.Context, source string) ([]byte, error) {
-	return f(ctx, source)
+func (f descriptorResolverFunc) ResolveDescriptor(ctx context.Context, request DescriptorResolutionRequest) ([]byte, error) {
+	return f(ctx, request)
 }
 
 type artifactFileStore struct{ path string }
@@ -38,13 +38,16 @@ func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, erro
 }
 
 func descriptor(uri, size string) []byte {
-	return []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","schema_version":"1.0.0","plugin_id":"example.plugin","version":"1.0.0","release_id":"release-1","download_uri":"` + uri + `","media_type":"application/vnd.pride.plugin+zip","size_bytes":` + size + `,"digest":{"algorithm":"sha-256","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"signature":{"algorithm":"Ed25519","key_id":"key-1","value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}}`)
+	return []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","schema_version":"1.0.0","plugin_id":"example.plugin","version":"1.0.0","release_id":"rel_01J9K8M7N6P5Q4R3S2T1","download_uri":"` + uri + `","media_type":"application/vnd.pride.plugin+zip","size_bytes":` + size + `,"digest":{"algorithm":"sha-256","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"signature":{"algorithm":"Ed25519","key_id":"key-1","value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}}`)
 }
 
 func newTestAcquirer(t *testing.T, rawDescriptor []byte, response *http.Response, maxBytes int64) (*HTTPArtifactAcquirer, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "artifact.zip")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) {
+	resolver := descriptorResolverFunc(func(_ context.Context, request DescriptorResolutionRequest) ([]byte, error) {
+		if request.ExpectedPluginID != "example.plugin" || request.ExpectedVersion != "1.0.0" || request.Reference.ReleaseID != "rel_01J9K8M7N6P5Q4R3S2T1" {
+			return nil, ErrRegistryIdentity
+		}
 		return append([]byte(nil), rawDescriptor...), nil
 	})
 	files := artifactFileStore{path: path}
@@ -68,7 +71,7 @@ func TestAcquireDownloadsExactArtifactAndRetainsDescriptor(t *testing.T) {
 	body := "zip-bytes"
 	raw := descriptor("https://downloads.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, body), 100)
-	result, err := acquirer.Acquire(context.Background(), "registry-release:1", "temporary/op-1")
+	result, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +90,7 @@ func TestAcquireDownloadsExactArtifactAndRetainsDescriptor(t *testing.T) {
 func TestAcquireRejectsUnapprovedHostBeforeRequest(t *testing.T) {
 	raw := descriptor("https://attacker.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, "zip-bytes"), 100)
-	_, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1")
+	_, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if !errors.Is(err, ErrUnsafeArtifactURL) {
 		t.Fatalf("expected unsafe URL rejection, got %v", err)
 	}
@@ -99,7 +102,7 @@ func TestAcquireRejectsUnapprovedHostBeforeRequest(t *testing.T) {
 func TestAcquireRejectsDuplicateDescriptorKeys(t *testing.T) {
 	raw := []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
 	acquirer, _ := newTestAcquirer(t, raw, response(http.StatusOK, "x"), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrInvalidDescriptor) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrInvalidDescriptor) {
 		t.Fatalf("expected duplicate-key rejection, got %v", err)
 	}
 }
@@ -109,7 +112,7 @@ func TestAcquireRemovesPartialArtifactOnSizeMismatch(t *testing.T) {
 	stream := response(http.StatusOK, "short")
 	stream.ContentLength = -1
 	acquirer, path := newTestAcquirer(t, raw, stream, 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactSize) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactSize) {
 		t.Fatalf("expected size mismatch, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
@@ -122,7 +125,7 @@ func TestAcquireEnforcesStreamingMaximumAndRemovesPartialArtifact(t *testing.T) 
 	stream := response(http.StatusOK, strings.Repeat("x", 101))
 	stream.ContentLength = -1
 	acquirer, path := newTestAcquirer(t, raw, stream, 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
 		t.Fatalf("expected archive limit rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
@@ -133,7 +136,7 @@ func TestAcquireEnforcesStreamingMaximumAndRemovesPartialArtifact(t *testing.T) 
 func TestAcquireRejectsDescriptorAboveConfiguredMaximum(t *testing.T) {
 	raw := descriptor("https://downloads.example.test/plugin.zip", "101")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, strings.Repeat("x", 101)), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
 		t.Fatalf("expected declared archive limit rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
@@ -144,7 +147,7 @@ func TestAcquireRejectsDescriptorAboveConfiguredMaximum(t *testing.T) {
 func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 	raw := descriptor("https://downloads.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusFound, ""), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrUnexpectedStatus) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrUnexpectedStatus) {
 		t.Fatalf("expected redirect/status rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
@@ -154,19 +157,19 @@ func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 
 func TestAcquirePreservesResolverErrors(t *testing.T) {
 	want := errors.New("registry unavailable")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, want })
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, want })
 	acquirer, err := NewHTTPArtifactAcquirer(resolver, artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}, Config{AllowedHosts: []string{"downloads.example.test"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = acquirer.Acquire(context.Background(), "release:1", "temporary/op-1")
+	_, err = acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if !errors.Is(err, want) {
 		t.Fatalf("expected resolver error, got %v", err)
 	}
 }
 
 func TestNewHTTPArtifactAcquirerRejectsUnsafeConfiguration(t *testing.T) {
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, nil })
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, nil })
 	files := artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}
 	for _, config := range []Config{
 		{},

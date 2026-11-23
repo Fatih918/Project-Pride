@@ -33,18 +33,19 @@ type IDGenerator interface {
 	NewOperationID(context.Context) (installation.OperationID, error)
 }
 
-// ArtifactAcquirer obtains the immutable release ZIP and its signed Registry
-// descriptor into the supplied operation workspace. It must populate
-// StagedArtifact.DescriptorJSON from the exact descriptor selected by the
-// Registry; stagingPath remains canonical and Plugin_Storage-relative.
 // OperationStorage creates the durable operation-scoped staging directory.
 // It returns a canonical path relative to Plugin_Storage, never an OS path.
 type OperationStorage interface {
 	CreateTemporaryOperationDirectory(context.Context, string) (string, error)
 }
 
+// ArtifactAcquirer obtains the immutable release ZIP and its signed Registry
+// descriptor into the supplied operation workspace. It receives the expected
+// Plugin identity so the Registry descriptor can be bound before downloading.
+// It must populate StagedArtifact.DescriptorJSON from the exact descriptor
+// selected by the Registry; stagingPath remains canonical and Plugin_Storage-relative.
 type ArtifactAcquirer interface {
-	Acquire(context.Context, string, string) (installation.StagedArtifact, error)
+	Acquire(context.Context, string, domain.PluginID, string, string) (installation.StagedArtifact, error)
 }
 
 // PackageInspector validates package structure and returns the SDK-neutral
@@ -191,7 +192,7 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 		return fail("validate staging location", installation.ErrRecordMismatch)
 	}
 
-	staged, err := s.acquirer.Acquire(ctx, request.SourceReference, stagingPath)
+	staged, err := s.acquirer.Acquire(ctx, request.SourceReference, request.PluginID, request.Version, stagingPath)
 	if err != nil {
 		return fail("acquire Plugin artifact", err)
 	}
