@@ -86,8 +86,8 @@ func (r *Retainer) Prune(ctx context.Context) (Report, error) {
 	}
 
 	type candidate struct {
-		entry        storage.QuarantineEntry
-		eligible     bool
+		entry         storage.QuarantineEntry
+		eligible      bool
 		quarantinedAt time.Time
 	}
 	items := make([]candidate, 0, len(entries))
