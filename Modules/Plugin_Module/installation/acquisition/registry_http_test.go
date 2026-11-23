@@ -41,7 +41,7 @@ func newTestRegistryResolver(status int, body string, headers http.Header, token
 		origins: map[string]*url.URL{"community": {Scheme: "https", Host: "registry.example.test"}},
 		tokens:  provider,
 		client:  client,
-		now:    func() time.Time { return time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC) },
+		now:     func() time.Time { return time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC) },
 	}
 	return resolver, captured, nil
 }
