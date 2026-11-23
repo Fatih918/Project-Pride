@@ -144,7 +144,7 @@ func TestAcquireRejectsDescriptorAboveConfiguredMaximum(t *testing.T) {
 func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 	raw := descriptor("https://downloads.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusFound, ""), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrUnexpectedStatus) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrUnexpectedStatus) {
 		t.Fatalf("expected redirect/status rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
