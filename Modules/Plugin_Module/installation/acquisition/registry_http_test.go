@@ -127,7 +127,7 @@ func TestRegistryResolverMapsSafeHTTPErrors(t *testing.T) {
 	token := BearerToken{Value: "token", ExpiresAt: time.Now().Add(time.Minute)}
 	for _, test := range tests {
 		resolver, _, _ := newTestRegistryResolver(test.status, "secret response body", http.Header{
-			"X-Request-ID": []string{"req_123"},
+			"X-Request-Id": []string{"req_123"},
 			"Retry-After":  []string{"30"},
 		}, token)
 		_, err := resolver.ResolveDescriptor(context.Background(), validResolution(t))
