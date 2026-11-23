@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"errors"
-	"math"
 	"os"
 	"path"
 	"path/filepath"
@@ -99,7 +98,7 @@ func (a *Adapter) quarantineDirectorySize(ctx context.Context, directory string)
 			if err != nil {
 				return 0, err
 			}
-			if size > math.MaxInt64-total {
+			if size > int64(^uint64(0)>>1)-total {
 				return 0, fmt.Errorf("quarantine size overflow")
 			}
 			total += size
