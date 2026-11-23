@@ -31,7 +31,7 @@ The age clock uses the quarantine directory's filesystem modification time. This
 
 ## Filesystem constraints
 
-The storage adapter inventories and deletes through the confined `os.Root` handle rooted at `Plugin_Storage`. It rejects symlinks and special files instead of following them. It validates operation IDs and removes only the corresponding `quarantine/<operation-id>` directory.
+The storage adapter inventories and deletes through the confined `os.Root` handle rooted at `Plugin_Storage`. Directory enumeration uses opened directory handles; file metadata is inspected without following links. It rejects symlinks and special files instead of following them. It validates operation IDs and removes only the corresponding `quarantine/<operation-id>` directory.
 
 The cleanup API does not accept arbitrary paths. It is deliberately separate from recovery and installation orchestration.
 
