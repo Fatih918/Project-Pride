@@ -75,7 +75,7 @@ func New(operations OperationLookup, quarantineStorage Storage, policy Policy) (
 // Prune removes only quarantine directories whose matching journal operation
 // is terminal (FAILED or ROLLED_BACK). Unknown and non-terminal operations are
 // retained. Age limits are applied first; count and byte limits then evict the
-// oldest eligible entries until the remaining inventory is within policy.
+// oldest remaining eligible entries.
 func (r *Retainer) Prune(ctx context.Context) (Report, error) {
 	if err := ctx.Err(); err != nil {
 		return Report{}, err
@@ -84,20 +84,16 @@ func (r *Retainer) Prune(ctx context.Context) (Report, error) {
 	if err != nil {
 		return Report{}, fmt.Errorf("inventory Plugin quarantine: %w", err)
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].ModifiedAt.Equal(entries[j].ModifiedAt) {
-			return entries[i].OperationID < entries[j].OperationID
-		}
-		return entries[i].ModifiedAt.Before(entries[j].ModifiedAt)
-	})
 
 	type candidate struct {
-		entry    storage.QuarantineEntry
-		eligible bool
+		entry        storage.QuarantineEntry
+		eligible     bool
+		quarantinedAt time.Time
 	}
 	items := make([]candidate, 0, len(entries))
-	// Resolve every journal record before deleting anything. A persistence
-	// failure therefore cannot leave a partially pruned inventory.
+	// Resolve every journal record before deleting anything. The durable
+	// terminal transition timestamp is the retention clock: filesystem mtimes
+	// can predate quarantine when an old installed directory is moved here.
 	for _, entry := range entries {
 		if err := ctx.Err(); err != nil {
 			return Report{}, err
@@ -110,10 +106,20 @@ func (r *Retainer) Prune(ctx context.Context) (Report, error) {
 		if lookupErr != nil {
 			return Report{}, fmt.Errorf("resolve quarantine operation %q: %w", entry.OperationID, lookupErr)
 		}
-		eligible := op.OperationID == installation.OperationID(entry.OperationID) &&
+		terminal := op.OperationID == installation.OperationID(entry.OperationID) &&
 			(op.Phase == installation.PhaseFailed || op.Phase == installation.PhaseRolledBack)
-		items = append(items, candidate{entry: entry, eligible: eligible})
+		items = append(items, candidate{
+			entry:         entry,
+			eligible:      terminal && !op.UpdatedAt.IsZero(),
+			quarantinedAt: op.UpdatedAt.UTC(),
+		})
 	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].quarantinedAt.Equal(items[j].quarantinedAt) {
+			return items[i].entry.OperationID < items[j].entry.OperationID
+		}
+		return items[i].quarantinedAt.Before(items[j].quarantinedAt)
+	})
 
 	now := r.now().UTC()
 	report := Report{Scanned: len(items)}
@@ -131,7 +137,7 @@ func (r *Retainer) Prune(ctx context.Context) (Report, error) {
 			return report, err
 		}
 		overLimit := count > r.policy.MaxArtifacts || bytes > r.policy.MaxBytes
-		expired := now.Sub(item.entry.ModifiedAt) >= r.policy.MaxAge
+		expired := !item.quarantinedAt.IsZero() && now.Sub(item.quarantinedAt) >= r.policy.MaxAge
 		if !item.eligible || (!expired && !overLimit) {
 			continue
 		}
