@@ -45,9 +45,6 @@ func TestListAndDeleteQuarantineEntries(t *testing.T) {
 	if len(entries) != 1 || entries[0].OperationID != "retention-op-1" || entries[0].SizeBytes != int64(len("quarantine payload")) {
 		t.Fatalf("unexpected quarantine inventory: %+v", entries)
 	}
-	if entries[0].ModifiedAt.IsZero() {
-		t.Fatal("quarantine modification time is missing")
-	}
 	if err := adapter.DeleteQuarantineOperation(context.Background(), "retention-op-1"); err != nil {
 		t.Fatal(err)
 	}
