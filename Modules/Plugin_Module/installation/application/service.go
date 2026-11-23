@@ -44,7 +44,7 @@ type OperationStorage interface {
 }
 
 type ArtifactAcquirer interface {
-	Acquire(context.Context, string, string) (installation.StagedArtifact, error)
+	Acquire(context.Context, string, domain.PluginID, string, string) (installation.StagedArtifact, error)
 }
 
 // PackageInspector validates package structure and returns the SDK-neutral
@@ -191,7 +191,7 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 		return fail("validate staging location", installation.ErrRecordMismatch)
 	}
 
-	staged, err := s.acquirer.Acquire(ctx, request.SourceReference, stagingPath)
+	staged, err := s.acquirer.Acquire(ctx, request.SourceReference, request.PluginID, request.Version, stagingPath)
 	if err != nil {
 		return fail("acquire Plugin artifact", err)
 	}
