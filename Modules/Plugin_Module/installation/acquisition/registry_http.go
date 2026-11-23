@@ -221,6 +221,9 @@ func (r *HTTPRegistryDescriptorResolver) ResolveDescriptor(ctx context.Context, 
 
 	token, err := r.tokens.Token(ctx, resolution.Reference.Namespace, origin.String())
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, ErrRegistryAuthentication
 	}
 	now := r.now()
@@ -277,8 +280,10 @@ func (r *HTTPRegistryDescriptorResolver) ResolveDescriptor(ctx context.Context, 
 		Version       string `json:"version"`
 		ReleaseID     string `json:"release_id"`
 	}
-	if err := json.Unmarshal(body, &descriptor); err != nil ||
-		descriptor.Schema != "urn:pride:registry-artifact-descriptor:1" ||
+	if err := json.Unmarshal(body, &descriptor); err != nil {
+		return nil, ErrRegistryResponse
+	}
+	if descriptor.Schema != "urn:pride:registry-artifact-descriptor:1" ||
 		descriptor.SchemaVersion != "1.0.0" ||
 		descriptor.PluginID != string(resolution.ExpectedPluginID) ||
 		descriptor.Version != resolution.ExpectedVersion ||
