@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	ErrRegistryConfiguration = errors.New("invalid Plugin Registry configuration")
+	ErrRegistryConfiguration  = errors.New("invalid Plugin Registry configuration")
 	ErrRegistryAuthentication = errors.New("Plugin Registry authentication failed")
 	ErrRegistryAuthorization  = errors.New("Plugin Registry authorization denied")
 	ErrRegistryNotFound       = errors.New("Plugin Registry release not found")
@@ -143,10 +143,10 @@ func NewHTTPRegistryDescriptorResolver(config RegistryResolverConfig, tokens Reg
 
 	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}
 	transport := &http.Transport{
-		Proxy:                 nil,
-		DisableCompression:    true,
+		Proxy:                  nil,
+		DisableCompression:     true,
 		MaxResponseHeaderBytes: 64 << 10,
-		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+		TLSClientConfig:        &tls.Config{MinVersion: tls.VersionTLS12},
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(address)
 			if err != nil || port != "443" {
@@ -364,7 +364,6 @@ func isSafeRequestID(value string) bool {
 	}
 	return true
 }
-
 
 func registryAddressesPublic(addresses []net.IPAddr) bool {
 	if len(addresses) == 0 {
