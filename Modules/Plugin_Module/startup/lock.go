@@ -54,7 +54,7 @@ func AcquireRecoveryLock(ctx context.Context, lockPath string) (*RecoveryLock, e
 		return nil, fmt.Errorf("inspect Plugin recovery lock file: %w", statErr)
 	}
 
-	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := openPlatformLockFile(lockPath)
 	if err != nil {
 		return nil, fmt.Errorf("open Plugin recovery lock file: %w", err)
 	}

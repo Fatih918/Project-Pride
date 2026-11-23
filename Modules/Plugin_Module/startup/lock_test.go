@@ -19,7 +19,18 @@ func TestAcquireRecoveryLockRejectsInvalidPaths(t *testing.T) {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 	if _, err := AcquireRecoveryLock(context.Background(), filepath.Join(link, "lock")); !errors.Is(err, ErrInvalidRecoveryLockPath) {
-		t.Fatalf("expected invalid path error, got %v", err)
+		t.Fatalf("expected invalid parent path error, got %v", err)
+	}
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, []byte("do not lock through a symlink"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockLink := filepath.Join(dir, "lock-link")
+	if err := os.Symlink(target, lockLink); err != nil {
+		t.Skipf("file symlinks unavailable: %v", err)
+	}
+	if _, err := AcquireRecoveryLock(context.Background(), lockLink); !errors.Is(err, ErrInvalidRecoveryLockPath) {
+		t.Fatalf("expected invalid lock target error, got %v", err)
 	}
 	if _, err := AcquireRecoveryLock(context.Background(), "relative.lock"); !errors.Is(err, ErrInvalidRecoveryLockPath) {
 		t.Fatalf("expected absolute path validation error, got %v", err)
