@@ -109,7 +109,7 @@ func TestAcquireRemovesPartialArtifactOnSizeMismatch(t *testing.T) {
 	stream := response(http.StatusOK, "short")
 	stream.ContentLength = -1
 	acquirer, path := newTestAcquirer(t, raw, stream, 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactSize) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactSize) {
 		t.Fatalf("expected size mismatch, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
@@ -122,7 +122,7 @@ func TestAcquireEnforcesStreamingMaximumAndRemovesPartialArtifact(t *testing.T) 
 	stream := response(http.StatusOK, strings.Repeat("x", 101))
 	stream.ContentLength = -1
 	acquirer, path := newTestAcquirer(t, raw, stream, 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
 		t.Fatalf("expected archive limit rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
