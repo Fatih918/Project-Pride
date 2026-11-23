@@ -126,3 +126,12 @@ go vet ./...
 ```
 
 The accepted PZIP-0001 policy fixes the ZIP processing limits: 100 MiB compressed archive, 512 MiB total expanded bytes, 128 MiB per file, 10,000 entries, directory depth 32, per-entry compression ratio 100:1, normalized path length 240 bytes, and 16 MiB parser metadata budget.
+
+
+## Quarantine retention
+
+- Added an SDK-neutral retention service with defaults of 30 days, 100 quarantine operation directories, and 1 GiB aggregate regular-file size.
+- Cleanup is restricted to journal-confirmed `FAILED` and `ROLLED_BACK` operations; missing or non-terminal records are retained.
+- The confined storage adapter inventories recursive regular-file sizes and deletes only validated `quarantine/<operation-id>` directories; symlinks and special files fail closed.
+- The host must invoke retention only after durable operation storage is available. No background scheduler or production composition wiring is added in this increment.
+- See [Plugin Quarantine Retention Policy](docs/Plugin%20Quarantine%20Retention%20Policy.md).
