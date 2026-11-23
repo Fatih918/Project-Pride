@@ -23,11 +23,11 @@ The service resolves the complete inventory before deleting anything. A journal 
 ## Eviction order
 
 1. Inventory all quarantine directories and their recursive regular-file sizes.
-2. Remove eligible entries whose directory modification time is at least the configured maximum age.
+2. Remove eligible entries whose durable operation journal terminal-transition timestamp is at least the configured maximum age.
 3. If the remaining inventory exceeds the directory-count or aggregate-byte limit, remove the oldest remaining eligible entries first. Ties are ordered by operation ID.
 4. Entries that are not eligible remain, even if that means the configured limits cannot be met. Safety takes precedence over quotas.
 
-The age clock uses the quarantine directory's filesystem modification time. This timestamp is a local retention signal, not a cryptographic or audit timestamp. Directory size includes all regular files recursively and excludes directory metadata.
+The age clock uses the operation journal's `UpdatedAt` timestamp written when the operation becomes `FAILED` or `ROLLED_BACK`. It deliberately does not use the quarantined directory's filesystem mtime: moving an old installed directory preserves its old mtime and could otherwise make a newly quarantined artifact appear immediately expired. Directory size includes all regular files recursively and excludes directory metadata.
 
 ## Filesystem constraints
 
