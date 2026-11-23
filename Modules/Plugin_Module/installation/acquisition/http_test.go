@@ -13,8 +13,8 @@ import (
 
 type descriptorResolverFunc func(context.Context, string) ([]byte, error)
 
-func (f descriptorResolverFunc) ResolveDescriptor(ctx context.Context, source string) ([]byte, error) {
-	return f(ctx, source)
+func (f descriptorResolverFunc) ResolveDescriptor(ctx context.Context, request DescriptorResolutionRequest) ([]byte, error) {
+	return f(ctx, request.Reference.String())
 }
 
 type artifactFileStore struct{ path string }
@@ -44,7 +44,7 @@ func descriptor(uri, size string) []byte {
 func newTestAcquirer(t *testing.T, rawDescriptor []byte, response *http.Response, maxBytes int64) (*HTTPArtifactAcquirer, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "artifact.zip")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) {
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) {
 		return append([]byte(nil), rawDescriptor...), nil
 	})
 	files := artifactFileStore{path: path}
@@ -68,7 +68,7 @@ func TestAcquireDownloadsExactArtifactAndRetainsDescriptor(t *testing.T) {
 	body := "zip-bytes"
 	raw := descriptor("https://downloads.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, body), 100)
-	result, err := acquirer.Acquire(context.Background(), "registry-release:1", "temporary/op-1")
+	result, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestAcquireDownloadsExactArtifactAndRetainsDescriptor(t *testing.T) {
 func TestAcquireRejectsUnapprovedHostBeforeRequest(t *testing.T) {
 	raw := descriptor("https://attacker.example.test/plugin.zip", "9")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, "zip-bytes"), 100)
-	_, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1")
+	_, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if !errors.Is(err, ErrUnsafeArtifactURL) {
 		t.Fatalf("expected unsafe URL rejection, got %v", err)
 	}
@@ -154,7 +154,7 @@ func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 
 func TestAcquirePreservesResolverErrors(t *testing.T) {
 	want := errors.New("registry unavailable")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, want })
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, want })
 	acquirer, err := NewHTTPArtifactAcquirer(resolver, artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}, Config{AllowedHosts: []string{"downloads.example.test"}})
 	if err != nil {
 		t.Fatal(err)
