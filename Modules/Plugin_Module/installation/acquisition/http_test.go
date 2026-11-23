@@ -159,7 +159,7 @@ func TestAcquirePreservesResolverErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = acquirer.Acquire(context.Background(), "release:1", "temporary/op-1")
+	_, err = acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1")
 	if !errors.Is(err, want) {
 		t.Fatalf("expected resolver error, got %v", err)
 	}
