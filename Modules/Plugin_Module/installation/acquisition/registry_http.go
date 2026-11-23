@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 )
 
 const (
@@ -329,6 +328,7 @@ func validBearerToken(value string) bool {
 		return false
 	}
 	paddingStarted := false
+	hasData := false
 	for _, r := range value {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9',
@@ -336,13 +336,14 @@ func validBearerToken(value string) bool {
 			if paddingStarted {
 				return false
 			}
+			hasData = true
 		case r == '=':
 			paddingStarted = true
 		default:
 			return false
 		}
 	}
-	return true
+	return hasData
 }
 
 func identityEncoding(value string) bool {
