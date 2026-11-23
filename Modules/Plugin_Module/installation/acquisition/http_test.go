@@ -11,10 +11,10 @@ import (
 	"testing"
 )
 
-type descriptorResolverFunc func(context.Context, string) ([]byte, error)
+type descriptorResolverFunc func(context.Context, DescriptorResolutionRequest) ([]byte, error)
 
 func (f descriptorResolverFunc) ResolveDescriptor(ctx context.Context, request DescriptorResolutionRequest) ([]byte, error) {
-	return f(ctx, request.Reference.String())
+	return f(ctx, request)
 }
 
 type artifactFileStore struct{ path string }
@@ -44,7 +44,10 @@ func descriptor(uri, size string) []byte {
 func newTestAcquirer(t *testing.T, rawDescriptor []byte, response *http.Response, maxBytes int64) (*HTTPArtifactAcquirer, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "artifact.zip")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) {
+	resolver := descriptorResolverFunc(func(_ context.Context, request DescriptorResolutionRequest) ([]byte, error) {
+		if request.ExpectedPluginID != "example.plugin" || request.ExpectedVersion != "1.0.0" || request.Reference.ReleaseID != "rel_01J9K8M7N6P5Q4R3S2T1" {
+			return nil, ErrRegistryIdentity
+		}
 		return append([]byte(nil), rawDescriptor...), nil
 	})
 	files := artifactFileStore{path: path}
@@ -154,7 +157,7 @@ func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 
 func TestAcquirePreservesResolverErrors(t *testing.T) {
 	want := errors.New("registry unavailable")
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, want })
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, want })
 	acquirer, err := NewHTTPArtifactAcquirer(resolver, artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}, Config{AllowedHosts: []string{"downloads.example.test"}})
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +169,7 @@ func TestAcquirePreservesResolverErrors(t *testing.T) {
 }
 
 func TestNewHTTPArtifactAcquirerRejectsUnsafeConfiguration(t *testing.T) {
-	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, nil })
+	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, nil })
 	files := artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}
 	for _, config := range []Config{
 		{},
