@@ -12,7 +12,7 @@ import (
 const registrySourceReferencePrefix = "pride-registry:v1/"
 
 var (
-	ErrInvalidSourceReference = errors.New("invalid Plugin Registry source reference")
+	ErrInvalidSourceReference   = errors.New("invalid Plugin Registry source reference")
 	ErrInvalidResolutionRequest = errors.New("invalid Plugin Registry descriptor resolution request")
 )
 
@@ -27,9 +27,9 @@ type RegistryReleaseReference struct {
 // DescriptorResolutionRequest binds an immutable source reference to the
 // identity and version requested by the installation application service.
 type DescriptorResolutionRequest struct {
-	Reference         RegistryReleaseReference
-	ExpectedPluginID  domain.PluginID
-	ExpectedVersion   string
+	Reference        RegistryReleaseReference
+	ExpectedPluginID domain.PluginID
+	ExpectedVersion  string
 }
 
 // ParseRegistryReleaseReference parses the canonical textual form:
@@ -57,7 +57,7 @@ func ParseRegistryReleaseReference(value string) (RegistryReleaseReference, erro
 	}
 	return RegistryReleaseReference{
 		Namespace: namespace,
-		PluginID: domain.PluginID(pluginID),
+		PluginID:  domain.PluginID(pluginID),
 		ReleaseID: releaseID,
 	}, nil
 }
@@ -71,9 +71,9 @@ func NewDescriptorResolutionRequest(reference RegistryReleaseReference, expected
 		return DescriptorResolutionRequest{}, ErrInvalidResolutionRequest
 	}
 	return DescriptorResolutionRequest{
-		Reference: reference,
+		Reference:        reference,
 		ExpectedPluginID: expectedPluginID,
-		ExpectedVersion: expectedVersion,
+		ExpectedVersion:  expectedVersion,
 	}, nil
 }
 
