@@ -4,7 +4,11 @@ package startup
 
 import "os"
 
-func openPlatformLockFile(string) (*os.File, error) {\n\treturn nil, ErrRecoveryLockUnsupported\n}\n\nfunc tryAcquirePlatformLock(*os.File) (bool, error) {
+func openPlatformLockFile(string) (*os.File, error) {
+	return nil, ErrRecoveryLockUnsupported
+}
+
+func tryAcquirePlatformLock(*os.File) (bool, error) {
 	return false, ErrRecoveryLockUnsupported
 }
 
