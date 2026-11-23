@@ -2,9 +2,9 @@ package acquisition
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"pride-plugin-module/domain"
 )
 
 const (
@@ -148,6 +147,7 @@ func NewHTTPRegistryDescriptorResolver(config RegistryResolverConfig, tokens Reg
 		Proxy:                 nil,
 		DisableCompression:    true,
 		MaxResponseHeaderBytes: 64 << 10,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(address)
 			if err != nil || port != "443" {
@@ -306,11 +306,10 @@ func registryStatusError(response *http.Response) error {
 func boundedRetryAfter(value string, now time.Time) time.Duration {
 	value = strings.TrimSpace(value)
 	if seconds, err := strconv.Atoi(value); err == nil && seconds >= 0 {
-		delay := time.Duration(seconds) * time.Second
-		if delay > maxRegistryRetryAfter {
+		if time.Duration(seconds) > maxRegistryRetryAfter/time.Second {
 			return maxRegistryRetryAfter
 		}
-		return delay
+		return time.Duration(seconds) * time.Second
 	}
 	if at, err := http.ParseTime(value); err == nil && at.After(now) {
 		delay := at.Sub(now)
@@ -353,5 +352,3 @@ func isSafeRequestID(value string) bool {
 	return true
 }
 
-var _ = fmt.Sprintf
-var _ = domain.PluginID("")
