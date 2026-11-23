@@ -27,9 +27,9 @@ func (f *fakeOperations) GetOperation(_ context.Context, id installation.Operati
 }
 
 type fakeStorage struct {
-	entries  []storage.QuarantineEntry
-	removed  []string
-	listErr  error
+	entries   []storage.QuarantineEntry
+	removed   []string
+	listErr   error
 	deleteErr error
 }
 
@@ -77,7 +77,7 @@ func TestPruneRemovesExpiredTerminalOnly(t *testing.T) {
 func TestPruneEvictsOldestEligibleUntilCountAndBytesFit(t *testing.T) {
 	now := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
 	ops := &fakeOperations{operations: map[installation.OperationID]installation.InstallationOperation{
-		"active": {OperationID: "active", Phase: installation.PhaseStaged},
+		"active":   {OperationID: "active", Phase: installation.PhaseStaged},
 		"failed-a": {OperationID: "failed-a", Phase: installation.PhaseFailed},
 		"failed-b": {OperationID: "failed-b", Phase: installation.PhaseRolledBack},
 	}}
