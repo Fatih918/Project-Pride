@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 )
 
 func TestListAndDeleteQuarantineEntries(t *testing.T) {
@@ -110,5 +109,4 @@ func TestListQuarantineHonorsContext(t *testing.T) {
 	if err := adapter.DeleteQuarantineOperation(ctx, "retention-op"); !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
-	_ = time.Second
 }
