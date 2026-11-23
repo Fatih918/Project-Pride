@@ -24,9 +24,9 @@ func newTestRegistryResolver(status int, body string, headers http.Header, token
 		captured = request.Clone(request.Context())
 		captured.Header = request.Header.Clone()
 		response := &http.Response{
-			StatusCode: status,
-			Header:     headers.Clone(),
-			Body:       io.NopCloser(strings.NewReader(body)),
+			StatusCode:    status,
+			Header:        headers.Clone(),
+			Body:          io.NopCloser(strings.NewReader(body)),
 			ContentLength: int64(len(body)),
 		}
 		return response, nil
@@ -39,9 +39,9 @@ func newTestRegistryResolver(status int, body string, headers http.Header, token
 	})
 	resolver := &HTTPRegistryDescriptorResolver{
 		origins: map[string]*url.URL{"community": {Scheme: "https", Host: "registry.example.test"}},
-		tokens: provider,
-		client: client,
-		now: func() time.Time { return time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC) },
+		tokens:  provider,
+		client:  client,
+		now:    func() time.Time { return time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC) },
 	}
 	return resolver, captured, nil
 }
@@ -72,9 +72,9 @@ func TestRegistryResolverReturnsExactDescriptorAndUsesScopedBearerToken(t *testi
 		captured = request.Clone(request.Context())
 		captured.Header = request.Header.Clone()
 		return &http.Response{
-			StatusCode: http.StatusOK,
-			Header: http.Header{"Content-Type": []string{"application/json"}},
-			Body: io.NopCloser(strings.NewReader(validRegistryDescriptor())),
+			StatusCode:    http.StatusOK,
+			Header:        http.Header{"Content-Type": []string{"application/json"}},
+			Body:          io.NopCloser(strings.NewReader(validRegistryDescriptor())),
 			ContentLength: int64(len(validRegistryDescriptor())),
 		}, nil
 	})
@@ -128,7 +128,7 @@ func TestRegistryResolverMapsSafeHTTPErrors(t *testing.T) {
 	for _, test := range tests {
 		resolver, _, _ := newTestRegistryResolver(test.status, "secret response body", http.Header{
 			"X-Request-ID": []string{"req_123"},
-			"Retry-After": []string{"30"},
+			"Retry-After":  []string{"30"},
 		}, token)
 		_, err := resolver.ResolveDescriptor(context.Background(), validResolution(t))
 		if !errors.Is(err, test.want) {
