@@ -48,13 +48,13 @@ func (f *fakeStorage) DeleteQuarantineOperation(_ context.Context, id string) er
 func TestPruneRemovesExpiredTerminalOnly(t *testing.T) {
 	now := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
 	operations := &fakeOperations{operations: map[installation.OperationID]installation.InstallationOperation{
-		"old-failed": {OperationID: "old-failed", Phase: installation.PhaseFailed},
-		"old-active": {OperationID: "old-active", Phase: installation.PhasePromoted},
+		"old-failed": {OperationID: "old-failed", Phase: installation.PhaseFailed, UpdatedAt: now.Add(-31 * 24 * time.Hour)},
+		"old-active": {OperationID: "old-active", Phase: installation.PhasePromoted, UpdatedAt: now.Add(-40 * 24 * time.Hour)},
 	}}
 	store := &fakeStorage{entries: []storage.QuarantineEntry{
-		{OperationID: "old-failed", ModifiedAt: now.Add(-31 * 24 * time.Hour), SizeBytes: 100},
-		{OperationID: "old-active", ModifiedAt: now.Add(-40 * 24 * time.Hour), SizeBytes: 200},
-		{OperationID: "missing-journal", ModifiedAt: now.Add(-50 * 24 * time.Hour), SizeBytes: 300},
+		{OperationID: "old-failed", SizeBytes: 100},
+		{OperationID: "old-active", SizeBytes: 200},
+		{OperationID: "missing-journal", SizeBytes: 300},
 	}}
 	retainer, err := New(operations, store, DefaultPolicy())
 	if err != nil {
@@ -77,14 +77,14 @@ func TestPruneRemovesExpiredTerminalOnly(t *testing.T) {
 func TestPruneEvictsOldestEligibleUntilCountAndBytesFit(t *testing.T) {
 	now := time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)
 	ops := &fakeOperations{operations: map[installation.OperationID]installation.InstallationOperation{
-		"active":   {OperationID: "active", Phase: installation.PhaseStaged},
-		"failed-a": {OperationID: "failed-a", Phase: installation.PhaseFailed},
-		"failed-b": {OperationID: "failed-b", Phase: installation.PhaseRolledBack},
+		"active":   {OperationID: "active", Phase: installation.PhaseStaged, UpdatedAt: now.Add(-3 * time.Hour)},
+		"failed-a": {OperationID: "failed-a", Phase: installation.PhaseFailed, UpdatedAt: now.Add(-2 * time.Hour)},
+		"failed-b": {OperationID: "failed-b", Phase: installation.PhaseRolledBack, UpdatedAt: now.Add(-time.Hour)},
 	}}
 	store := &fakeStorage{entries: []storage.QuarantineEntry{
-		{OperationID: "active", ModifiedAt: now.Add(-3 * time.Hour), SizeBytes: 60},
-		{OperationID: "failed-a", ModifiedAt: now.Add(-2 * time.Hour), SizeBytes: 60},
-		{OperationID: "failed-b", ModifiedAt: now.Add(-time.Hour), SizeBytes: 60},
+		{OperationID: "active", SizeBytes: 60},
+		{OperationID: "failed-a", SizeBytes: 60},
+		{OperationID: "failed-b", SizeBytes: 60},
 	}}
 	policy := Policy{MaxAge: 24 * time.Hour, MaxArtifacts: 2, MaxBytes: 100}
 	retainer, err := New(ops, store, policy)
