@@ -169,10 +169,8 @@ func NewHTTPRegistryDescriptorResolver(config RegistryResolverConfig, tokens Reg
 			}
 			// Reject the entire answer set if any address is non-public. This
 			// prevents selecting a public answer from a mixed public/private set.
-			for _, candidate := range ips {
-				if !isPublicUnicast(candidate.IP) {
-					return nil, ErrRegistryConfiguration
-				}
+			if !registryAddressesPublic(ips) {
+				return nil, ErrRegistryConfiguration
 			}
 			return dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
 		},
@@ -357,3 +355,15 @@ func isSafeRequestID(value string) bool {
 	return true
 }
 
+
+func registryAddressesPublic(addresses []net.IPAddr) bool {
+	if len(addresses) == 0 {
+		return false
+	}
+	for _, address := range addresses {
+		if !isPublicUnicast(address.IP) {
+			return false
+		}
+	}
+	return true
+}
