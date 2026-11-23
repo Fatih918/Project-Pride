@@ -41,7 +41,7 @@ type DescriptorResolutionRequest struct {
 // are rejected. The Registry is responsible for issuing immutable release IDs.
 func ParseRegistryReleaseReference(value string) (RegistryReleaseReference, error) {
 	if value == "" || len(value) > 512 || !utf8.ValidString(value) ||
-		strings.TrimSpace(value) != value || strings.ContainsAny(value, "%?#\\:@") {
+		strings.TrimSpace(value) != value || strings.ContainsAny(value, "%?#\\@") {
 		return RegistryReleaseReference{}, ErrInvalidSourceReference
 	}
 	if !strings.HasPrefix(value, registrySourceReferencePrefix) {
