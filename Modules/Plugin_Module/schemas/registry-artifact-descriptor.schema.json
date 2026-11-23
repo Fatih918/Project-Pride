@@ -35,7 +35,7 @@
     "release_id": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 512
+      "maxLength": 128
     },
     "download_uri": {
       "type": "string",
