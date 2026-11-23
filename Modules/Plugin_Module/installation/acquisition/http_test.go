@@ -38,13 +38,13 @@ func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, erro
 }
 
 func descriptor(uri, size string) []byte {
-	return []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","schema_version":"1.0.0","plugin_id":"example.plugin","version":"1.0.0","release_id":"release-1","download_uri":"` + uri + `","media_type":"application/vnd.pride.plugin+zip","size_bytes":` + size + `,"digest":{"algorithm":"sha-256","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"signature":{"algorithm":"Ed25519","key_id":"key-1","value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}}`)
+	return []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","schema_version":"1.0.0","plugin_id":"example.plugin","version":"1.0.0","release_id":"rel_01J9K8M7N6P5Q4R3S2T1","download_uri":"` + uri + `","media_type":"application/vnd.pride.plugin+zip","size_bytes":` + size + `,"digest":{"algorithm":"sha-256","value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"signature":{"algorithm":"Ed25519","key_id":"key-1","value":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}}`)
 }
 
 func newTestAcquirer(t *testing.T, rawDescriptor []byte, response *http.Response, maxBytes int64) (*HTTPArtifactAcquirer, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "artifact.zip")
-	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) {
+	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) {
 		return append([]byte(nil), rawDescriptor...), nil
 	})
 	files := artifactFileStore{path: path}
@@ -99,7 +99,7 @@ func TestAcquireRejectsUnapprovedHostBeforeRequest(t *testing.T) {
 func TestAcquireRejectsDuplicateDescriptorKeys(t *testing.T) {
 	raw := []byte(`{"$schema":"urn:pride:registry-artifact-descriptor:1","$schema":"urn:pride:registry-artifact-descriptor:1"}`)
 	acquirer, _ := newTestAcquirer(t, raw, response(http.StatusOK, "x"), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrInvalidDescriptor) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrInvalidDescriptor) {
 		t.Fatalf("expected duplicate-key rejection, got %v", err)
 	}
 }
@@ -154,7 +154,7 @@ func TestAcquireRejectsRedirectAndUnexpectedStatus(t *testing.T) {
 
 func TestAcquirePreservesResolverErrors(t *testing.T) {
 	want := errors.New("registry unavailable")
-	resolver := descriptorResolverFunc(func(context.Context, DescriptorResolutionRequest) ([]byte, error) { return nil, want })
+	resolver := descriptorResolverFunc(func(context.Context, string) ([]byte, error) { return nil, want })
 	acquirer, err := NewHTTPArtifactAcquirer(resolver, artifactFileStore{path: filepath.Join(t.TempDir(), "artifact.zip")}, Config{AllowedHosts: []string{"downloads.example.test"}})
 	if err != nil {
 		t.Fatal(err)
