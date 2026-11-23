@@ -88,7 +88,7 @@ type testAcquirer struct {
 	path string
 }
 
-func (a testAcquirer) Acquire(_ context.Context, _ string, target string) (installation.StagedArtifact, error) {
+func (a testAcquirer) Acquire(_ context.Context, _ string, _ domain.PluginID, _ string, target string) (installation.StagedArtifact, error) {
 	if a.err != nil {
 		return installation.StagedArtifact{}, a.err
 	}
