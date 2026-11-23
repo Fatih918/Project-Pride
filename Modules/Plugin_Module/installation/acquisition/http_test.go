@@ -133,7 +133,7 @@ func TestAcquireEnforcesStreamingMaximumAndRemovesPartialArtifact(t *testing.T) 
 func TestAcquireRejectsDescriptorAboveConfiguredMaximum(t *testing.T) {
 	raw := descriptor("https://downloads.example.test/plugin.zip", "101")
 	acquirer, path := newTestAcquirer(t, raw, response(http.StatusOK, strings.Repeat("x", 101)), 100)
-	if _, err := acquirer.Acquire(context.Background(), "release:1", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
+	if _, err := acquirer.Acquire(context.Background(), "pride-registry:v1/community/example.plugin/rel_01J9K8M7N6P5Q4R3S2T1", "example.plugin", "1.0.0", "temporary/op-1"); !errors.Is(err, ErrArtifactTooLarge) {
 		t.Fatalf("expected declared archive limit rejection, got %v", err)
 	}
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
