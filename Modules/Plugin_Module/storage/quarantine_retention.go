@@ -103,7 +103,7 @@ func (a *Adapter) quarantineDirectorySize(ctx context.Context, directory string)
 			}
 			total += size
 		case info.Mode().IsRegular():
-			if info.Size() < 0 || info.Size() > math.MaxInt64-total {
+			if info.Size() < 0 || info.Size() > int64(^uint64(0)>>1)-total {
 				return 0, fmt.Errorf("quarantine size overflow")
 			}
 			total += info.Size()
