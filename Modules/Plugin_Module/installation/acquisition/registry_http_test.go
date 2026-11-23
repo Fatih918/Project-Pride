@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net/http"
 	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -101,6 +101,7 @@ func TestRegistryResolverRejectsExpiredOrMalformedToken(t *testing.T) {
 	for _, token := range []BearerToken{
 		{Value: "expired", ExpiresAt: now},
 		{Value: "bad token", ExpiresAt: now.Add(time.Minute)},
+		{Value: "=", ExpiresAt: now.Add(time.Minute)},
 	} {
 		resolver, _, _ := newTestRegistryResolver(http.StatusOK, validRegistryDescriptor(), make(http.Header), token)
 		resolver.now = func() time.Time { return now }
