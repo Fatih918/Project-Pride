@@ -36,7 +36,7 @@ func (a *Adapter) ListQuarantineEntries(ctx context.Context) ([]QuarantineEntry,
 	if !rootInfo.IsDir() || rootInfo.Mode()&fs.ModeSymlink != 0 {
 		return nil, ErrInvalidPath
 	}
-	directories, err := a.root.ReadDir("quarantine")
+	directories, err := a.readQuarantineDirectory("quarantine")
 	if err != nil {
 		return nil, fmt.Errorf("list quarantine root: %w", err)
 	}
@@ -76,7 +76,7 @@ func (a *Adapter) quarantineDirectorySize(ctx context.Context, directory string)
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	children, err := a.root.ReadDir(filepath.FromSlash(directory))
+	children, err := a.readQuarantineDirectory(directory)
 	if err != nil {
 		return 0, err
 	}
@@ -145,4 +145,16 @@ func (a *Adapter) DeleteQuarantineOperation(ctx context.Context, operationID str
 		return fmt.Errorf("remove quarantined Plugin operation %q: %w", operationID, err)
 	}
 	return nil
+}
+
+
+// readQuarantineDirectory opens a directory through the confined root and
+// reads its entries from the resulting directory handle.
+func (a *Adapter) readQuarantineDirectory(relative string) ([]fs.DirEntry, error) {
+	directory, err := a.root.Open(filepath.FromSlash(relative))
+	if err != nil {
+		return nil, err
+	}
+	defer directory.Close()
+	return directory.ReadDir(-1)
 }
