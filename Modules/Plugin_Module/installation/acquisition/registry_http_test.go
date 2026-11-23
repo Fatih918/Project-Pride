@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net"
 	"net/url"
 	"strings"
 	"testing"
@@ -189,5 +190,38 @@ func TestRegistryResolverRejectsUnsafeOriginConfiguration(t *testing.T) {
 		if _, err := NewHTTPRegistryDescriptorResolver(RegistryResolverConfig{Origins: map[string]string{"community": origin}}, provider); !errors.Is(err, ErrRegistryConfiguration) {
 			t.Errorf("origin %q: expected configuration rejection, got %v", origin, err)
 		}
+	}
+}
+
+func TestRegistryResolverRejectsMixedAndNonPublicDNSAnswers(t *testing.T) {
+	if registryAddressesPublic([]net.IPAddr{{IP: net.ParseIP("8.8.8.8")}}) != true {
+		t.Fatal("expected public address to pass")
+	}
+	for _, addresses := range [][]net.IPAddr{
+		nil,
+		{{IP: net.ParseIP("10.0.0.1")}},
+		{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("127.0.0.1")}},
+		{{IP: net.ParseIP("8.8.8.8")}, {IP: net.ParseIP("::1")}},
+	} {
+		if registryAddressesPublic(addresses) {
+			t.Fatalf("expected address set to be rejected: %#v", addresses)
+		}
+	}
+}
+
+func TestRegistryResolverRejectsOversizedDescriptor(t *testing.T) {
+	body := strings.Repeat("x", maxRegistryDescriptorBytes+1)
+	resolver, _, _ := newTestRegistryResolver(http.StatusOK, body, http.Header{"Content-Type": []string{"application/json"}}, BearerToken{Value: "token", ExpiresAt: time.Now().Add(time.Minute)})
+	if _, err := resolver.ResolveDescriptor(context.Background(), validResolution(t)); !errors.Is(err, ErrRegistryResponse) {
+		t.Fatalf("expected oversized response rejection, got %v", err)
+	}
+}
+
+func TestRegistryResolverPropagatesCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	resolver, _, _ := newTestRegistryResolver(http.StatusOK, validRegistryDescriptor(), make(http.Header), BearerToken{Value: "token", ExpiresAt: time.Now().Add(time.Minute)})
+	if _, err := resolver.ResolveDescriptor(ctx, validResolution(t)); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
 	}
 }
