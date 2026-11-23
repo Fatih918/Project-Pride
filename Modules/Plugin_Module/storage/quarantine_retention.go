@@ -8,7 +8,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"time"
 )
 
 // QuarantineEntry describes one operation-scoped quarantine directory.
@@ -16,7 +15,6 @@ import (
 // the sum of regular-file sizes below it.
 type QuarantineEntry struct {
 	OperationID string
-	ModifiedAt  time.Time
 	SizeBytes   int64
 }
 
@@ -65,7 +63,6 @@ func (a *Adapter) ListQuarantineEntries(ctx context.Context) ([]QuarantineEntry,
 		}
 		entries = append(entries, QuarantineEntry{
 			OperationID: directory.Name(),
-			ModifiedAt:  info.ModTime().UTC(),
 			SizeBytes:   size,
 		})
 	}
