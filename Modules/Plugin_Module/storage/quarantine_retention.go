@@ -11,8 +11,7 @@ import (
 )
 
 // QuarantineEntry describes one operation-scoped quarantine directory.
-// ModifiedAt is the directory's filesystem modification time; SizeBytes is
-// the sum of regular-file sizes below it.
+// SizeBytes is the sum of regular-file sizes below it.
 type QuarantineEntry struct {
 	OperationID string
 	SizeBytes   int64
