@@ -8,6 +8,7 @@ import (
 
 	"pride-plugin-module/domain"
 	"pride-plugin-module/installation"
+	"pride-plugin-module/installation/artifactverify"
 	"pride-plugin-module/registry"
 )
 
@@ -264,3 +265,27 @@ func TestRecoverUpdatePreservesPluginCreationTime(t *testing.T) {
 // Keep the compile-time dependency explicit: the local Plugin repository is
 // distinct from the Marketplace descriptor resolver.
 var _ registry.Repository = recoveryPluginRepository{}
+
+func TestRecoverLegacyDescriptorUsesExplicitCompatibilityFailure(t *testing.T) {
+	manifest := recoveryManifest()
+	op := installation.InstallationOperation{
+		OperationID: "op-legacy-descriptor", PluginID: manifest.PluginID, TargetVersion: manifest.Version,
+		Kind: installation.KindInstall, Phase: installation.PhasePromoted,
+		FinalArtifactPath: "installed/example.plugin/1.2.0", DescriptorJSON: `{"schema_version":"1.0.0"}`,
+		CreatedAt: time.Now().UTC(),
+	}
+	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
+	storage := &recoveryStorage{}
+	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest}}
+	verifier := &recoveryVerifier{err: artifactverify.ErrUnsupportedDescriptorVersion}
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, inspector, verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Recover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if storage.calls != 1 || storage.source != op.FinalArtifactPath || repo.failed != failureLegacyDescriptor || repo.committed {
+		t.Fatalf("legacy descriptor did not fail closed: storage=%d source=%q failed=%q committed=%v", storage.calls, storage.source, repo.failed, repo.committed)
+	}
+}
