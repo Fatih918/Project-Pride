@@ -11,14 +11,14 @@ import (
 )
 
 type testRepository struct {
-	selected     installation.InstalledVersion
-	selectedErr  error
-	operation    installation.InstallationOperation
-	phases       []installation.Phase
-	committed    bool
+	selected        installation.InstalledVersion
+	selectedErr     error
+	operation       installation.InstallationOperation
+	phases          []installation.Phase
+	committed       bool
 	committedPlugin domain.Plugin
-	markedFailed string
-	commitErr    error
+	markedFailed    string
+	commitErr       error
 }
 
 func (r *testRepository) BeginOperation(_ context.Context, op installation.InstallationOperation) error {
