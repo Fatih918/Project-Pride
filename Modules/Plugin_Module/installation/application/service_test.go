@@ -16,6 +16,7 @@ type testRepository struct {
 	operation    installation.InstallationOperation
 	phases       []installation.Phase
 	committed    bool
+	committedPlugin domain.Plugin
 	markedFailed string
 	commitErr    error
 }
@@ -37,11 +38,12 @@ func (r *testRepository) RecordPromoted(_ context.Context, _ installation.Operat
 	r.phases = append(r.phases, installation.PhasePromoted)
 	return nil
 }
-func (r *testRepository) CommitInstallation(_ context.Context, _ installation.OperationID, _ domain.Plugin, _ installation.InstalledVersion) error {
+func (r *testRepository) CommitInstallation(_ context.Context, _ installation.OperationID, plugin domain.Plugin, _ installation.InstalledVersion) error {
 	if r.commitErr != nil {
 		return r.commitErr
 	}
 	r.committed = true
+	r.committedPlugin = plugin.Clone()
 	r.phases = append(r.phases, installation.PhaseCommitted)
 	return nil
 }
@@ -182,6 +184,9 @@ func TestInstallCoordinatesSuccessfulCommit(t *testing.T) {
 	}
 	if !repo.committed {
 		t.Fatal("expected atomic installation commit")
+	}
+	if repo.committedPlugin.Type != domain.PluginTypePassive {
+		t.Fatalf("Plugin type was not sourced from verified descriptor metadata: %#v", repo.committedPlugin)
 	}
 	if len(repo.phases) != 5 || repo.phases[4] != installation.PhaseCommitted {
 		t.Fatalf("unexpected phases: %#v", repo.phases)
