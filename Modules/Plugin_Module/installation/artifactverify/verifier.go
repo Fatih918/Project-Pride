@@ -27,11 +27,11 @@ const (
 )
 
 var (
-	ErrInvalidDescriptor = errors.New("invalid Registry artifact descriptor")
+	ErrInvalidDescriptor            = errors.New("invalid Registry artifact descriptor")
 	ErrUnsupportedDescriptorVersion = errors.New("unsupported Registry artifact descriptor version")
-	ErrUntrustedKey      = errors.New("Marketplace signing key is not trusted")
-	ErrDigestMismatch    = errors.New("artifact SHA-256 digest mismatch")
-	ErrSignatureInvalid  = errors.New("artifact descriptor signature is invalid")
+	ErrUntrustedKey                 = errors.New("Marketplace signing key is not trusted")
+	ErrDigestMismatch               = errors.New("artifact SHA-256 digest mismatch")
+	ErrSignatureInvalid             = errors.New("artifact descriptor signature is invalid")
 )
 
 // Canonicalizer must implement RFC 8785 JSON Canonicalization Scheme exactly.
@@ -95,11 +95,11 @@ type descriptor struct {
 		Value     string `json:"value"`
 	} `json:"digest"`
 	PlatformMetadata struct {
-		SchemaVersion       string `json:"schema_version"`
-		PluginType          string `json:"plugin_type"`
+		SchemaVersion       string              `json:"schema_version"`
+		PluginType          string              `json:"plugin_type"`
 		Capabilities        []domain.Capability `json:"capabilities"`
-		PermissionIDs       []string `json:"permission_ids"`
-		CompatibilityStatus string `json:"compatibility_status"`
+		PermissionIDs       []string            `json:"permission_ids"`
+		CompatibilityStatus string              `json:"compatibility_status"`
 	} `json:"platform_metadata"`
 	Signature struct {
 		Algorithm string `json:"algorithm"`
