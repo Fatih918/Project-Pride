@@ -1,6 +1,6 @@
 {
   "$schema": "urn:pride:registry-artifact-descriptor:1",
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "plugin_id": "example.plugin",
   "version": "1.0.0",
   "release_id": "marketplace-release-01JEXAMPLE",
@@ -15,5 +15,20 @@
     "algorithm": "Ed25519",
     "key_id": "marketplace-ed25519-2026-01",
     "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "platform_metadata": {
+    "schema_version": "1.0.0",
+    "plugin_type": "passive",
+    "capabilities": [
+      {
+        "id": "text.generate",
+        "name": "Text generation",
+        "description": "Generates text from an input request."
+      }
+    ],
+    "permission_ids": [
+      "network.http"
+    ],
+    "compatibility_status": "verified"
   }
 }
