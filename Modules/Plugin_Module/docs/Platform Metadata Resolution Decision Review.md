@@ -1,6 +1,6 @@
 # Platform Metadata Resolution — Decision Review
 
-**Status:** Proposed for review; no Registry metadata endpoint or production metadata wire format is approved by this document.  
+**Status:** Accepted — Option A adopted; implementation is tracked in the signed platform-metadata descriptor increment.  
 **Scope:** Trusted resolution of Marketplace-owned Plugin type and protected metadata during installation and recovery.  
 **Related:** Official Registry Descriptor Resolution Architecture Decision Record, PTS-0004, PRIDE Registry Format Specification, Plugin Module Production Host Integration Contract.
 
@@ -8,11 +8,7 @@
 
 The Plugin Module deliberately separates developer-owned Manifest data from Marketplace-owned metadata.
 
-The current application boundary exposes:
-
-`PlatformMetadataResolver.Resolve(ctx, pluginID, version)`
-
-The resolver supplies `PluginType` and `ProtectedMetadata`, but the repository does not yet define:
+The previous application boundary exposed `PlatformMetadataResolver.Resolve(ctx, pluginID, version)`. That mutable lookup has been removed. The accepted design now defines:
 
 - the authoritative Registry representation for these fields at one immutable release;
 - a wire schema or approved Registry operation for retrieving them;
@@ -20,9 +16,7 @@ The resolver supplies `PluginType` and `ProtectedMetadata`, but the repository d
 - how the resolver binds metadata to the exact namespace, Plugin ID, release ID, and expected version;
 - how recovery obtains the same metadata after restart without trusting developer-controlled package content.
 
-The Registry Format Specification establishes that Marketplace-generated metadata is authoritative and protected. The existing signed artifact descriptor, however, currently defines artifact identity, download location, size, digest, and signature; it does not define a typed platform-metadata object.
-
-This is a contract gap, not a reason to invent a live endpoint or accept unsigned metadata.
+The Registry Format Specification establishes that Marketplace-generated metadata is authoritative and protected. PTS-0004 v1.1.0 now requires a typed `platform_metadata` object inside the Marketplace-signed artifact descriptor. No separate metadata endpoint is required.
 
 ## 2. Invariants
 
@@ -96,17 +90,17 @@ The host configures a Registry endpoint and the resolver trusts the response bec
 
 **Rejected.** This violates the developer/Marketplace ownership boundary and permits package authors to self-assert protected capabilities, permissions, compatibility, or Plugin type.
 
-## 4. Recommended direction
+## 4. Accepted decision
 
-**Recommend Option A: include typed platform metadata in the signed artifact descriptor.**
+**Option A is accepted: include typed platform metadata in the signed artifact descriptor.**
 
 The descriptor already represents one immutable Registry release and is verified using the Marketplace Ed25519 trust chain. Its signing payload is canonicalized after removing only the signature field, so a typed metadata member can be covered by the same signature without creating a second trust system.
 
-This recommendation does not mean the current verifier already validates platform metadata. It does not. The verifier currently decodes only artifact fields, while its signing-payload construction includes all descriptor fields other than `signature`. Explicit schema validation and typed decoding are required before the recommendation can be implemented safely.
+The verifier now strictly decodes and validates the metadata shape. The descriptor signing payload continues to omit only `signature`, so the complete metadata object is covered by the existing RFC 8785 JCS + Ed25519 signature.
 
-The implementation should use a typed metadata extraction port over the exact descriptor bytes, not a lookup keyed only by Plugin ID/version. The application and recovery coordinators must verify the descriptor signature before treating the extracted metadata as trusted or committing the assembled Plugin.
+The verifier returns typed metadata only after descriptor signature and artifact digest verification. Installation and recovery build the Plugin aggregate from this verified result. Recovery uses the exact descriptor bytes persisted in the journal and does not perform a second metadata lookup.
 
-## 5. Decisions requested
+## 5. Accepted decisions
 
 | ID | Decision | Recommended option | Notes |
 |---|---|---|---|
@@ -116,12 +110,12 @@ The implementation should use a typed metadata extraction port over the exact de
 | M4 | Arbitrary attributes | Defer | Do not publish unstandardized security fields through `map[string]any` |
 | M5 | Release binding | Exact descriptor identity: namespace/reference, Plugin ID, release ID, expected version | No mutable Plugin ID-only lookup |
 | M6 | Trust semantics | Metadata is untrusted until existing Ed25519 descriptor verification succeeds | TLS is not metadata authenticity |
-| M7 | Legacy descriptor behavior | Reject missing metadata for new installs; define explicit recovery compatibility before production enablement | No silent metadata defaults |
+| M7 | Legacy descriptor behavior | Reject schema 1.0.0 for new installs and auto-commit recovery; quarantine legacy PROMOTED operations | Failure code `RECOVERY_LEGACY_DESCRIPTOR_UNSUPPORTED`; committed installs are not automatically removed |
 | M8 | Permission semantics | Metadata only; authorization remains Core-owned | No authorization logic in Plugin Module |
 
 ## 6. Proposed metadata shape
 
-Illustrative shape only; it becomes normative only after M1–M4 are approved:
+Normative shape for descriptor schema 1.1.0; PTS-0004 defines exact limits and validation rules:
 
 ```json
 {
@@ -154,15 +148,9 @@ Validation must at minimum enforce:
 
 Capability identifiers and permission identifiers must be interpreted as opaque platform identifiers here. This contract does not define capability matching or permission authorization.
 
-## 7. Required implementation sequence after approval
+## 7. Implementation status
 
-1. Update PTS-0004 and the descriptor JSON schema for the selected metadata contract.
-2. Extend descriptor decoding and strict validation; preserve the exact raw descriptor bytes for JCS signature verification.
-3. Replace the Plugin ID/version-only metadata resolver input with a typed descriptor-backed request or extraction port.
-4. Reorder installation and recovery so extracted metadata cannot be treated as trusted until descriptor signature verification succeeds.
-5. Add tests for missing/malformed metadata, duplicate IDs, duplicate JSON keys, identity mismatch, unsupported metadata schema, invalid signatures, and recovery from persisted descriptor evidence.
-6. Update the production host integration contract and Module README to reflect the new boundary.
-7. Keep installation disabled until the Marketplace signer actually publishes the approved metadata shape and the host supplies the real trust configuration.
+Implemented in this increment: PTS-0004 and JSON Schema updated to 1.1.0; verifier strict-decodes metadata and returns it only after Ed25519 and SHA-256 verification; installation and recovery no longer use a mutable metadata resolver; recovery uses persisted descriptor evidence; unsupported legacy descriptor versions fail closed with an explicit recovery code; tests cover schema rejection, unknown fields, duplicate IDs, and verified metadata extraction. Marketplace signing pipeline and production host composition remain deployment blockers.
 
 ## 8. Explicit non-goals
 
@@ -174,4 +162,4 @@ This decision review does not approve:
 - arbitrary security attributes or trust-score semantics;
 - production host composition or real bootstrap key material.
 
-The purpose is to settle the source, integrity, and recovery contract before writing a production adapter.
+The decision is accepted and the Module-side implementation is in place. Production enablement still requires the Marketplace signer to emit schema 1.1.0 descriptors and the host to supply real trust configuration and composition.
