@@ -206,9 +206,6 @@ func validateDescriptor(d descriptor, plugin domain.Plugin) error {
 	if err := validatePlatformMetadata(d.PlatformMetadata); err != nil {
 		return fmt.Errorf("%w: invalid platform metadata: %v", ErrInvalidDescriptor, err)
 	}
-	if !platformMetadataMatches(d.PlatformMetadata, plugin) {
-		return fmt.Errorf("%w: platform metadata does not match signed descriptor", ErrInvalidDescriptor)
-	}
 	if _, err := hex.DecodeString(d.Digest.Value); err != nil || strings.ToLower(d.Digest.Value) != d.Digest.Value {
 		return ErrInvalidDescriptor
 	}
@@ -280,20 +277,6 @@ func validatePlatformMetadata(metadata struct {
 }
 
 func boundedNonEmpty(value string, max int) bool { return strings.TrimSpace(value) != "" && len([]rune(value)) <= max }
-
-func platformMetadataMatches(metadata struct {
-	SchemaVersion string `json:"schema_version"`
-	PluginType string `json:"plugin_type"`
-	Capabilities []domain.Capability `json:"capabilities"`
-	PermissionIDs []string `json:"permission_ids"`
-	CompatibilityStatus string `json:"compatibility_status"`
-}, plugin domain.Plugin) bool {
-	wantType := domain.PluginTypeActive; if metadata.PluginType == "passive" { wantType = domain.PluginTypePassive }
-	if plugin.Type != wantType || plugin.Protected.CompatibilityStatus != metadata.CompatibilityStatus || len(plugin.Protected.Capabilities) != len(metadata.Capabilities) || len(plugin.Protected.PermissionIDs) != len(metadata.PermissionIDs) || len(plugin.Protected.Attributes) != 0 { return false }
-	for i := range metadata.Capabilities { if plugin.Protected.Capabilities[i] != metadata.Capabilities[i] { return false } }
-	for i := range metadata.PermissionIDs { if plugin.Protected.PermissionIDs[i] != metadata.PermissionIDs[i] { return false } }
-	return true
-}
 
 func descriptorSigningPayload(raw []byte) ([]byte, error) {
 	var fields map[string]json.RawMessage
