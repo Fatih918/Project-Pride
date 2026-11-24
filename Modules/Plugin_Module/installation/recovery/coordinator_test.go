@@ -12,12 +12,12 @@ import (
 )
 
 type recoveryRepository struct {
-	operations []installation.InstallationOperation
-	rolledBack string
-	failed     string
-	committed  bool
+	operations      []installation.InstallationOperation
+	rolledBack      string
+	failed          string
+	committed       bool
 	committedPlugin domain.Plugin
-	commitErr  error
+	commitErr       error
 }
 
 func (r *recoveryRepository) BeginOperation(context.Context, installation.InstallationOperation) error {
