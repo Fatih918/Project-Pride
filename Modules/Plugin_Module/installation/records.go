@@ -72,6 +72,7 @@ type VerifiedArtifact struct {
 	VerificationPolicy      string
 	VerificationEvidenceRef string
 	ManifestJSON            string
+	PlatformMetadata        PlatformMetadata
 }
 
 func (o InstallationOperation) ValidateForBegin() error {
