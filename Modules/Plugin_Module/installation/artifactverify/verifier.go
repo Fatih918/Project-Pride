@@ -180,7 +180,10 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 	if strings.TrimSpace(finalPath) == "" {
 		return installation.VerifiedArtifact{}, installation.ErrRecordMismatch
 	}
+	platformType := domain.PluginTypeActive
+	if d.PlatformMetadata.PluginType == "passive" { platformType = domain.PluginTypePassive }
 	return installation.VerifiedArtifact{
+		PlatformMetadata: installation.PlatformMetadata{Type: platformType, Protected: domain.ProtectedMetadata{Capabilities: append([]domain.Capability(nil), d.PlatformMetadata.Capabilities...), PermissionIDs: append([]string(nil), d.PlatformMetadata.PermissionIDs...), CompatibilityStatus: d.PlatformMetadata.CompatibilityStatus}},
 		FinalArtifactPath:       finalPath,
 		DigestAlgorithm:         "sha-256",
 		DigestValue:             actualDigest,
