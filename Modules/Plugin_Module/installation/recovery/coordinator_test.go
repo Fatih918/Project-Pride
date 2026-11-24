@@ -187,9 +187,6 @@ func TestRecoverPromotedTransientVerifierFailureRemainsRetryable(t *testing.T) {
 	storage := &recoveryStorage{}
 	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest}}
 	verifier := &recoveryVerifier{err: errors.New("trust endpoint unavailable")}
-	metadata := recoveryMetadata{result: installation.PlatformMetadata{
-		Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}},
-	}}
 	coordinator, err := New(repo, recoveryPluginRepository{}, storage, inspector, verifier)
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +208,7 @@ func TestRecoverPromotedWithoutDescriptorFailsClosed(t *testing.T) {
 	}
 	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
 	storage := &recoveryStorage{}
-	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, recoveryMetadata{}, &recoveryVerifier{})
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, &recoveryVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
