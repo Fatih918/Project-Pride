@@ -16,6 +16,7 @@ type recoveryRepository struct {
 	rolledBack string
 	failed     string
 	committed  bool
+	committedPlugin domain.Plugin
 	commitErr  error
 }
 
@@ -31,11 +32,12 @@ func (r *recoveryRepository) RecordVerified(context.Context, installation.Operat
 func (r *recoveryRepository) RecordPromoted(context.Context, installation.OperationID, string) error {
 	return nil
 }
-func (r *recoveryRepository) CommitInstallation(_ context.Context, _ installation.OperationID, _ domain.Plugin, _ installation.InstalledVersion) error {
+func (r *recoveryRepository) CommitInstallation(_ context.Context, _ installation.OperationID, plugin domain.Plugin, _ installation.InstalledVersion) error {
 	if r.commitErr != nil {
 		return r.commitErr
 	}
 	r.committed = true
+	r.committedPlugin = plugin.Clone()
 	return nil
 }
 func (r *recoveryRepository) GetOperation(context.Context, installation.OperationID) (installation.InstallationOperation, error) {
@@ -172,6 +174,9 @@ func TestRecoverPromotedReverifiesAndCommits(t *testing.T) {
 	}
 	if !repo.committed {
 		t.Fatal("PROMOTED operation was not committed")
+	}
+	if repo.committedPlugin.Type != domain.PluginTypePassive {
+		t.Fatalf("recovered Plugin did not use verified descriptor metadata: %#v", repo.committedPlugin)
 	}
 }
 
