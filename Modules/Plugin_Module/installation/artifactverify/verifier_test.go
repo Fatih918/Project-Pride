@@ -209,9 +209,13 @@ func TestVerifierReturnsPlatformMetadataOnlyAfterVerification(t *testing.T) {
 func TestVerifierRejectsDuplicateCapabilityIdentifiers(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
 	var metadata map[string]any
-	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		t.Fatal(err)
+	}
 	metadata["capabilities"] = []any{
 		map[string]any{"id": "text.generate", "name": "Text", "description": ""},
 		map[string]any{"id": "text.generate", "name": "Text duplicate", "description": ""},
@@ -226,9 +230,13 @@ func TestVerifierRejectsDuplicateCapabilityIdentifiers(t *testing.T) {
 func TestVerifierRejectsMissingRequiredPlatformMetadataArray(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
 	var metadata map[string]json.RawMessage
-	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		t.Fatal(err)
+	}
 	delete(metadata, "permission_ids")
 	fields["platform_metadata"], _ = json.Marshal(metadata)
 	staged.DescriptorJSON, _ = json.Marshal(fields)
@@ -240,9 +248,13 @@ func TestVerifierRejectsMissingRequiredPlatformMetadataArray(t *testing.T) {
 func TestVerifierRejectsMissingCapabilityDescription(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
 	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
 	var metadata map[string]json.RawMessage
-	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		t.Fatal(err)
+	}
 	metadata["capabilities"] = json.RawMessage(`[{"id":"text.generate","name":"Text"}]`)
 	fields["platform_metadata"], _ = json.Marshal(metadata)
 	staged.DescriptorJSON, _ = json.Marshal(fields)
