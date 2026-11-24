@@ -24,7 +24,7 @@ A Registry document MUST NOT turn an arbitrary repository page or mutable branch
 
 ## 3. D1 — Versioned Registry artifact descriptor
 
-Every installable release MUST publish an explicit provider-neutral descriptor containing: $schema, schema_version, plugin_id, version, release_id, download_uri, media_type, size_bytes, digest, and signature.
+Every installable release MUST publish an explicit provider-neutral descriptor containing: $schema, schema_version, plugin_id, version, release_id, download_uri, media_type, size_bytes, digest, platform_metadata, and signature.
 
 - schema_version is 1.1.0; $schema remains urn:pride:registry-artifact-descriptor:1. Descriptor schema 1.1.0 requires the signed `platform_metadata` object defined in §3.2.
 - plugin_id and version MUST match the Registry identity, package Manifest, and installation request.
@@ -42,6 +42,25 @@ Provider-specific release identifiers may be opaque strings. Provider-specific A
 The signature is detached. Construct the descriptor JSON with every required field except signature, canonicalize it using RFC 8785 JSON Canonicalization Scheme (JCS), encode the canonical JSON as UTF-8, and sign those bytes with the Marketplace Ed25519 private key. The verifier MUST reconstruct the same payload. It MUST NOT sign arbitrary pretty-printed or source-order JSON bytes.
 
 The signature binds Plugin identity, version, immutable release ID, download URI, media type, byte length, digest, and the complete `platform_metadata` object. SHA-256 is computed over the exact downloaded ZIP bytes, not extracted files.
+
+## 3.2 Marketplace-owned platform metadata (descriptor schema 1.1.0)
+
+Every descriptor with `schema_version: 1.1.0` MUST contain a `platform_metadata` object. The object is part of the descriptor signing payload and is authenticated by the same Marketplace Ed25519 signature. It is not a separate document and MUST NOT be fetched from a mutable Plugin ID/version lookup.
+
+The object has exactly these properties:
+
+- `schema_version`: string, exactly `1.0.0` for this metadata contract.
+- `plugin_type`: exactly `active` or `passive`.
+- `capabilities`: array of at most 256 objects. Each object has exactly `id`, `name`, and `description`. IDs are non-empty strings of at most 255 Unicode code points and unique within the array. Names are non-empty strings of at most 128 code points. Descriptions are strings of at most 1,024 code points; empty descriptions are allowed.
+- `permission_ids`: array of at most 256 unique non-empty strings, each at most 255 Unicode code points.
+- `compatibility_status`: non-empty string of at most 64 Unicode code points.
+
+Unknown properties inside `platform_metadata` and its capability objects MUST be rejected. Duplicate JSON object keys MUST be rejected at every nesting level. The descriptor's existing 1 MiB raw-byte limit bounds the complete document; the collection and string limits above provide additional deterministic bounds. Arbitrary `ProtectedMetadata.Attributes` are deferred and MUST NOT be populated from this contract.
+
+The metadata is untrusted while parsing. Implementations MUST NOT use it to create or commit a Plugin until the descriptor's Ed25519 signature has been successfully verified against the accepted trust configuration. The exact raw descriptor bytes persisted in the installation operation journal are the recovery evidence. Recovery MUST extract metadata from those bytes and MUST NOT perform a second metadata lookup.
+
+Descriptor schema 1.0.0 does not contain authenticated platform metadata. New installations MUST reject schema 1.0.0. A PROMOTED legacy operation without a 1.1.0 descriptor MUST NOT be auto-committed during recovery; it must be quarantined and marked failed with a stable compatibility failure code. Already committed installed Plugins are not automatically removed by this rule. No implicit metadata defaults are permitted.
+
 
 ## 4. D2 — ZIP package format
 
@@ -113,21 +132,3 @@ Production installation remains disabled until required adapters and the numeric
 
 PZIP-0001 defines the mandatory numeric resource limits for version 1 ZIP inspection and extraction. Its accepted version is 1.0.0. The machine-readable instance is `schemas/zip-installation-policy.v1.json`, validated by `schemas/zip-installation-policy.schema.json`. Implementations MUST enforce the exact policy semantics and values; missing or invalid policy configuration is a fail-closed error. Changing limits or enforcement semantics requires an explicitly reviewed policy version. PZIP-0001 does not enable production installation until the parser, extractor, verifier, and recovery boundaries are implemented and tested.
 
-
-## 3.2 Marketplace-owned platform metadata (descriptor schema 1.1.0)
-
-Every descriptor with `schema_version: 1.1.0` MUST contain a `platform_metadata` object. The object is part of the descriptor signing payload and is authenticated by the same Marketplace Ed25519 signature. It is not a separate document and MUST NOT be fetched from a mutable Plugin ID/version lookup.
-
-The object has exactly these properties:
-
-- `schema_version`: string, exactly `1.0.0` for this metadata contract.
-- `plugin_type`: exactly `active` or `passive`.
-- `capabilities`: array of at most 256 objects. Each object has exactly `id`, `name`, and `description`. IDs are non-empty strings of at most 255 Unicode code points and unique within the array. Names are non-empty strings of at most 128 code points. Descriptions are strings of at most 1,024 code points; empty descriptions are allowed.
-- `permission_ids`: array of at most 256 unique non-empty strings, each at most 255 Unicode code points.
-- `compatibility_status`: non-empty string of at most 64 Unicode code points.
-
-Unknown properties inside `platform_metadata` and its capability objects MUST be rejected. Duplicate JSON object keys MUST be rejected at every nesting level. The descriptor's existing 1 MiB raw-byte limit bounds the complete document; the collection and string limits above provide additional deterministic bounds. Arbitrary `ProtectedMetadata.Attributes` are deferred and MUST NOT be populated from this contract.
-
-The metadata is untrusted while parsing. Implementations MUST NOT use it to create or commit a Plugin until the descriptor's Ed25519 signature has been successfully verified against the accepted trust configuration. The exact raw descriptor bytes persisted in the installation operation journal are the recovery evidence. Recovery MUST extract metadata from those bytes and MUST NOT perform a second metadata lookup.
-
-Descriptor schema 1.0.0 does not contain authenticated platform metadata. New installations MUST reject schema 1.0.0. A PROMOTED legacy operation without a 1.1.0 descriptor MUST NOT be auto-committed during recovery; it must be quarantined and marked failed with a stable compatibility failure code. Already committed installed Plugins are not automatically removed by this rule. No implicit metadata defaults are permitted.
