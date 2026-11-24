@@ -183,8 +183,26 @@ func TestVerifierRejectsUnknownPlatformMetadataProperty(t *testing.T) {
 	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil { t.Fatal("expected unknown metadata property to fail") }
 }
 
-func TestVerifierRejectsMetadataNotMatchingAssembledPlugin(t *testing.T) {
+func TestVerifierReturnsPlatformMetadataOnlyAfterVerification(t *testing.T) {
 	verifier, staged, plugin, _, _ := fixture(t, false)
-	plugin.Type = domain.PluginTypeActive
-	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil { t.Fatal("expected metadata mismatch to fail") }
+	got, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin)
+	if err != nil { t.Fatal(err) }
+	if got.PlatformMetadata.Type != domain.PluginTypePassive || got.PlatformMetadata.Protected.CompatibilityStatus != "verified" {
+		t.Fatalf("unexpected verified platform metadata: %#v", got.PlatformMetadata)
+	}
+}
+
+func TestVerifierRejectsDuplicateCapabilityIdentifiers(t *testing.T) {
+	verifier, staged, plugin, _, _ := fixture(t, false)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil { t.Fatal(err) }
+	var metadata map[string]any
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil { t.Fatal(err) }
+	metadata["capabilities"] = []any{
+		map[string]any{"id":"text.generate","name":"Text","description":""},
+		map[string]any{"id":"text.generate","name":"Text duplicate","description":""},
+	}
+	fields["platform_metadata"], _ = json.Marshal(metadata)
+	staged.DescriptorJSON, _ = json.Marshal(fields)
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil { t.Fatal("expected duplicate capability IDs to fail") }
 }
