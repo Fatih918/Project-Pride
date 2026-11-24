@@ -17,13 +17,12 @@ The host must execute these steps in order:
 3. Open the SQLite-backed registry and installation-operation repositories. Apply supported migrations and verify that the database is usable. The host owns and closes these resources.
 4. Construct the confined storage adapter against the canonical Plugin_Storage root. Do not pass arbitrary user-controlled absolute paths into storage adapters.
 5. Construct the ZIP package inspector/extractor and artifact verifier using the approved PZIP-0001 policy and the production trust resolver.
-6. Construct the trusted platform metadata resolver. It must return platform-owned Plugin type/protected metadata; never derive these fields from developer-controlled Manifest JSON.
-7. Construct the recovery coordinator with the real operation repository, Plugin registry repository, confined quarantine storage, package inspector, platform metadata resolver, and artifact verifier.
-8. Ensure the canonical Plugin_Storage directory exists and acquire `startup.AcquireRecoveryLock(ctx, layout.StartupRecoveryLockPath())`.
-9. Retain the returned lock handle for the entire lifetime of the Plugin subsystem, not merely until recovery completes. This prevents a second process from recovering an operation while the first process is actively installing or updating a Plugin.
-10. Call `startup.Initialize(ctx, recoverer, pluginRepository)`.
-11. Publish the discovery service and mark Plugin discovery ready only after initialization succeeds. Keep discovery and Plugin execution unavailable on any error.
-12. During shutdown, stop accepting new Plugin operations, wait for in-flight operations to finish, close Module dependencies, and then release the recovery lock. On initialization failure, close constructed dependencies and release the lock.
+6. Construct the recovery coordinator with the real operation repository, Plugin registry repository, confined quarantine storage, package inspector, and artifact verifier. The verifier must extract platform metadata from the exact descriptor bytes and return it only after successful Ed25519 and SHA-256 verification.
+7. Ensure the canonical Plugin_Storage directory exists and acquire `startup.AcquireRecoveryLock(ctx, layout.StartupRecoveryLockPath())`.
+8. Retain the returned lock handle for the entire lifetime of the Plugin subsystem, not merely until recovery completes. This prevents a second process from recovering an operation while the first process is actively installing or updating a Plugin.
+9. Call `startup.Initialize(ctx, recoverer, pluginRepository)`.
+10. Publish the discovery service and mark Plugin discovery ready only after initialization succeeds. Keep discovery and Plugin execution unavailable on any error.
+11. During shutdown, stop accepting new Plugin operations, wait for in-flight operations to finish, close Module dependencies, and then release the recovery lock. On initialization failure, close constructed dependencies and release the lock.
 
 `startup.Initialize` implements the fail-closed discovery ordering. `startup.AcquireRecoveryLock` provides the process-shared advisory lock; the host remains responsible for acquiring it before initialization and retaining it until Plugin subsystem shutdown.
 
@@ -35,7 +34,7 @@ The host must execute these steps in order:
 | Trust configuration source | Fetch signed trust configuration from the distribution-configured HTTPS endpoint | Invalid endpoint policy, transport failure, invalid signature, stale/rollback sequence, or unavailable bootstrap trust |
 | Bootstrap public keys | Supply release-controlled Ed25519 trust anchors through the distribution/build process | Missing, malformed, or unapproved key material |
 | Artifact host allowlist | Supply exact HTTPS hostnames permitted by the acquisition adapter | Empty or invalid allowlist |
-| Platform metadata resolver | Resolve trusted platform-owned Plugin metadata for a Plugin ID and version | Missing or ambiguous metadata |
+| Signed platform metadata | Marketplace emits descriptor schema 1.1.0 with the required typed metadata; the verifier validates it and exposes it only after signature/digest verification | Missing, malformed, unsupported, or unsigned metadata; descriptor schema 1.0.0 cannot be installed or auto-committed during recovery |
 | SQLite repositories | Persist Plugin records, installed versions, operation journal, and trust sequence | Migration, integrity, or database errors |
 | Confined storage | Provide operation workspaces, artifact reads/writes, extraction, promotion, and quarantine under one canonical storage root | Path escape, symlink violation, unsafe destination, or filesystem error |
 
@@ -47,7 +46,7 @@ No production URL, credential, bootstrap key, Marketplace signer, or authenticat
 - The host must not enable Plugin loading, lifecycle transitions, or execution merely because discovery initialization succeeded; those capabilities require their own implemented and authorized runtime boundaries.
 - A recovery error means startup is not ready. The host must retain the error for diagnostics and must not silently continue with an empty or partially recovered registry.
 - If initialization fails after resources are opened, the host must close them in reverse construction order and leave durable operation records/artifacts for a later recovery attempt.
-- A transient trust, metadata, or database error during PROMOTED recovery must remain retryable. The host must not convert it into an artifact-invalid result.
+- A transient trust or database error during PROMOTED recovery must remain retryable. The host must not convert it into an artifact-invalid result.
 - The host should expose a health/readiness state that distinguishes Plugin subsystem unavailable, recovery in progress, and discovery ready. It must not expose secrets or internal credential material in health responses.
 
 ## 5. Cross-process coordination
@@ -71,7 +70,7 @@ Plugin installation must remain disabled until all of the following are true:
 - [ ] Production Registry namespace-to-origin configuration and a real host-owned audience-scoped token provider are supplied and integration-tested with the implemented descriptor resolver.
 - [ ] Marketplace signing and trust-configuration service are operational.
 - [ ] Release-controlled Ed25519 bootstrap keys are provisioned and rotation/revocation procedures are tested.
-- [ ] Production platform metadata resolver is implemented.
+- [ ] Marketplace signing pipeline emits schema 1.1.0 descriptors with the accepted `platform_metadata` object, and end-to-end signature verification covers that exact object.
 - [ ] Production host composition wires the actual adapters and calls `startup.Initialize` before exposing discovery.
 - [ ] Cross-process recovery exclusion is implemented and tested.
 - [ ] Startup failure cleanup and readiness behavior are tested.
