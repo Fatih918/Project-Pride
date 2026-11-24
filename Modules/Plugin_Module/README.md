@@ -15,6 +15,14 @@ The production host boundary and required startup ordering are specified in [Plu
 - Documents the release-controlled bootstrap-key provisioning boundary. No fabricated production key or insecure environment override is included.
 - The actual trust endpoint, bootstrap public-key value, Marketplace service authentication, and production composition root remain distribution/service responsibilities.
 
+## Increment 14 — Authenticated Registry descriptor resolution
+
+- Added a strict immutable Registry release-reference parser and typed descriptor-resolution request bound to namespace, Plugin ID, release ID, and expected version.
+- Added a host-configured HTTPS descriptor resolver with a host-owned audience-scoped bearer-token provider.
+- Enforced TLS 1.2+, exact configured origins, disabled redirects and environment proxies, connection-time public-address validation, bounded response handling, identity content encoding, and exact raw descriptor preservation.
+- Added safe typed HTTP errors, bounded Retry-After handling, cancellation propagation, and identity validation before artifact download.
+- The actual Registry origin mapping, token issuer/provider, credentials, Marketplace signer, trust service, bootstrap key material, and production host composition remain deployment/service responsibilities.
+
 ## Increment 12 — Registry artifact acquisition
 
 - Added an SDK-neutral `DescriptorResolver` port that resolves an opaque immutable source reference into the exact signed Marketplace descriptor.
@@ -90,11 +98,10 @@ The production host boundary and required startup ordering are specified in [Plu
 - Permission IDs are metadata only; authorization remains outside this module.
 - Core owns capability matching and candidate selection.
 - SQLite stores structured metadata; Plugin package files belong in local `Plugin_Storage`.
-- The application service treats Registry source references and package/verification formats as opaque adapter contracts; it does not invent unresolved wire formats or trust policy.
+- The application service keeps Registry parsing and HTTP transport behind the acquisition adapter; it does not own endpoint configuration, credentials, or trust policy.
 
 ## Not implemented yet
 
-- Production Official Registry descriptor resolver and authenticated Registry API/endpoint contract.
 - Production Marketplace signing and remote trust-configuration service.
 - Actual distribution bootstrap public-key value and release/build provisioning.
 - Production composition-root wiring for the Registry resolver, trust source, bootstrap keys, artifact verifier, and final-path adapter.
@@ -103,7 +110,7 @@ The production host boundary and required startup ordering are specified in [Plu
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Verification, bounded artifact acquisition, and bounded trust transport primitives are available, but production installation remains disabled until the Official Registry resolver, live trust service, actual distribution bootstrap key, production composition, filesystem promotion, and startup recovery are wired into the production host.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Authenticated Registry descriptor resolution, bounded artifact acquisition, signed artifact verification, bounded trust transport, filesystem promotion, and startup recovery components are implemented. Production installation remains disabled until the host supplies the real Registry origin mapping and token provider, the Marketplace operates the signed trust-configuration service, release-controlled bootstrap public keys are provisioned, the trusted platform-metadata contract is finalized and implemented, and the production composition root wires these dependencies behind the fail-closed startup gate.
 
 The detailed deployment boundary is in `docs/Trust Configuration Transport and Bootstrap-Key Provisioning.md`.
 
