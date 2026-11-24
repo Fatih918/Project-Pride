@@ -17,18 +17,11 @@ import (
 	"pride-plugin-module/storage"
 )
 
-type integrationMetadataResolver struct {
-	metadata installation.PlatformMetadata
-}
-
-func (r integrationMetadataResolver) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
-	return r.metadata, nil
-}
-
 type integrationArtifactVerifier struct {
 	finalPath string
 	digest    string
 	policy    string
+	metadata  installation.PlatformMetadata
 }
 
 func (v integrationArtifactVerifier) Verify(_ context.Context, _ installation.StagedArtifact, inspected installation.InspectedPackage, _ domain.Plugin) (installation.VerifiedArtifact, error) {
@@ -38,6 +31,7 @@ func (v integrationArtifactVerifier) Verify(_ context.Context, _ installation.St
 		DigestValue:        v.digest,
 		VerificationPolicy: v.policy,
 		ManifestJSON:       string(inspected.ManifestJSON),
+		PlatformMetadata:   v.metadata,
 	}, nil
 }
 
@@ -171,9 +165,7 @@ func TestRecoveryIntegrationSQLiteAndFilesystemRollsBackStagedOperation(t *testi
 		t.Fatal(err)
 	}
 
-	coordinator, err := New(env.repo, env.repo, env.storage, env.inspect,
-		integrationMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive}},
-		integrationArtifactVerifier{})
+	coordinator, err := New(env.repo, env.repo, env.storage, env.inspect, integrationArtifactVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +197,7 @@ func TestRecoveryIntegrationSQLiteAndFilesystemCommitsPromotedArtifact(t *testin
 	if err := env.repo.BeginOperation(ctx, op); err != nil {
 		t.Fatal(err)
 	}
-	descriptor := []byte(`{"schema_version":"1.0.0"}`)
+	descriptor := []byte(`{"schema_version":"1.1.0"}`)
 	if err := env.repo.RecordStaged(ctx, op.OperationID, installation.StagedArtifact{
 		StagingPath: stagingPath, DescriptorJSON: descriptor,
 	}); err != nil {
@@ -234,11 +226,10 @@ func TestRecoveryIntegrationSQLiteAndFilesystemCommitsPromotedArtifact(t *testin
 	}
 
 	coordinator, err := New(env.repo, env.repo, env.storage, env.inspect,
-		integrationMetadataResolver{metadata: installation.PlatformMetadata{
+		integrationArtifactVerifier{finalPath: finalRelative, digest: verified.DigestValue, policy: verified.VerificationPolicy, metadata: installation.PlatformMetadata{
 			Type:      domain.PluginTypePassive,
 			Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}},
-		}},
-		integrationArtifactVerifier{finalPath: finalRelative, digest: verified.DigestValue, policy: verified.VerificationPolicy})
+		}})
 	if err != nil {
 		t.Fatal(err)
 	}
