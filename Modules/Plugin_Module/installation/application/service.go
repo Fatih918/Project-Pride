@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -61,14 +62,9 @@ type PackageExtractor interface {
 	Extract(context.Context, string) (string, error)
 }
 
-// PlatformMetadataResolver supplies Marketplace/Registry-owned metadata. The
-// package Manifest is never allowed to authoritatively set these fields.
-type PlatformMetadataResolver interface {
-	Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error)
-}
-
-// ArtifactVerifier verifies integrity and authenticity under an explicitly
-// configured policy. The service does not choose algorithms or trust roots.
+// ArtifactVerifier validates the signed descriptor, verifies integrity and
+// authenticity, and returns Marketplace-owned metadata only after success.
+// The service does not choose algorithms or trust roots.
 type ArtifactVerifier interface {
 	Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error)
 }
@@ -88,7 +84,6 @@ type Service struct {
 	acquirer   ArtifactAcquirer
 	inspector  PackageInspector
 	extractor  PackageExtractor
-	metadata   PlatformMetadataResolver
 	verifier   ArtifactVerifier
 	promoter   ArtifactPromoter
 	now        func() time.Time
@@ -101,11 +96,10 @@ func NewService(
 	acquirer ArtifactAcquirer,
 	inspector PackageInspector,
 	extractor PackageExtractor,
-	metadata PlatformMetadataResolver,
 	verifier ArtifactVerifier,
 	promoter ArtifactPromoter,
 ) (*Service, error) {
-	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || extractor == nil || metadata == nil || verifier == nil || promoter == nil {
+	if repository == nil || ids == nil || storage == nil || acquirer == nil || inspector == nil || extractor == nil || verifier == nil || promoter == nil {
 		return nil, ErrMissingPort
 	}
 	return &Service{
@@ -115,7 +109,6 @@ func NewService(
 		acquirer:   acquirer,
 		inspector:  inspector,
 		extractor:  extractor,
-		metadata:   metadata,
 		verifier:   verifier,
 		promoter:   promoter,
 		now:        func() time.Time { return time.Now().UTC() },
@@ -210,27 +203,26 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if inspected.Manifest.PluginID != request.PluginID || inspected.Manifest.Version != request.Version {
 		return fail("match inspected Plugin identity", ErrPluginMismatch)
 	}
-	platformMetadata, err := s.metadata.Resolve(ctx, request.PluginID, request.Version)
-	if err != nil {
-		return fail("resolve platform Plugin metadata", err)
-	}
+	// Build only the developer-owned identity/descriptive candidate first.
+	// Marketplace-owned fields are populated exclusively from the verifier's
+	// result after the descriptor signature and artifact digest are accepted.
 	plugin := domain.Plugin{
 		ID:        inspected.Manifest.PluginID,
 		Manifest:  inspected.Manifest,
-		Type:      platformMetadata.Type,
 		State:     domain.PluginStateInstalled,
-		Protected: platformMetadata.Protected,
 		CreatedAt: now,
 		UpdatedAt: s.now().UTC(),
-	}
-	if err := plugin.Validate(); err != nil {
-		return fail("validate assembled Plugin", err)
 	}
 	// Verify the exact staged ZIP and signed descriptor before extracting
 	// developer-controlled payload into the operation workspace.
 	verified, err := s.verifier.Verify(ctx, staged, inspected, plugin.Clone())
 	if err != nil {
 		return fail("verify Plugin artifact", err)
+	}
+	plugin.Type = verified.PlatformMetadata.Type
+	plugin.Protected = verified.PlatformMetadata.Protected
+	if err := plugin.Validate(); err != nil {
+		return fail("validate assembled Plugin", err)
 	}
 
 	extractedPath, err := s.extractor.Extract(ctx, staged.StagingPath)
@@ -247,7 +239,7 @@ func (s *Service) Install(ctx context.Context, request Request) error {
 	if err != nil {
 		return fail("reverify Plugin artifact after extraction", err)
 	}
-	if reverified != verified {
+	if !sameVerifiedArtifact(reverified, verified) {
 		return fail("compare Plugin artifact verification evidence", installation.ErrRecordMismatch)
 	}
 	verified = reverified
@@ -309,8 +301,6 @@ func failureCode(stage string) string {
 		return "PACKAGE_INSPECTION_FAILED"
 	case "validate assembled Plugin":
 		return "PLUGIN_VALIDATION_FAILED"
-	case "resolve platform Plugin metadata":
-		return "PLATFORM_METADATA_RESOLUTION_FAILED"
 	case "match inspected Plugin identity":
 		return "PLUGIN_IDENTITY_MISMATCH"
 	case "extract Plugin package":
@@ -330,4 +320,14 @@ func failureCode(stage string) string {
 	default:
 		return "INSTALLATION_FAILED"
 	}
+}
+
+func sameVerifiedArtifact(left, right installation.VerifiedArtifact) bool {
+	return left.FinalArtifactPath == right.FinalArtifactPath &&
+		left.DigestAlgorithm == right.DigestAlgorithm &&
+		left.DigestValue == right.DigestValue &&
+		left.VerificationPolicy == right.VerificationPolicy &&
+		left.VerificationEvidenceRef == right.VerificationEvidenceRef &&
+		left.ManifestJSON == right.ManifestJSON &&
+		reflect.DeepEqual(left.PlatformMetadata, right.PlatformMetadata)
 }

@@ -11,13 +11,14 @@ import (
 )
 
 type testRepository struct {
-	selected     installation.InstalledVersion
-	selectedErr  error
-	operation    installation.InstallationOperation
-	phases       []installation.Phase
-	committed    bool
-	markedFailed string
-	commitErr    error
+	selected        installation.InstalledVersion
+	selectedErr     error
+	operation       installation.InstallationOperation
+	phases          []installation.Phase
+	committed       bool
+	committedPlugin domain.Plugin
+	markedFailed    string
+	commitErr       error
 }
 
 func (r *testRepository) BeginOperation(_ context.Context, op installation.InstallationOperation) error {
@@ -37,11 +38,12 @@ func (r *testRepository) RecordPromoted(_ context.Context, _ installation.Operat
 	r.phases = append(r.phases, installation.PhasePromoted)
 	return nil
 }
-func (r *testRepository) CommitInstallation(_ context.Context, _ installation.OperationID, _ domain.Plugin, _ installation.InstalledVersion) error {
+func (r *testRepository) CommitInstallation(_ context.Context, _ installation.OperationID, plugin domain.Plugin, _ installation.InstalledVersion) error {
 	if r.commitErr != nil {
 		return r.commitErr
 	}
 	r.committed = true
+	r.committedPlugin = plugin.Clone()
 	r.phases = append(r.phases, installation.PhaseCommitted)
 	return nil
 }
@@ -126,15 +128,6 @@ func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, e
 	return stagingPath + "/package", nil
 }
 
-type testMetadataResolver struct {
-	metadata installation.PlatformMetadata
-	err      error
-}
-
-func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
-	return r.metadata, r.err
-}
-
 type testVerifier struct {
 	result installation.VerifiedArtifact
 	err    error
@@ -142,6 +135,9 @@ type testVerifier struct {
 }
 
 func (v testVerifier) Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error) {
+	if v.result.PlatformMetadata.Type == domain.PluginTypeUnspecified {
+		v.result.PlatformMetadata = installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}
+	}
 	if v.order != nil {
 		*v.order = append(*v.order, "verify")
 	}
@@ -168,7 +164,7 @@ func validPlugin() domain.Plugin {
 
 func newTestService(t *testing.T, repo *testRepository, acquirer ArtifactAcquirer, inspector PackageInspector, verifier ArtifactVerifier, promoter ArtifactPromoter) *Service {
 	t.Helper()
-	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testExtractor{}, testMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}, verifier, promoter)
+	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testExtractor{}, verifier, promoter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,6 +184,9 @@ func TestInstallCoordinatesSuccessfulCommit(t *testing.T) {
 	}
 	if !repo.committed {
 		t.Fatal("expected atomic installation commit")
+	}
+	if repo.committedPlugin.Type != domain.PluginTypePassive {
+		t.Fatalf("Plugin type was not sourced from verified descriptor metadata: %#v", repo.committedPlugin)
 	}
 	if len(repo.phases) != 5 || repo.phases[4] != installation.PhaseCommitted {
 		t.Fatalf("unexpected phases: %#v", repo.phases)

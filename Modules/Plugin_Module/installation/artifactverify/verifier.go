@@ -27,10 +27,11 @@ const (
 )
 
 var (
-	ErrInvalidDescriptor = errors.New("invalid Registry artifact descriptor")
-	ErrUntrustedKey      = errors.New("Marketplace signing key is not trusted")
-	ErrDigestMismatch    = errors.New("artifact SHA-256 digest mismatch")
-	ErrSignatureInvalid  = errors.New("artifact descriptor signature is invalid")
+	ErrInvalidDescriptor            = errors.New("invalid Registry artifact descriptor")
+	ErrUnsupportedDescriptorVersion = errors.New("unsupported Registry artifact descriptor version")
+	ErrUntrustedKey                 = errors.New("Marketplace signing key is not trusted")
+	ErrDigestMismatch               = errors.New("artifact SHA-256 digest mismatch")
+	ErrSignatureInvalid             = errors.New("artifact descriptor signature is invalid")
 )
 
 // Canonicalizer must implement RFC 8785 JSON Canonicalization Scheme exactly.
@@ -93,6 +94,13 @@ type descriptor struct {
 		Algorithm string `json:"algorithm"`
 		Value     string `json:"value"`
 	} `json:"digest"`
+	PlatformMetadata struct {
+		SchemaVersion       string              `json:"schema_version"`
+		PluginType          string              `json:"plugin_type"`
+		Capabilities        []domain.Capability `json:"capabilities"`
+		PermissionIDs       []string            `json:"permission_ids"`
+		CompatibilityStatus string              `json:"compatibility_status"`
+	} `json:"platform_metadata"`
 	Signature struct {
 		Algorithm string `json:"algorithm"`
 		KeyID     string `json:"key_id"`
@@ -173,25 +181,38 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 	if strings.TrimSpace(finalPath) == "" {
 		return installation.VerifiedArtifact{}, installation.ErrRecordMismatch
 	}
+	platformType := domain.PluginTypeActive
+	if d.PlatformMetadata.PluginType == "passive" {
+		platformType = domain.PluginTypePassive
+	}
 	return installation.VerifiedArtifact{
+		PlatformMetadata:        installation.PlatformMetadata{Type: platformType, Protected: domain.ProtectedMetadata{Capabilities: append([]domain.Capability(nil), d.PlatformMetadata.Capabilities...), PermissionIDs: append([]string(nil), d.PlatformMetadata.PermissionIDs...), CompatibilityStatus: d.PlatformMetadata.CompatibilityStatus}},
 		FinalArtifactPath:       finalPath,
 		DigestAlgorithm:         "sha-256",
 		DigestValue:             actualDigest,
-		VerificationPolicy:      "registry-artifact-descriptor-v1+sha256+ed25519",
+		VerificationPolicy:      "registry-artifact-descriptor-v1.1.0+sha256+ed25519",
 		VerificationEvidenceRef: "marketplace-key:" + d.Signature.KeyID,
 		ManifestJSON:            string(append([]byte(nil), inspected.ManifestJSON...)),
 	}, nil
 }
 
 func validateDescriptor(d descriptor, plugin domain.Plugin) error {
-	if d.Schema != descriptorSchema || d.SchemaVersion != "1.0.0" ||
-		d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
+	if d.Schema != descriptorSchema {
+		return ErrInvalidDescriptor
+	}
+	if d.SchemaVersion != "1.1.0" {
+		return ErrUnsupportedDescriptorVersion
+	}
+	if d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
 		d.Version == "" || len([]rune(d.Version)) > 128 || d.Version != plugin.Manifest.Version ||
-		d.ReleaseID == "" || len([]rune(d.ReleaseID)) > 512 || d.SizeBytes == 0 ||
+		d.ReleaseID == "" || len([]rune(d.ReleaseID)) > 128 || d.SizeBytes == 0 ||
 		d.MediaType != descriptorMediaType ||
 		d.Digest.Algorithm != "sha-256" || len(d.Digest.Value) != sha256.Size*2 ||
 		d.Signature.Algorithm != "Ed25519" || strings.TrimSpace(d.Signature.KeyID) == "" || len([]rune(d.Signature.KeyID)) > 255 {
 		return ErrInvalidDescriptor
+	}
+	if err := validatePlatformMetadata(d.PlatformMetadata); err != nil {
+		return fmt.Errorf("%w: invalid platform metadata: %v", ErrInvalidDescriptor, err)
 	}
 	if _, err := hex.DecodeString(d.Digest.Value); err != nil || strings.ToLower(d.Digest.Value) != d.Digest.Value {
 		return ErrInvalidDescriptor
@@ -214,6 +235,26 @@ func validateDescriptorNestedProperties(raw []byte) error {
 	if err := validateOnlyJSONProperties(fields["signature"], "algorithm", "key_id", "value"); err != nil {
 		return fmt.Errorf("signature: %w", err)
 	}
+	if err := validateOnlyJSONProperties(fields["platform_metadata"], "schema_version", "plugin_type", "capabilities", "permission_ids", "compatibility_status"); err != nil {
+		return fmt.Errorf("platform_metadata: %w", err)
+	}
+	if err := requireJSONProperties(fields["platform_metadata"], "schema_version", "plugin_type", "capabilities", "permission_ids", "compatibility_status"); err != nil {
+		return fmt.Errorf("platform_metadata: %w", err)
+	}
+	var metadata struct {
+		Capabilities []json.RawMessage `json:"capabilities"`
+	}
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		return err
+	}
+	for i, capability := range metadata.Capabilities {
+		if err := validateOnlyJSONProperties(capability, "id", "name", "description"); err != nil {
+			return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err)
+		}
+		if err := requireJSONProperties(capability, "id", "name", "description"); err != nil {
+			return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err)
+		}
+	}
 	return nil
 }
 
@@ -229,6 +270,56 @@ func validateOnlyJSONProperties(raw json.RawMessage, allowed ...string) error {
 	for key := range fields {
 		if _, ok := allowedSet[key]; !ok {
 			return fmt.Errorf("unknown property %q", key)
+		}
+	}
+	return nil
+}
+
+func validatePlatformMetadata(metadata struct {
+	SchemaVersion       string              `json:"schema_version"`
+	PluginType          string              `json:"plugin_type"`
+	Capabilities        []domain.Capability `json:"capabilities"`
+	PermissionIDs       []string            `json:"permission_ids"`
+	CompatibilityStatus string              `json:"compatibility_status"`
+}) error {
+	if metadata.SchemaVersion != "1.0.0" || (metadata.PluginType != "active" && metadata.PluginType != "passive") || metadata.Capabilities == nil || metadata.PermissionIDs == nil || len(metadata.Capabilities) > 256 || len(metadata.PermissionIDs) > 256 || !boundedNonEmpty(metadata.CompatibilityStatus, 64) {
+		return errors.New("unsupported schema, plugin type, or collection/string limit")
+	}
+	seenCapabilities := make(map[string]struct{}, len(metadata.Capabilities))
+	for _, capability := range metadata.Capabilities {
+		if !boundedNonEmpty(capability.ID, 255) || !boundedNonEmpty(capability.Name, 128) || len([]rune(capability.Description)) > 1024 {
+			return errors.New("invalid capability field")
+		}
+		if _, exists := seenCapabilities[capability.ID]; exists {
+			return errors.New("duplicate capability ID")
+		}
+		seenCapabilities[capability.ID] = struct{}{}
+	}
+	seenPermissions := make(map[string]struct{}, len(metadata.PermissionIDs))
+	for _, permissionID := range metadata.PermissionIDs {
+		if !boundedNonEmpty(permissionID, 255) {
+			return errors.New("invalid permission ID")
+		}
+		if _, exists := seenPermissions[permissionID]; exists {
+			return errors.New("duplicate permission ID")
+		}
+		seenPermissions[permissionID] = struct{}{}
+	}
+	return nil
+}
+
+func boundedNonEmpty(value string, max int) bool {
+	return strings.TrimSpace(value) != "" && len([]rune(value)) <= max
+}
+
+func requireJSONProperties(raw json.RawMessage, required ...string) error {
+	var fields map[string]json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return errors.New("expected JSON object")
+	}
+	for _, key := range required {
+		if _, ok := fields[key]; !ok {
+			return fmt.Errorf("missing required property %q", key)
 		}
 	}
 	return nil

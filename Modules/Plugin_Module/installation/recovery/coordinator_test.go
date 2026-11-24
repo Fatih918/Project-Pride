@@ -8,15 +8,17 @@ import (
 
 	"pride-plugin-module/domain"
 	"pride-plugin-module/installation"
+	"pride-plugin-module/installation/artifactverify"
 	"pride-plugin-module/registry"
 )
 
 type recoveryRepository struct {
-	operations []installation.InstallationOperation
-	rolledBack string
-	failed     string
-	committed  bool
-	commitErr  error
+	operations      []installation.InstallationOperation
+	rolledBack      string
+	failed          string
+	committed       bool
+	committedPlugin domain.Plugin
+	commitErr       error
 }
 
 func (r *recoveryRepository) BeginOperation(context.Context, installation.InstallationOperation) error {
@@ -31,11 +33,12 @@ func (r *recoveryRepository) RecordVerified(context.Context, installation.Operat
 func (r *recoveryRepository) RecordPromoted(context.Context, installation.OperationID, string) error {
 	return nil
 }
-func (r *recoveryRepository) CommitInstallation(_ context.Context, _ installation.OperationID, _ domain.Plugin, _ installation.InstalledVersion) error {
+func (r *recoveryRepository) CommitInstallation(_ context.Context, _ installation.OperationID, plugin domain.Plugin, _ installation.InstalledVersion) error {
 	if r.commitErr != nil {
 		return r.commitErr
 	}
 	r.committed = true
+	r.committedPlugin = plugin.Clone()
 	return nil
 }
 func (r *recoveryRepository) GetOperation(context.Context, installation.OperationID) (installation.InstallationOperation, error) {
@@ -94,15 +97,6 @@ func (i *recoveryInspector) Inspect(_ context.Context, path string) (installatio
 	return i.result, i.err
 }
 
-type recoveryMetadata struct {
-	result installation.PlatformMetadata
-	err    error
-}
-
-func (m recoveryMetadata) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
-	return m.result, m.err
-}
-
 type recoveryVerifier struct {
 	result installation.VerifiedArtifact
 	err    error
@@ -130,7 +124,7 @@ func TestRecoverPrePromotionQuarantinesAndRollsBack(t *testing.T) {
 	}
 	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
 	storage := &recoveryStorage{}
-	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, recoveryMetadata{}, &recoveryVerifier{})
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, &recoveryVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,14 +154,12 @@ func TestRecoverPromotedReverifiesAndCommits(t *testing.T) {
 		FinalArtifactPath: op.FinalArtifactPath, DigestAlgorithm: op.DigestAlgorithm,
 		DigestValue: op.DigestValue, VerificationPolicy: op.VerificationPolicy,
 		VerificationEvidenceRef: "marketplace-key:key-1", ManifestJSON: op.ManifestJSON,
+		PlatformMetadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}},
 	}
 	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
 	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest, ManifestJSON: []byte(op.ManifestJSON)}}
 	verifier := &recoveryVerifier{result: verified}
-	metadata := recoveryMetadata{result: installation.PlatformMetadata{
-		Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}},
-	}}
-	coordinator, err := New(repo, recoveryPluginRepository{}, &recoveryStorage{}, inspector, metadata, verifier)
+	coordinator, err := New(repo, recoveryPluginRepository{}, &recoveryStorage{}, inspector, verifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,6 +176,9 @@ func TestRecoverPromotedReverifiesAndCommits(t *testing.T) {
 	if !repo.committed {
 		t.Fatal("PROMOTED operation was not committed")
 	}
+	if repo.committedPlugin.Type != domain.PluginTypePassive {
+		t.Fatalf("recovered Plugin did not use verified descriptor metadata: %#v", repo.committedPlugin)
+	}
 }
 
 func TestRecoverPromotedTransientVerifierFailureRemainsRetryable(t *testing.T) {
@@ -198,10 +193,7 @@ func TestRecoverPromotedTransientVerifierFailureRemainsRetryable(t *testing.T) {
 	storage := &recoveryStorage{}
 	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest}}
 	verifier := &recoveryVerifier{err: errors.New("trust endpoint unavailable")}
-	metadata := recoveryMetadata{result: installation.PlatformMetadata{
-		Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}},
-	}}
-	coordinator, err := New(repo, recoveryPluginRepository{}, storage, inspector, metadata, verifier)
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, inspector, verifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +214,7 @@ func TestRecoverPromotedWithoutDescriptorFailsClosed(t *testing.T) {
 	}
 	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
 	storage := &recoveryStorage{}
-	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, recoveryMetadata{}, &recoveryVerifier{})
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, &recoveryInspector{}, &recoveryVerifier{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,13 +244,13 @@ func TestRecoverUpdatePreservesPluginCreationTime(t *testing.T) {
 	verified := installation.VerifiedArtifact{
 		FinalArtifactPath: op.FinalArtifactPath, DigestAlgorithm: op.DigestAlgorithm,
 		DigestValue: op.DigestValue, VerificationPolicy: op.VerificationPolicy, ManifestJSON: op.ManifestJSON,
+		PlatformMetadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}},
 	}
 	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
 	plugins := recoveryPluginRepository{plugin: plugin}
 	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest, ManifestJSON: []byte(op.ManifestJSON)}}
 	verifier := &recoveryVerifier{result: verified}
-	metadata := recoveryMetadata{result: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}
-	coordinator, err := New(repo, plugins, &recoveryStorage{}, inspector, metadata, verifier)
+	coordinator, err := New(repo, plugins, &recoveryStorage{}, inspector, verifier)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,3 +265,27 @@ func TestRecoverUpdatePreservesPluginCreationTime(t *testing.T) {
 // Keep the compile-time dependency explicit: the local Plugin repository is
 // distinct from the Marketplace descriptor resolver.
 var _ registry.Repository = recoveryPluginRepository{}
+
+func TestRecoverLegacyDescriptorUsesExplicitCompatibilityFailure(t *testing.T) {
+	manifest := recoveryManifest()
+	op := installation.InstallationOperation{
+		OperationID: "op-legacy-descriptor", PluginID: manifest.PluginID, TargetVersion: manifest.Version,
+		Kind: installation.KindInstall, Phase: installation.PhasePromoted,
+		FinalArtifactPath: "installed/example.plugin/1.2.0", DescriptorJSON: `{"schema_version":"1.0.0"}`,
+		CreatedAt: time.Now().UTC(),
+	}
+	repo := &recoveryRepository{operations: []installation.InstallationOperation{op}}
+	storage := &recoveryStorage{}
+	inspector := &recoveryInspector{result: installation.InspectedPackage{Manifest: manifest}}
+	verifier := &recoveryVerifier{err: artifactverify.ErrUnsupportedDescriptorVersion}
+	coordinator, err := New(repo, recoveryPluginRepository{}, storage, inspector, verifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := coordinator.Recover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if storage.calls != 1 || storage.source != op.FinalArtifactPath || repo.failed != failureLegacyDescriptor || repo.committed {
+		t.Fatalf("legacy descriptor did not fail closed: storage=%d source=%q failed=%q committed=%v", storage.calls, storage.source, repo.failed, repo.committed)
+	}
+}

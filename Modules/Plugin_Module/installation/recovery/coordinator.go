@@ -17,16 +17,13 @@ import (
 const (
 	failureInterrupted       = "RECOVERY_INTERRUPTED_BEFORE_PROMOTION"
 	failureMissingDescriptor = "RECOVERY_MISSING_DESCRIPTOR_EVIDENCE"
+	failureLegacyDescriptor  = "RECOVERY_LEGACY_DESCRIPTOR_UNSUPPORTED"
 	failureInvalidPackage    = "RECOVERY_PACKAGE_INVALID"
 	failureInvalidArtifact   = "RECOVERY_ARTIFACT_INVALID"
 )
 
 type PackageInspector interface {
 	Inspect(context.Context, string) (installation.InspectedPackage, error)
-}
-
-type PlatformMetadataResolver interface {
-	Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error)
 }
 
 type ArtifactVerifier interface {
@@ -46,7 +43,6 @@ type Coordinator struct {
 	plugins    registry.Repository
 	storage    QuarantineStorage
 	inspector  PackageInspector
-	metadata   PlatformMetadataResolver
 	verifier   ArtifactVerifier
 	now        func() time.Time
 }
@@ -56,10 +52,9 @@ func New(
 	plugins registry.Repository,
 	storage QuarantineStorage,
 	inspector PackageInspector,
-	metadata PlatformMetadataResolver,
 	verifier ArtifactVerifier,
 ) (*Coordinator, error) {
-	if operations == nil || plugins == nil || storage == nil || inspector == nil || metadata == nil || verifier == nil {
+	if operations == nil || plugins == nil || storage == nil || inspector == nil || verifier == nil {
 		return nil, errors.New("installation recovery dependencies are required")
 	}
 	return &Coordinator{
@@ -67,7 +62,6 @@ func New(
 		plugins:    plugins,
 		storage:    storage,
 		inspector:  inspector,
-		metadata:   metadata,
 		verifier:   verifier,
 		now:        func() time.Time { return time.Now().UTC() },
 	}, nil
@@ -150,18 +144,12 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 		return quarantineAndFail(failureInvalidPackage, installation.ErrRecordMismatch)
 	}
 
-	platform, err := c.metadata.Resolve(ctx, operation.PluginID, operation.TargetVersion)
-	if err != nil {
-		// Metadata/trust infrastructure failures are retryable. Do not move a
-		// potentially valid artifact merely because a remote dependency is down.
-		return fmt.Errorf("resolve trusted platform Plugin metadata: %w", err)
-	}
+	// Platform metadata is extracted from the exact descriptor bytes persisted
+	// in the operation journal. It remains untrusted until Verify succeeds.
 	plugin := domain.Plugin{
 		ID:        inspected.Manifest.PluginID,
 		Manifest:  inspected.Manifest,
-		Type:      platform.Type,
 		State:     domain.PluginStateInstalled,
-		Protected: platform.Protected,
 		CreatedAt: operation.CreatedAt,
 		UpdatedAt: c.now().UTC(),
 	}
@@ -172,10 +160,6 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 		}
 		plugin.CreatedAt = existing.CreatedAt
 	}
-	if err := plugin.Validate(); err != nil {
-		return fmt.Errorf("validate recovered Plugin aggregate: %w", err)
-	}
-
 	staged := installation.StagedArtifact{
 		StagingPath:    operation.FinalArtifactPath,
 		DescriptorJSON: []byte(operation.DescriptorJSON),
@@ -185,6 +169,9 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 		// Only cryptographic/descriptor failures are definitive. In particular,
 		// ErrUntrustedKey may wrap a temporary trust-transport failure and must
 		// remain retryable.
+		if errors.Is(err, artifactverify.ErrUnsupportedDescriptorVersion) {
+			return quarantineAndFail(failureLegacyDescriptor, err)
+		}
 		if errors.Is(err, artifactverify.ErrInvalidDescriptor) ||
 			errors.Is(err, artifactverify.ErrDigestMismatch) ||
 			errors.Is(err, artifactverify.ErrSignatureInvalid) {
@@ -192,6 +179,12 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 		}
 		return fmt.Errorf("reverify promoted Plugin artifact: %w", err)
 	}
+	plugin.Type = verified.PlatformMetadata.Type
+	plugin.Protected = verified.PlatformMetadata.Protected
+	if err := plugin.Validate(); err != nil {
+		return quarantineAndFail(failureInvalidArtifact, err)
+	}
+
 	if verified.FinalArtifactPath != operation.FinalArtifactPath ||
 		verified.DigestAlgorithm != operation.DigestAlgorithm ||
 		verified.DigestValue != operation.DigestValue ||
