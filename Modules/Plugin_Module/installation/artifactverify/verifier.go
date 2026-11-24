@@ -28,6 +28,7 @@ const (
 
 var (
 	ErrInvalidDescriptor = errors.New("invalid Registry artifact descriptor")
+	ErrUnsupportedDescriptorVersion = errors.New("unsupported Registry artifact descriptor version")
 	ErrUntrustedKey      = errors.New("Marketplace signing key is not trusted")
 	ErrDigestMismatch    = errors.New("artifact SHA-256 digest mismatch")
 	ErrSignatureInvalid  = errors.New("artifact descriptor signature is invalid")
@@ -187,14 +188,20 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 		FinalArtifactPath:       finalPath,
 		DigestAlgorithm:         "sha-256",
 		DigestValue:             actualDigest,
-		VerificationPolicy:      "registry-artifact-descriptor-v1+sha256+ed25519",
+		VerificationPolicy:      "registry-artifact-descriptor-v1.1.0+sha256+ed25519",
 		VerificationEvidenceRef: "marketplace-key:" + d.Signature.KeyID,
 		ManifestJSON:            string(append([]byte(nil), inspected.ManifestJSON...)),
 	}, nil
 }
 
 func validateDescriptor(d descriptor, plugin domain.Plugin) error {
-	if d.Schema != descriptorSchema || d.SchemaVersion != "1.1.0" ||
+	if d.Schema != descriptorSchema {
+		return ErrInvalidDescriptor
+	}
+	if d.SchemaVersion != "1.1.0" {
+		return ErrUnsupportedDescriptorVersion
+	}
+	if
 		d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
 		d.Version == "" || len([]rune(d.Version)) > 128 || d.Version != plugin.Manifest.Version ||
 		d.ReleaseID == "" || len([]rune(d.ReleaseID)) > 128 || d.SizeBytes == 0 ||
