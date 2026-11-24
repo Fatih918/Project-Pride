@@ -17,6 +17,7 @@ import (
 const (
 	failureInterrupted       = "RECOVERY_INTERRUPTED_BEFORE_PROMOTION"
 	failureMissingDescriptor = "RECOVERY_MISSING_DESCRIPTOR_EVIDENCE"
+	failureLegacyDescriptor  = "RECOVERY_LEGACY_DESCRIPTOR_UNSUPPORTED"
 	failureInvalidPackage    = "RECOVERY_PACKAGE_INVALID"
 	failureInvalidArtifact   = "RECOVERY_ARTIFACT_INVALID"
 )
@@ -168,6 +169,9 @@ func (c *Coordinator) recoverPromoted(ctx context.Context, operation installatio
 		// Only cryptographic/descriptor failures are definitive. In particular,
 		// ErrUntrustedKey may wrap a temporary trust-transport failure and must
 		// remain retryable.
+		if errors.Is(err, artifactverify.ErrUnsupportedDescriptorVersion) {
+			return quarantineAndFail(failureLegacyDescriptor, err)
+		}
 		if errors.Is(err, artifactverify.ErrInvalidDescriptor) ||
 			errors.Is(err, artifactverify.ErrDigestMismatch) ||
 			errors.Is(err, artifactverify.ErrSignatureInvalid) {
