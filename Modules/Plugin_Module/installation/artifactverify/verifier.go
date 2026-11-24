@@ -182,9 +182,11 @@ func (v *Verifier) Verify(ctx context.Context, staged installation.StagedArtifac
 		return installation.VerifiedArtifact{}, installation.ErrRecordMismatch
 	}
 	platformType := domain.PluginTypeActive
-	if d.PlatformMetadata.PluginType == "passive" { platformType = domain.PluginTypePassive }
+	if d.PlatformMetadata.PluginType == "passive" {
+		platformType = domain.PluginTypePassive
+	}
 	return installation.VerifiedArtifact{
-		PlatformMetadata: installation.PlatformMetadata{Type: platformType, Protected: domain.ProtectedMetadata{Capabilities: append([]domain.Capability(nil), d.PlatformMetadata.Capabilities...), PermissionIDs: append([]string(nil), d.PlatformMetadata.PermissionIDs...), CompatibilityStatus: d.PlatformMetadata.CompatibilityStatus}},
+		PlatformMetadata:        installation.PlatformMetadata{Type: platformType, Protected: domain.ProtectedMetadata{Capabilities: append([]domain.Capability(nil), d.PlatformMetadata.Capabilities...), PermissionIDs: append([]string(nil), d.PlatformMetadata.PermissionIDs...), CompatibilityStatus: d.PlatformMetadata.CompatibilityStatus}},
 		FinalArtifactPath:       finalPath,
 		DigestAlgorithm:         "sha-256",
 		DigestValue:             actualDigest,
@@ -201,8 +203,7 @@ func validateDescriptor(d descriptor, plugin domain.Plugin) error {
 	if d.SchemaVersion != "1.1.0" {
 		return ErrUnsupportedDescriptorVersion
 	}
-	if
-		d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
+	if d.PluginID == "" || len([]rune(d.PluginID)) > 255 || d.PluginID != string(plugin.ID) ||
 		d.Version == "" || len([]rune(d.Version)) > 128 || d.Version != plugin.Manifest.Version ||
 		d.ReleaseID == "" || len([]rune(d.ReleaseID)) > 128 || d.SizeBytes == 0 ||
 		d.MediaType != descriptorMediaType ||
@@ -237,10 +238,16 @@ func validateDescriptorNestedProperties(raw []byte) error {
 	if err := validateOnlyJSONProperties(fields["platform_metadata"], "schema_version", "plugin_type", "capabilities", "permission_ids", "compatibility_status"); err != nil {
 		return fmt.Errorf("platform_metadata: %w", err)
 	}
-	var metadata struct { Capabilities []json.RawMessage `json:"capabilities"` }
-	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil { return err }
+	var metadata struct {
+		Capabilities []json.RawMessage `json:"capabilities"`
+	}
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		return err
+	}
 	for i, capability := range metadata.Capabilities {
-		if err := validateOnlyJSONProperties(capability, "id", "name", "description"); err != nil { return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err) }
+		if err := validateOnlyJSONProperties(capability, "id", "name", "description"); err != nil {
+			return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err)
+		}
 	}
 	return nil
 }
@@ -263,27 +270,41 @@ func validateOnlyJSONProperties(raw json.RawMessage, allowed ...string) error {
 }
 
 func validatePlatformMetadata(metadata struct {
-	SchemaVersion string `json:"schema_version"`
-	PluginType string `json:"plugin_type"`
-	Capabilities []domain.Capability `json:"capabilities"`
-	PermissionIDs []string `json:"permission_ids"`
-	CompatibilityStatus string `json:"compatibility_status"`
+	SchemaVersion       string              `json:"schema_version"`
+	PluginType          string              `json:"plugin_type"`
+	Capabilities        []domain.Capability `json:"capabilities"`
+	PermissionIDs       []string            `json:"permission_ids"`
+	CompatibilityStatus string              `json:"compatibility_status"`
 }) error {
-	if metadata.SchemaVersion != "1.0.0" || (metadata.PluginType != "active" && metadata.PluginType != "passive") || len(metadata.Capabilities) > 256 || len(metadata.PermissionIDs) > 256 || !boundedNonEmpty(metadata.CompatibilityStatus, 64) { return errors.New("unsupported schema, plugin type, or collection/string limit") }
+	if metadata.SchemaVersion != "1.0.0" || (metadata.PluginType != "active" && metadata.PluginType != "passive") || len(metadata.Capabilities) > 256 || len(metadata.PermissionIDs) > 256 || !boundedNonEmpty(metadata.CompatibilityStatus, 64) {
+		return errors.New("unsupported schema, plugin type, or collection/string limit")
+	}
 	seenCapabilities := make(map[string]struct{}, len(metadata.Capabilities))
 	for _, capability := range metadata.Capabilities {
-		if !boundedNonEmpty(capability.ID, 255) || !boundedNonEmpty(capability.Name, 128) || len([]rune(capability.Description)) > 1024 { return errors.New("invalid capability field") }
-		if _, exists := seenCapabilities[capability.ID]; exists { return errors.New("duplicate capability ID") }; seenCapabilities[capability.ID] = struct{}{}
+		if !boundedNonEmpty(capability.ID, 255) || !boundedNonEmpty(capability.Name, 128) || len([]rune(capability.Description)) > 1024 {
+			return errors.New("invalid capability field")
+		}
+		if _, exists := seenCapabilities[capability.ID]; exists {
+			return errors.New("duplicate capability ID")
+		}
+		seenCapabilities[capability.ID] = struct{}{}
 	}
 	seenPermissions := make(map[string]struct{}, len(metadata.PermissionIDs))
 	for _, permissionID := range metadata.PermissionIDs {
-		if !boundedNonEmpty(permissionID, 255) { return errors.New("invalid permission ID") }
-		if _, exists := seenPermissions[permissionID]; exists { return errors.New("duplicate permission ID") }; seenPermissions[permissionID] = struct{}{}
+		if !boundedNonEmpty(permissionID, 255) {
+			return errors.New("invalid permission ID")
+		}
+		if _, exists := seenPermissions[permissionID]; exists {
+			return errors.New("duplicate permission ID")
+		}
+		seenPermissions[permissionID] = struct{}{}
 	}
 	return nil
 }
 
-func boundedNonEmpty(value string, max int) bool { return strings.TrimSpace(value) != "" && len([]rune(value)) <= max }
+func boundedNonEmpty(value string, max int) bool {
+	return strings.TrimSpace(value) != "" && len([]rune(value)) <= max
+}
 
 func descriptorSigningPayload(raw []byte) ([]byte, error) {
 	var fields map[string]json.RawMessage
