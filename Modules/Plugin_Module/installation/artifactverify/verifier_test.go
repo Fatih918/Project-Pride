@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -260,5 +261,36 @@ func TestVerifierRejectsMissingCapabilityDescription(t *testing.T) {
 	staged.DescriptorJSON, _ = json.Marshal(fields)
 	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); err == nil {
 		t.Fatal("expected missing capability description to fail")
+	}
+}
+
+func TestVerifierRejectsTamperedSignedPlatformMetadata(t *testing.T) {
+	verifier, staged, plugin, _, _ := fixture(t, false)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal(fields["platform_metadata"], &metadata); err != nil {
+		t.Fatal(err)
+	}
+	metadata["compatibility_status"] = "tampered"
+	fields["platform_metadata"], _ = json.Marshal(metadata)
+	staged.DescriptorJSON, _ = json.Marshal(fields)
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); !errors.Is(err, ErrSignatureInvalid) {
+		t.Fatalf("expected signature error for modified signed metadata, got %v", err)
+	}
+}
+
+func TestVerifierRejectsLegacyDescriptorVersion(t *testing.T) {
+	verifier, staged, plugin, _, _ := fixture(t, false)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(staged.DescriptorJSON, &fields); err != nil {
+		t.Fatal(err)
+	}
+	fields["schema_version"] = json.RawMessage(`"1.0.0"`)
+	staged.DescriptorJSON, _ = json.Marshal(fields)
+	if _, err := verifier.Verify(context.Background(), staged, installation.InspectedPackage{}, plugin); !errors.Is(err, ErrUnsupportedDescriptorVersion) {
+		t.Fatalf("expected unsupported descriptor version, got %v", err)
 	}
 }
