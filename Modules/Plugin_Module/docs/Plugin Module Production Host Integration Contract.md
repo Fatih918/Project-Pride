@@ -31,7 +31,7 @@ The host must execute these steps in order:
 
 | Dependency | Host responsibility | Fail-closed condition |
 |---|---|---|
-| Registry descriptor resolver | Resolve opaque immutable source references to exact signed Marketplace descriptor bytes using an approved authenticated Registry API | No approved endpoint/authentication contract, unsigned or synthesized descriptor, or unavailable required service |
+| Registry descriptor resolver | Wire the implemented HTTPS resolver with host-configured namespace origins and a host-owned audience-scoped token provider; resolve exact signed Marketplace descriptor bytes | Missing/invalid origin mapping or token provider, unsigned or synthesized descriptor, identity mismatch, or unavailable required service |
 | Trust configuration source | Fetch signed trust configuration from the distribution-configured HTTPS endpoint | Invalid endpoint policy, transport failure, invalid signature, stale/rollback sequence, or unavailable bootstrap trust |
 | Bootstrap public keys | Supply release-controlled Ed25519 trust anchors through the distribution/build process | Missing, malformed, or unapproved key material |
 | Artifact host allowlist | Supply exact HTTPS hostnames permitted by the acquisition adapter | Empty or invalid allowlist |
@@ -68,7 +68,7 @@ The host owns the lifetime of SQLite handles, HTTP transports, trust sources, st
 
 Plugin installation must remain disabled until all of the following are true:
 
-- [ ] Official Registry API and authenticated descriptor-resolution contract are approved and implemented.
+- [ ] Production Registry namespace-to-origin configuration and a real host-owned audience-scoped token provider are supplied and integration-tested with the implemented descriptor resolver.
 - [ ] Marketplace signing and trust-configuration service are operational.
 - [ ] Release-controlled Ed25519 bootstrap keys are provisioned and rotation/revocation procedures are tested.
 - [ ] Production platform metadata resolver is implemented.
