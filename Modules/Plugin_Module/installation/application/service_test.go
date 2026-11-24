@@ -126,15 +126,6 @@ func (e testExtractor) Extract(_ context.Context, stagingPath string) (string, e
 	return stagingPath + "/package", nil
 }
 
-type testMetadataResolver struct {
-	metadata installation.PlatformMetadata
-	err      error
-}
-
-func (r testMetadataResolver) Resolve(context.Context, domain.PluginID, string) (installation.PlatformMetadata, error) {
-	return r.metadata, r.err
-}
-
 type testVerifier struct {
 	result installation.VerifiedArtifact
 	err    error
@@ -142,6 +133,9 @@ type testVerifier struct {
 }
 
 func (v testVerifier) Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error) {
+	if v.result.PlatformMetadata.Type == domain.PluginTypeUnspecified {
+		v.result.PlatformMetadata = installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}
+	}
 	if v.order != nil {
 		*v.order = append(*v.order, "verify")
 	}
@@ -168,7 +162,7 @@ func validPlugin() domain.Plugin {
 
 func newTestService(t *testing.T, repo *testRepository, acquirer ArtifactAcquirer, inspector PackageInspector, verifier ArtifactVerifier, promoter ArtifactPromoter) *Service {
 	t.Helper()
-	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testExtractor{}, testMetadataResolver{metadata: installation.PlatformMetadata{Type: domain.PluginTypePassive, Protected: domain.ProtectedMetadata{Capabilities: []domain.Capability{}}}}, verifier, promoter)
+	service, err := NewService(repo, testIDs{}, testOperationStorage{}, acquirer, inspector, testExtractor{}, verifier, promoter)
 	if err != nil {
 		t.Fatal(err)
 	}
