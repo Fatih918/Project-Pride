@@ -238,6 +238,9 @@ func validateDescriptorNestedProperties(raw []byte) error {
 	if err := validateOnlyJSONProperties(fields["platform_metadata"], "schema_version", "plugin_type", "capabilities", "permission_ids", "compatibility_status"); err != nil {
 		return fmt.Errorf("platform_metadata: %w", err)
 	}
+	if err := requireJSONProperties(fields["platform_metadata"], "schema_version", "plugin_type", "capabilities", "permission_ids", "compatibility_status"); err != nil {
+		return fmt.Errorf("platform_metadata: %w", err)
+	}
 	var metadata struct {
 		Capabilities []json.RawMessage `json:"capabilities"`
 	}
@@ -246,6 +249,9 @@ func validateDescriptorNestedProperties(raw []byte) error {
 	}
 	for i, capability := range metadata.Capabilities {
 		if err := validateOnlyJSONProperties(capability, "id", "name", "description"); err != nil {
+			return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err)
+		}
+		if err := requireJSONProperties(capability, "id", "name", "description"); err != nil {
 			return fmt.Errorf("platform_metadata.capabilities[%d]: %w", i, err)
 		}
 	}
@@ -276,7 +282,7 @@ func validatePlatformMetadata(metadata struct {
 	PermissionIDs       []string            `json:"permission_ids"`
 	CompatibilityStatus string              `json:"compatibility_status"`
 }) error {
-	if metadata.SchemaVersion != "1.0.0" || (metadata.PluginType != "active" && metadata.PluginType != "passive") || len(metadata.Capabilities) > 256 || len(metadata.PermissionIDs) > 256 || !boundedNonEmpty(metadata.CompatibilityStatus, 64) {
+	if metadata.SchemaVersion != "1.0.0" || (metadata.PluginType != "active" && metadata.PluginType != "passive") || metadata.Capabilities == nil || metadata.PermissionIDs == nil || len(metadata.Capabilities) > 256 || len(metadata.PermissionIDs) > 256 || !boundedNonEmpty(metadata.CompatibilityStatus, 64) {
 		return errors.New("unsupported schema, plugin type, or collection/string limit")
 	}
 	seenCapabilities := make(map[string]struct{}, len(metadata.Capabilities))
@@ -304,6 +310,19 @@ func validatePlatformMetadata(metadata struct {
 
 func boundedNonEmpty(value string, max int) bool {
 	return strings.TrimSpace(value) != "" && len([]rune(value)) <= max
+}
+
+func requireJSONProperties(raw json.RawMessage, required ...string) error {
+	var fields map[string]json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return errors.New("expected JSON object")
+	}
+	for _, key := range required {
+		if _, ok := fields[key]; !ok {
+			return fmt.Errorf("missing required property %q", key)
+		}
+	}
+	return nil
 }
 
 func descriptorSigningPayload(raw []byte) ([]byte, error) {
