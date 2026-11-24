@@ -373,12 +373,12 @@ The first implementation PR following this design should be considered complete 
 
 ## 16. Related Documents
 
-- [PRIDE Plugin Module Specification](../04-Platform%20Specification%20Standard/Module%20Specification/PRIDE%20Plugin%20Module%20Specification.md)
-- [PRIDE Plugin SDK Specification](../04-Platform%20Specification%20Standard/SDK%20Specification/PRIDE%20Plugin%20SDK%20Specification.md)
-- [PRIDE Plugin SDK Module Boundary Design](../sdks/DOCS/SDK%20Spesification/SDK%20Plugin/PRIDE%20Plugin%20SDK%20Module%20Boundary%20Design.md)
-- [PRIDE Plugin SDK Discovery Integration Guide](../sdks/DOCS/SDK%20Spesification/SDK%20Plugin/PRIDE%20Plugin%20SDK%20Discovery%20Integration%20Guide.md)
-- [PRIDE Plugin Manifest Specification](../04-Platform%20Specification%20Standard/Core%20Standard%20Spesification/PRIDE%20Plugin%20Manifest%20Specification.md)
-- [ADR-002 — Plugin SDK as the Official Plugin Communication Boundary](ADR/ADR-002%20%E2%80%94%20Plugin%20SDK%20as%20the%20Official%20Plugin%20Communication%20Boundary.md)
-- [ADR-004 — Capability Registry](ADR/ADR-004%20%E2%80%94%20Capability%20Registry.md)
-- [ADR-008 — Marketplace + Registry Architecture](ADR/ADR-008%20%E2%80%94%20Marketplace%20%2B%20Registry%20Architecture.md)
-- [ADR-010 — PRIDE SDK Ecosystem Architecture](ADR/ADR-010%20%E2%80%94%20PRIDE%20SDK%20Ecosystem%20Architecture.md)
+- **PRIDE Plugin Module Specification**
+- **PRIDE Plugin SDK Specification**
+- **PRIDE Plugin SDK Module Boundary Design**
+- **PRIDE Plugin SDK Discovery Integration Guide**
+- **PRIDE Plugin Manifest Specification**
+- **ADR-002 — Plugin SDK as the Official Plugin Communication Boundary**
+- **ADR-004 — Capability Registry**
+- **ADR-008 — Marketplace + Registry Architecture**
+- **ADR-010 — PRIDE SDK Ecosystem Architecture**

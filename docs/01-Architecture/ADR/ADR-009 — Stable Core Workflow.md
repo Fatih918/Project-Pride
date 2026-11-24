@@ -425,10 +425,10 @@ A component may require sophisticated internal behavior while still conforming t
 
 This ADR follows:
 
-* **ADR-000 — Software Design Record Concept**
+* **ADR-000 — Architecture Decision Framework**
 * **ADR-001 — Plugin-First Architecture**
-* **ADR-002 — Plugin SDK Boundary**
-* **ADR-003 — Official Interface**
+* **ADR-002 — Plugin SDK as the Official Plugin Communication Boundary**
+* **ADR-003 — Official Interface as the Platform Interaction Layer**
 * **ADR-004 — Capability Registry**
 * **ADR-005 — Execution Architecture**
 * **ADR-006 — Unified Memory Architecture**

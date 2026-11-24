@@ -464,10 +464,10 @@ Marketplace, Registry, Plugin SDK, and Plugin Module must remain clearly separat
 
 This ADR follows:
 
-* **ADR-000 — Software Design Record Concept**
+* **ADR-000 — Architecture Decision Framework**
 * **ADR-001 — Plugin-First Architecture**
-* **ADR-002 — Plugin SDK Boundary**
-* **ADR-003 — Official Interface**
+* **ADR-002 — Plugin SDK as the Official Plugin Communication Boundary**
+* **ADR-003 — Official Interface as the Platform Interaction Layer**
 * **ADR-004 — Capability Registry**
 * **ADR-005 — Execution Architecture**
 * **ADR-006 — Unified Memory Architecture**
@@ -475,7 +475,7 @@ This ADR follows:
 
 This ADR establishes the Marketplace and Registry architecture that later participates in:
 
-* **ADR-009 — Workflow**
+* **ADR-009 — Stable Core Workflow**
 
 The Marketplace does not replace the Plugin SDK, Capability Registry, AI SDK, Memory SDK, or Workflow.
 

@@ -341,10 +341,10 @@ Capability selection and execution are separate responsibilities. The Registry g
 
 This ADR follows:
 
-* **ADR-000 — SDR Concept**
+* **ADR-000 — Architecture Decision Framework**
 * **ADR-001 — Plugin-First Architecture**
-* **ADR-002 — Plugin SDK Boundary**
-* **ADR-003 — Official Interface**
+* **ADR-002 — Plugin SDK as the Official Plugin Communication Boundary**
+* **ADR-003 — Official Interface as the Platform Interaction Layer**
 
 This decision establishes the architectural foundation for:
 

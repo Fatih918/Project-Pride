@@ -458,7 +458,7 @@ This ADR builds upon:
 * **ADR-001 — Plugin-First Architecture**
 * **ADR-002 — Plugin SDK as the Official Plugin Communication Boundary**
 * **ADR-006 — Unified Memory Architecture**
-* **ADR-007 — AI SDK as the Official AI Communication Boundary**
+* **ADR-007 — AI SDK Boundary**
 * **ADR-009 — Stable Core Workflow**
 
 The individual ADRs define the boundaries and responsibilities of their respective domains.

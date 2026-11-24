@@ -278,34 +278,9 @@ This was rejected because it would create inconsistent integration patterns and 
 
 ---
 
-# 10. Relationship With Other Decisions
 
-This ADR establishes the architectural foundation for subsequent decisions.
 
-It precedes:
-
-* **ADR-002 — Plugin SDK Boundary**
-* **ADR-003 — Official Interface Architecture**
-* **ADR-004 — Capability Registry Architecture**
-* **ADR-005 — Execution Architecture**
-* **ADR-008 — Marketplace & Registry Architecture**
-* **ADR-009 — Workflow Architecture**
-
-ADR-002 shall define how the Plugin-First architecture is enforced through the Plugin SDK.
-
-ADR-003 shall define the Official Interface layer through which users interact with platform functionality.
-
-ADR-004 shall define capability discovery and matching.
-
-ADR-005 shall define execution behavior.
-
-ADR-008 shall define Marketplace and Registry architecture.
-
-ADR-009 shall define the resulting Workflow architecture.
-
----
-
-# 11. Architectural Invariants
+# 10. Architectural Invariants
 
 The following statements are architectural invariants established by this decision:
 
@@ -322,7 +297,7 @@ The following statements are architectural invariants established by this decisi
 
 ---
 
-# 12. Decision Outcome
+# 11. Decision Outcome
 
 PRIDE shall use a Plugin-First Architecture as the foundational extension model of the platform.
 

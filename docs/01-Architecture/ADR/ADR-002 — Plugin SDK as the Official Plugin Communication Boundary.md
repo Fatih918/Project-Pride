@@ -334,17 +334,6 @@ This ADR depends on:
 ADR-001 establishes Plugins as the primary extension mechanism.
 
 ADR-002 establishes the communication boundary that makes that architecture enforceable.
-
-The following decisions build upon this boundary:
-
-* **ADR-003 — Official Interface Architecture**
-* **ADR-004 — Capability Registry Architecture**
-* **ADR-005 — Execution Architecture**
-* **ADR-006 — Memory SDK Boundary**
-* **ADR-007 — Memory Architecture**
-* **ADR-008 — Marketplace & Registry Architecture**
-* **ADR-009 — Workflow Architecture**
-
 ---
 
 # 15. Decision Outcome
