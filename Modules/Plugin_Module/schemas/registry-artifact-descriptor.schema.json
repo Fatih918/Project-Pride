@@ -13,14 +13,15 @@
     "media_type",
     "size_bytes",
     "digest",
-    "signature"
+    "signature",
+    "platform_metadata"
   ],
   "properties": {
     "$schema": {
       "const": "urn:pride:registry-artifact-descriptor:1"
     },
     "schema_version": {
-      "const": "1.0.0"
+      "const": "1.1.0"
     },
     "plugin_id": {
       "type": "string",
@@ -89,7 +90,74 @@
         }
       },
       "additionalProperties": false
+    },
+    "platform_metadata": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "plugin_type",
+        "capabilities",
+        "permission_ids",
+        "compatibility_status"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "plugin_type": {
+          "enum": [
+            "active",
+            "passive"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "description"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "permission_ids": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          }
+        },
+        "compatibility_status": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "additionalProperties": false
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$comment": "Schema 1.1.0 requires Marketplace-owned platform metadata covered by the detached Ed25519 descriptor signature. Duplicate JSON object keys must be rejected by implementations."
 }
