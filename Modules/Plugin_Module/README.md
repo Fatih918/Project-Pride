@@ -1,6 +1,6 @@
 # PRIDE Plugin Module
 
-**Status:** Increment 17 — bounded ZIP installation, signed artifact verification, durable recovery, and a fail-closed startup recovery gate implemented; production startup wiring remains pending.
+**Status:** Increment 18 — signed Marketplace platform metadata is now part of descriptor schema 1.1.0; verifier, installation, and recovery consume it only after cryptographic verification. Production startup wiring remains pending.
 
 The Plugin Module owns SDK-neutral installed Plugin records, local persistence, storage layout, and read-only discovery. The SDK integration adapter is isolated in the nested `sdkadapter` Go module.
 
@@ -30,7 +30,7 @@ The production host boundary and required startup ordering are specified in [Plu
 - Enforced exact artifact-host allowlisting, TLS 1.2+, no redirects/proxies, non-public DNS address rejection, bounded timeouts/headers, context-aware streaming, and PZIP-0001's 100 MiB compressed-size ceiling.
 - Required actual downloaded bytes to match the descriptor's declared size; partial artifact files are removed after acquisition failures.
 - Kept signature and SHA-256 verification in `installation/artifactverify`; acquisition does not treat downloaded metadata as trusted.
-- The production Official Registry resolver remains an injected port because no Registry API/endpoint contract has been approved.
+- The production Registry origin mapping and host-owned token provider remain deployment dependencies; the authenticated descriptor resolver and its API contract are implemented.
 
 ## Implemented
 
@@ -79,14 +79,17 @@ The production host boundary and required startup ordering are specified in [Plu
 - Bounded HTTPS trust transport retrieves the signed trust document without treating transport success as authenticity.
 - Installation orchestration verifies before extraction and verifies again after extraction before recording VERIFIED, reducing the chance that a changed staged archive is promoted.
 - Storage adapter resolves immutable installation destinations as canonical Plugin_Storage-relative paths and creates extraction outputs exclusively through its `os.Root` confinement.
-- A dedicated injected metadata resolver supplies platform metadata; `plugin.json` cannot author platform-owned fields.
+- Descriptor schema 1.1.0 requires typed `platform_metadata` inside the Marketplace-signed descriptor; the verifier validates its shape and returns it only after Ed25519 signature and SHA-256 digest verification.
+- Installation assembles the Plugin aggregate from verifier-returned metadata; no mutable Plugin ID/version metadata lookup is used.
+- Recovery extracts metadata from the exact signed descriptor bytes persisted in the operation journal and never performs a second metadata lookup.
+- Descriptor schema 1.0.0 is rejected for new installs and auto-commit recovery; legacy PROMOTED operations are quarantined with `RECOVERY_LEGACY_DESCRIPTOR_UNSUPPORTED`.
 - SDK-neutral orchestration of operation-scoped staging creation, artifact acquisition, package inspection, payload extraction, artifact verification, filesystem promotion, and atomic installation persistence through injected ports.
 - Confined filesystem promotion adapter atomically renames the complete verified operation workspace from `temporary/<operation-id>` to `installed/<plugin-id>/<version>` on the same Plugin_Storage filesystem; validates canonical paths and staged contents, and rejects an existing destination.
 - Durable operation phase recording and recoverable handling when the post-promotion database commit fails.
 - SQLite schema v4 persists the exact signed Registry artifact descriptor bytes with each STAGED operation (bounded to 1 MiB), allowing recovery to repeat signature, trust-key, descriptor, and artifact-digest verification after restart.
 - Startup recovery coordinator reconciles PREPARING/STAGED/VERIFIED operations by quarantining their incomplete workspaces and marking them rolled back; it never resumes untrusted partial staging.
-- PROMOTED recovery reopens the final artifact through the confined storage adapter, re-inspects the ZIP/Manifest, resolves platform metadata, repeats descriptor/signature/digest verification, compares persisted verification evidence, and atomically completes the installation commit.
-- Missing descriptor evidence and definitive package/cryptographic failures fail closed and quarantine the uncommitted artifact; transient trust/metadata or database failures leave PROMOTED operations retryable.
+- PROMOTED recovery reopens the final artifact through the confined storage adapter, re-inspects the ZIP/Manifest, extracts platform metadata from the exact persisted descriptor, repeats descriptor/signature/digest verification, compares persisted verification evidence, validates the Plugin aggregate, and atomically completes the installation commit.
+- Missing descriptor evidence and definitive package/cryptographic failures fail closed and quarantine the uncommitted artifact; transient trust or database failures leave PROMOTED operations retryable.
 - Confined artifact reads now support both temporary workspaces and installed-version directories; quarantine moves are operation-scoped, root-confined, no-overwrite, and idempotent after a completed move.
 
 ## Architectural boundaries
@@ -110,7 +113,7 @@ The production host boundary and required startup ordering are specified in [Plu
 - Plugin Loader, lifecycle transitions, Runtime, and execution.
 - Permission authorization.
 
-PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Authenticated Registry descriptor resolution, bounded artifact acquisition, signed artifact verification, bounded trust transport, filesystem promotion, and startup recovery components are implemented. Production installation remains disabled until the host supplies the real Registry origin mapping and token provider, the Marketplace operates the signed trust-configuration service, release-controlled bootstrap public keys are provisioned, the trusted platform-metadata contract is finalized and implemented, and the production composition root wires these dependencies behind the fail-closed startup gate.
+PTS-0001 defines the accepted local storage and persistence contract. PTS-0004 and DCR-0001 finalize the path, artifact descriptor, ZIP, signature/trust, and Manifest JSON contracts. The application service coordinates injected ports only. Authenticated Registry descriptor resolution, bounded artifact acquisition, signed artifact verification, bounded trust transport, filesystem promotion, and startup recovery components are implemented. Production installation remains disabled until the host supplies the real Registry origin mapping and token provider, the Marketplace operates the signed trust-configuration service, release-controlled bootstrap public keys are provisioned, the Marketplace signer emits descriptor schema 1.1.0 with the accepted signed platform-metadata object, and the production composition root wires these dependencies behind the fail-closed startup gate.
 
 The detailed deployment boundary is in `docs/Trust Configuration Transport and Bootstrap-Key Provisioning.md`.
 
