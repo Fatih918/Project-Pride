@@ -62,10 +62,9 @@ type PackageExtractor interface {
 	Extract(context.Context, string) (string, error)
 }
 
-// PlatformMetadataResolver supplies Marketplace/Registry-owned metadata. The
-// package Manifest is never allowed to authoritatively set these fields.
-// ArtifactVerifier verifies integrity and authenticity under an explicitly
-// configured policy. The service does not choose algorithms or trust roots.
+// ArtifactVerifier validates the signed descriptor, verifies integrity and
+// authenticity, and returns Marketplace-owned metadata only after success.
+// The service does not choose algorithms or trust roots.
 type ArtifactVerifier interface {
 	Verify(context.Context, installation.StagedArtifact, installation.InspectedPackage, domain.Plugin) (installation.VerifiedArtifact, error)
 }
