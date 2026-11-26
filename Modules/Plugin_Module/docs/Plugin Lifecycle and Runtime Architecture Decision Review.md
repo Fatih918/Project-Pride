@@ -1,6 +1,6 @@
 # Plugin Lifecycle and Runtime Architecture Decision Review
 
-**Status:** Proposed for review  
+**Status:** Accepted by PLR-ADR-0001 and PLR-DOM-0001  
 **Document ID:** PLR-DR-0001  
 **Scope:** Lifecycle state ownership, runtime boundary, authorization, failure recovery, and future SDK protocol evolution  
 **Depends on:** Plugin Module domain/registry/discovery foundation; installation and recovery contracts
@@ -141,4 +141,6 @@ This review does not implement:
 
 ## 7. Review outcome
 
-No decision in this document is accepted until explicitly approved. The recommendations are proposals, not implemented behavior. The next implementation increment must be based on the accepted decisions and must not infer missing production host, identity, policy, or runtime details.
+The recommendations L1–L9 were explicitly accepted on 2026-11-26 and are recorded normatively in `Plugin Lifecycle and Runtime Architecture Decision Record.md` (PLR-ADR-0001). The SDK-neutral state and transition semantics are specified in `Plugin Lifecycle Domain Contract.md` (PLR-DOM-0001).
+
+Acceptance is an architecture decision, not evidence of implementation. No lifecycle code, database migration, runtime adapter, authorization implementation, or Protobuf change is implied. Implementation must satisfy the accepted ADR and domain contract and must not infer missing production host, identity, policy, or runtime details.
