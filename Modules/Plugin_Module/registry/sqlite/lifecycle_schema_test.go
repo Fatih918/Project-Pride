@@ -2,11 +2,8 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"path/filepath"
 	"testing"
-
-	"pride-plugin-module/domain"
 
 	_ "modernc.org/sqlite"
 )
@@ -120,5 +117,3 @@ func TestLifecycleSchemaV5RejectsInvalidAuthorizationEvidenceShape(t *testing.T)
 	}
 }
 
-var _ = sql.ErrNoRows
-var _ domain.Plugin
