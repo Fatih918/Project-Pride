@@ -13,6 +13,7 @@ var (
 	ErrAuthorizationDenied      = errors.New("lifecycle authorization denied")
 	ErrAuthorizationUnavailable = errors.New("lifecycle authorization unavailable")
 	ErrLeaseLost                = errors.New("lifecycle operation lease lost")
+	ErrFencingTokenExhausted    = errors.New("lifecycle fencing token exhausted")
 	ErrInvalidTransition        = errors.New("invalid lifecycle transition")
 	ErrPersistence              = errors.New("lifecycle persistence failure")
 )
