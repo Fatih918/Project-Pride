@@ -298,8 +298,8 @@ func TestInstallationSchemaMigrationPreservesExistingPlugins(t *testing.T) {
 	if err := repository.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != 4 {
-		t.Fatalf("schema version = %d, want 4", version)
+	if version != schemaVersion {
+		t.Fatalf("schema version = %d, want %d", version, schemaVersion)
 	}
 	var tableCount int
 	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM sqlite_master
