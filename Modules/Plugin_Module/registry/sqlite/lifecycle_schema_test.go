@@ -116,4 +116,3 @@ func TestLifecycleSchemaV5RejectsInvalidAuthorizationEvidenceShape(t *testing.T)
 		t.Fatal("authorization evidence constraint accepted a partial decision")
 	}
 }
-
