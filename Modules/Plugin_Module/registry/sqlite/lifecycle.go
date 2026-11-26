@@ -64,7 +64,9 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 			return lifecycle.OperationReservation{}, lifecycle.ErrOperationIDConflict
 		}
 		return lifecycle.OperationReservation{Operation: existing, Existing: true}, nil
-	} else if !errors.Is(err, sql.ErrNoRows) { return lifecycle.OperationReservation{}, lifePersist("read existing operation", err) }
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return lifecycle.OperationReservation{}, lifePersist("read existing operation", err)
+	}
 
 	insert, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO plugin_lifecycle_fencing_tokens (plugin_id, last_token) VALUES (?, 1)", string(op.PluginID))
 	if err != nil {
@@ -81,7 +83,9 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 			return lifecycle.OperationReservation{}, lifecycle.ErrOperationIDConflict
 		}
 		return lifecycle.OperationReservation{Operation: existing, Existing: true}, nil
-	} else if !errors.Is(err, sql.ErrNoRows) { return lifecycle.OperationReservation{}, lifePersist("recheck operation ID", err) }
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return lifecycle.OperationReservation{}, lifePersist("recheck operation ID", err)
+	}
 
 	var selected string
 	err = tx.QueryRowContext(ctx, "SELECT version FROM installed_plugin_versions WHERE plugin_id = ? AND selected = 1", string(op.PluginID)).Scan(&selected)
@@ -113,7 +117,9 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 		if _, err := tx.ExecContext(ctx, "DELETE FROM plugin_lifecycle_leases WHERE plugin_id=? AND operation_id=?", string(op.PluginID), previousID); err != nil {
 			return lifecycle.OperationReservation{}, lifePersist("delete expired lease", err)
 		}
-	} else if !errors.Is(err, sql.ErrNoRows) { return lifecycle.OperationReservation{}, lifePersist("read active lease", err) }
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return lifecycle.OperationReservation{}, lifePersist("read active lease", err)
+	}
 
 	// A process may have terminated after releasing/losing its lease but
 	// before recording a terminal phase. Such orphaned work is never resumed.
@@ -218,7 +224,9 @@ func (r *LifecycleRepository) CommitDesiredState(ctx context.Context, id string,
 			if err != nil {
 				return lifePersist("insert lifecycle record", err)
 			}
-		} else if err != nil { return lifePersist("read lifecycle record", err) } else {
+		} else if err != nil {
+			return lifePersist("read lifecycle record", err)
+		} else {
 			changed := committed.DesiredState != target
 			versionChanged := committed.SelectedVersion != op.PluginVersion
 			if changed && committed.Revision >= math.MaxInt64 {
