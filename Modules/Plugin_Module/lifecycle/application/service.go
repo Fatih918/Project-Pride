@@ -16,8 +16,8 @@ import (
 )
 
 var (
-	ErrInvalidRequest = errors.New("invalid lifecycle request")
-	ErrMissingPort    = errors.New("lifecycle application port is not configured")
+	ErrInvalidRequest  = errors.New("invalid lifecycle request")
+	ErrMissingPort     = errors.New("lifecycle application port is not configured")
 	ErrOperationFailed = errors.New("lifecycle operation previously failed")
 )
 
@@ -53,8 +53,8 @@ type Result struct {
 type Service struct {
 	targets       lifecycle.SelectedTargetResolver
 	authorization lifecycle.AuthorizationPort
-	repository   lifecycle.LifecycleRepository
-	now          func() time.Time
+	repository    lifecycle.LifecycleRepository
+	now           func() time.Time
 }
 
 func NewService(
@@ -68,8 +68,8 @@ func NewService(
 	return &Service{
 		targets:       targets,
 		authorization: authorization,
-		repository:   repository,
-		now:          func() time.Time { return time.Now().UTC() },
+		repository:    repository,
+		now:           func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
