@@ -34,6 +34,7 @@ func (s *authorizationStub) AuthorizeLifecycle(_ context.Context, request lifecy
 
 type repositoryStub struct {
 	reservation       lifecycle.OperationReservation
+	existingOperation *domain.LifecycleOperation
 	reserveErr        error
 	recordAuthErr     error
 	beginApplyErr     error
@@ -92,6 +93,10 @@ func (s *repositoryStub) FailOperation(_ context.Context, _ string, _ lifecycle.
 }
 
 func (s *repositoryStub) GetOperation(context.Context, string) (domain.LifecycleOperation, error) {
+	s.events = append(s.events, "get")
+	if s.existingOperation != nil {
+		return *s.existingOperation, nil
+	}
 	return domain.LifecycleOperation{}, lifecycle.ErrOperationNotFound
 }
 
@@ -169,7 +174,7 @@ func TestExecuteEnableCommitsDesiredStateWithoutRuntimeSideEffects(t *testing.T)
 	if len(authorization.request.PermissionIDs) != 2 {
 		t.Fatalf("authorization permission metadata = %v", authorization.request.PermissionIDs)
 	}
-	wantEvents := []string{"reserve", "authorize", "begin", "commit", "release"}
+	wantEvents := []string{"get", "reserve", "authorize", "begin", "commit", "release"}
 	if len(repository.events) != len(wantEvents) {
 		t.Fatalf("repository events = %v, want %v", repository.events, wantEvents)
 	}
@@ -231,12 +236,7 @@ func TestExecuteReplaysSucceededOperationWithoutReauthorizing(t *testing.T) {
 		CreatedAt:     now.Add(-time.Minute),
 		UpdatedAt:     now,
 	}
-	repository := &repositoryStub{
-		reservation: lifecycle.OperationReservation{
-			Operation: operation,
-			Existing:  true,
-		},
-	}
+	repository := &repositoryStub{existingOperation: &operation}
 	authorization := &authorizationStub{}
 	service := newTestService(t, repository, authorization)
 
@@ -250,7 +250,7 @@ func TestExecuteReplaysSucceededOperationWithoutReauthorizing(t *testing.T) {
 	if authorization.calls != 0 {
 		t.Fatalf("authorization calls = %d, want 0", authorization.calls)
 	}
-	if len(repository.events) != 1 || repository.events[0] != "reserve" {
+	if len(repository.events) != 1 || repository.events[0] != "get" {
 		t.Fatalf("unexpected repository events: %v", repository.events)
 	}
 }
