@@ -67,7 +67,7 @@ func TestLifecycleOperationValidation(t *testing.T) {
 		PluginVersion: "1.2.3",
 		Action:        LifecycleActionEnable,
 		Phase:         LifecycleOperationPhaseRequested,
-		CreatedAt:    now,
+		CreatedAt:     now,
 		UpdatedAt:    now,
 	}
 	if err := valid.Validate(); err != nil {
