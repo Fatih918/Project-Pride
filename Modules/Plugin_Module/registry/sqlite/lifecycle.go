@@ -87,6 +87,15 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 		}
 	} else if !errors.Is(err, sql.ErrNoRows) { return lifecycle.OperationReservation{}, lifePersist("read active lease", err) }
 
+	// A process may have terminated after releasing/losing its lease but
+	// before recording a terminal phase. Such orphaned work is never resumed.
+	if _, err := tx.ExecContext(ctx, `UPDATE plugin_lifecycle_operations
+		SET phase='RECOVERY_REQUIRED', updated_at=?
+		WHERE plugin_id=? AND phase IN ('REQUESTED','AUTHORIZED','APPLYING')
+		AND NOT EXISTS (SELECT 1 FROM plugin_lifecycle_leases l WHERE l.operation_id=plugin_lifecycle_operations.operation_id)`, nowText, string(op.PluginID)); err != nil {
+		return lifecycle.OperationReservation{}, lifePersist("classify orphaned lifecycle operations", err)
+	}
+
 	var token int64
 	if inserted == 1 { token = 1 } else {
 		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_fencing_tokens SET last_token=last_token+1 WHERE plugin_id=? AND last_token<?", string(op.PluginID), int64(math.MaxInt64))
@@ -297,6 +306,12 @@ func scanLifeOperation(row lifeScanner) (domain.LifecycleOperation, string, erro
 	if evaluated.Valid { op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String); if err != nil { return op, "", err } }
 	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created); if err != nil { return op, "", err }
 	op.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated); if err != nil { return op, "", err }
+	if len(fp) != 64 || strings.ToLower(fp) != fp {
+		return op, "", errors.New("invalid persisted lifecycle fingerprint")
+	}
+	if _, err := hex.DecodeString(fp); err != nil {
+		return op, "", errors.New("invalid persisted lifecycle fingerprint")
+	}
 	if err := op.Validate(); err != nil { return op, "", err }
 	return op, fp, nil
 }
@@ -349,6 +364,9 @@ func isBusyError(err error) bool { s:=strings.ToLower(err.Error()); return strin
 func formatLifeTime(value time.Time) string {
 	return value.UTC().Format("2006-01-02T15:04:05.000000000Z")
 }
+
+var _ lifecycle.LifecycleRepository = (*LifecycleRepository)(nil)
+var _ lifecycle.RecoveryRepository = (*LifecycleRepository)(nil)
 
 var _ lifecycle.LifecycleRepository = (*LifecycleRepository)(nil)
 var _ lifecycle.RecoveryRepository = (*LifecycleRepository)(nil)
