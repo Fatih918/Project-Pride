@@ -54,12 +54,12 @@ The stored PluginVersion remains immutable audit evidence and is always supplied
 
 ### P4 — Per-Plugin lease and fencing
 
-**Recommendation: Use a durable database-backed lease with a monotonically increasing unsigned-64-bit fencing token per Plugin. Initial lease duration: 120 seconds.**
+**Recommendation: Use a durable database-backed lease with a monotonically increasing positive signed-64-bit fencing token per Plugin (matching SQLite INTEGER). Initial lease duration: 120 seconds.**
 
 Reservation and lease acquisition occur in one write transaction:
 1. Check whether OperationID already exists and compare its fingerprint.
 2. Reject a different active operation for the same Plugin.
-3. If no unexpired lease exists, increment the durable per-Plugin fencing counter and assign the new token.
+3. If no unexpired lease exists, increment the durable per-Plugin fencing counter and assign the new token. If the counter reaches SQLite's maximum signed 64-bit integer, reservation fails closed rather than wrapping or reusing a token.
 4. Persist the operation and lease atomically.
 
 Every mutating method must verify OperationID, PluginID, fencing token, and lease expiry in the same transaction as its state mutation. A stale or expired worker receives `ErrLeaseLost`. Release is idempotent and may expire/delete only the exact lease owner/token; it must never release a newer owner's lease.
