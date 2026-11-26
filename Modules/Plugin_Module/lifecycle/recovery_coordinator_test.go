@@ -59,8 +59,8 @@ func TestRecoveryCoordinatorClassifiesExpiredOperationsAndKeepsRecoveryRequired(
 
 func TestRecoveryCoordinatorFailsClosedForActiveLease(t *testing.T) {
 	repo := &recoveryRepositoryStub{candidates: []RecoveryCandidate{{
-		Operation:     domain.LifecycleOperation{Phase: domain.LifecycleOperationPhaseApplying},
-		LeaseActive:   true,
+		Operation:      domain.LifecycleOperation{Phase: domain.LifecycleOperationPhaseApplying},
+		LeaseActive:    true,
 		LeaseExpiresAt: time.Now().Add(time.Minute),
 	}}}
 	coordinator, _ := NewRecoveryCoordinator(repo, 10)
