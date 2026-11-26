@@ -11,9 +11,9 @@ import (
 // reached a terminal phase. It does not imply that the operation is safe to
 // resume or that its previous authorization remains valid.
 type RecoveryCandidate struct {
-	Operation     domain.LifecycleOperation
+	Operation      domain.LifecycleOperation
 	LeaseExpiresAt time.Time
-	LeaseActive   bool
+	LeaseActive    bool
 }
 
 // RecoveryRepository exposes the minimal journal inspection and expiry
