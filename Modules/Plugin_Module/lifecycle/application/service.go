@@ -39,8 +39,8 @@ type Request struct {
 }
 
 // Result describes the durable operation outcome. Replayed is true when the
-// operation ID already existed and the repository confirmed the same
-// idempotency fingerprint. Replayed successful operations do not include a
+// operation ID already existed and its request identity matched. Replayed
+// successful operations do not include a
 // LifecycleRecord because the repository port intentionally exposes no
 // separate record-read operation yet.
 type Result struct {
