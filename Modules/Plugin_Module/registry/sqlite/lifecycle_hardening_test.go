@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -287,4 +286,3 @@ func TestLifecycleRepositoryCommitFailureRollsBackDesiredStateAndOperation(t *te
 	}
 }
 
-var _ = sql.ErrNoRows
