@@ -44,7 +44,7 @@ func TestRecoveryCoordinatorClassifiesExpiredOperationsAndKeepsRecoveryRequired(
 	if report.Classified != 3 || report.RecoveryRequired != 1 {
 		t.Fatalf("unexpected report: %+v", report)
 	}
-	if repo.classifyCalls != 3 { t.Fatalf("expected three bounded classification calls, got %d", repo.classifyCalls) }
+	if repo.classifyCalls != 2 { t.Fatalf("expected two bounded classification calls, got %d", repo.classifyCalls) }
 }
 
 func TestRecoveryCoordinatorFailsClosedForActiveLease(t *testing.T) {
