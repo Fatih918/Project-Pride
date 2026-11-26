@@ -1,7 +1,7 @@
-# Plugin Lifecycle Persistence Decision Review
+# Plugin Lifecycle Persistence Architecture Decision Record
 
-**Status:** Proposed for review  
-**Document ID:** PLR-PDR-0002  
+**Status:** Accepted  
+**Document ID:** PLR-ADR-0002  
 **Decision authority:** PLR-ADR-0001, PLR-DOM-0001, PLR-BND-0001  
 **Scope:** SQLite lifecycle journal, desired-state persistence, idempotency, leases/fencing, retention, and crash recovery  
 **Out of scope:** Runtime execution, Core authorization implementation, SDK lifecycle RPCs, uninstall, update orchestration
@@ -12,11 +12,13 @@ The lifecycle domain, boundary contracts, and Enable/Disable application service
 
 The lifecycle repository remains logically separate from the installation journal. It may share the existing SQLite database and connection infrastructure, but it must not reuse installation operation tables or phases.
 
-## 2. Proposed decisions
+## 2. Accepted decisions
+
+The project owner accepted P1–P10 without modification on 2026-11-26. The recommendations below are normative implementation decisions for the lifecycle persistence adapter.
 
 ### P1 — Persistence adapter placement
 
-**Recommendation: Implement a dedicated lifecycle repository adapter in the existing SQLite infrastructure package, backed by the same database handle as the Plugin registry and installation repositories.**
+**Accepted: Implement a dedicated lifecycle repository adapter in the existing SQLite infrastructure package, backed by the same database handle as the Plugin registry and installation repositories.**
 
 The adapter is a distinct type implementing `lifecycle.LifecycleRepository`; it does not add lifecycle methods to the installation repository contract. Sharing the database handle ensures migrations and transactions use one SQLite database and avoids independent connection/migration ownership. The adapter may live beside the existing SQLite repository implementation initially; a later infrastructure-package reorganization is not a prerequisite.
 
@@ -27,7 +29,7 @@ The adapter is a distinct type implementing `lifecycle.LifecycleRepository`; it 
 
 ### P2 — Schema evolution
 
-**Recommendation: Add schema version 5 to the existing SQLite database using the current transactional `PRAGMA user_version` migration mechanism.**
+**Accepted: Add schema version 5 to the existing SQLite database using the current transactional `PRAGMA user_version` migration mechanism.**
 
 Create separate tables for:
 - `plugin_lifecycle_records`: one row per Plugin, containing selected version, desired state, runtime observation, revision, and timestamps.
@@ -39,7 +41,7 @@ Use constrained text representations for enum values, explicit CHECK constraints
 
 ### P3 — Operation identity and idempotency fingerprint
 
-**Recommendation: Fingerprint the caller-visible immutable command identity: authenticated PrincipalID, PluginID, and Action. Persist the exact selected PluginVersion separately on the operation at first reservation.**
+**Accepted: Fingerprint the caller-visible immutable command identity: authenticated PrincipalID, PluginID, and Action. Persist the exact selected PluginVersion separately on the operation at first reservation.**
 
 This preserves the existing service behavior: a retry is looked up by OperationID before resolving the currently selected version, so a version change after the original operation does not turn a valid retry into a conflict or cause it to target new code.
 
@@ -54,7 +56,7 @@ The stored PluginVersion remains immutable audit evidence and is always supplied
 
 ### P4 — Per-Plugin lease and fencing
 
-**Recommendation: Use a durable database-backed lease with a monotonically increasing positive signed-64-bit fencing token per Plugin (matching SQLite INTEGER). Initial lease duration: 120 seconds.**
+**Accepted: Use a durable database-backed lease with a monotonically increasing positive signed-64-bit fencing token per Plugin (matching SQLite INTEGER). Initial lease duration: 120 seconds.**
 
 Reservation and lease acquisition occur in one write transaction:
 1. Check whether OperationID already exists and compare its fingerprint.
@@ -70,13 +72,13 @@ The repository clock is authoritative for lease creation, expiry, and comparison
 
 ### P5 — Lease renewal
 
-**Recommendation: Do not add renewal in the first adapter increment. Keep the application operation bounded by the host request deadline and a 120-second lease.**
+**Accepted: Do not add renewal in the first adapter increment. Keep the application operation bounded by the host request deadline and a 120-second lease.**
 
 The initial flow has no external runtime side effect and performs one Core authorization call followed by short SQLite transactions. If production measurements show a need for longer operations, add an explicit fenced renewal method in a separately reviewed contract change. The adapter must fail closed on expiry; it must not silently extend a lease during unrelated writes.
 
 ### P6 — Lifecycle record initialization and revision
 
-**Recommendation: Lazily create the lifecycle record on the first successful desired-state commit. The initial baseline is Disabled + Unknown, revision 1.**
+**Accepted: Lazily create the lifecycle record on the first successful desired-state commit. The initial baseline is Disabled + Unknown, revision 1.**
 
 - The first successful Enable produces Enabled + Unknown, revision 1.
 - The first successful Disable produces Disabled + Unknown, revision 1.
@@ -89,7 +91,7 @@ If the selected installed version changed between reservation and commit, the co
 
 ### P7 — Authorization evidence and operation phases
 
-**Recommendation: Persist the complete safe decision evidence required by the domain operation: DecisionID, PolicyRevision, EvaluatedAt, and bounded ReasonCode. Persist no credentials, raw policy text, or raw adapter errors.**
+**Accepted: Persist the complete safe decision evidence required by the domain operation: DecisionID, PolicyRevision, EvaluatedAt, and bounded ReasonCode. Persist no credentials, raw policy text, or raw adapter errors.**
 
 - An explicit denial is recorded before the operation transitions to Failed.
 - Authorization transport errors or malformed decisions fail closed and are recorded with bounded failure codes; they are not represented as a denial.
@@ -102,7 +104,7 @@ The existing domain operation may be extended with EvaluatedAt and ReasonCode if
 
 ### P8 — Crash recovery
 
-**Recommendation: Add a lifecycle recovery query and coordinator before enabling lifecycle mutations in production. For the first SQLite adapter, expose incomplete operations and classify expired operations as RecoveryRequired; do not replay authorization or infer an outcome.**
+**Accepted: Add a lifecycle recovery query and coordinator before enabling lifecycle mutations in production. For the first SQLite adapter, expose incomplete operations and classify expired operations as RecoveryRequired; do not replay authorization or infer an outcome.**
 
 The initial Enable/Disable flow has no RuntimePort side effects, so a process crash before the atomic desired-state commit leaves no external Plugin execution to reconcile. Recovery rules:
 - Succeeded and Failed are terminal and returned unchanged.
@@ -116,13 +118,13 @@ The recovery coordinator and startup gate are a follow-up implementation slice; 
 
 ### P9 — Operation retention
 
-**Recommendation: Retain lifecycle operation rows indefinitely in the initial implementation.**
+**Accepted: Retain lifecycle operation rows indefinitely in the initial implementation.**
 
 No cleanup job or automatic retention policy is introduced until an audit/retention requirement is defined. Non-terminal and RecoveryRequired operations must never be deleted. A future retention design must preserve idempotency guarantees and terminal audit evidence.
 
 ### P10 — Runtime observation ownership
 
-**Recommendation: SQLite lifecycle persistence may store RuntimeObservation, but only a future RuntimePort/reconciliation coordinator may update it. Enable/Disable application service may only preserve the current observation.**
+**Accepted: SQLite lifecycle persistence may store RuntimeObservation, but only a future RuntimePort/reconciliation coordinator may update it. Enable/Disable application service may only preserve the current observation.**
 
 This prevents administrative intent from being mistaken for actual process health and keeps the initial application service free of runtime side effects.
 
@@ -160,6 +162,6 @@ This review does not authorize:
 - automatic lifecycle operation pruning;
 - production host composition or readiness claims.
 
-## 5. Decision response format
+## 5. Implementation requirements
 
-Please record each decision as Accepted, Modified, or Rejected. Any modification should include the replacement rule and rationale. The implementation PR must follow the accepted decisions and update PLR-BND-0001 if its current contract requires clarification.
+The implementation PR must follow P1–P10. Any required deviation must be brought back for explicit review before implementation. Update PLR-BND-0001 if the concrete repository semantics require clarification.
