@@ -127,9 +127,9 @@ func newTestService(t *testing.T, repository *repositoryStub, authorization *aut
 		SelectedVersion:    target.PluginVersion,
 		DesiredState:       domain.LifecycleDesiredStateEnabled,
 		RuntimeObservation: domain.RuntimeObservationUnknown,
-		Revision:            2,
-		CreatedAt:           now.Add(-time.Minute),
-		UpdatedAt:           now,
+		Revision:           2,
+		CreatedAt:          now.Add(-time.Minute),
+		UpdatedAt:          now,
 	}
 	authorization.decision = lifecycle.AuthorizationDecision{
 		Allowed:        true,
