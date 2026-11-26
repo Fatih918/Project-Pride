@@ -112,9 +112,9 @@ func DesiredStateTransition(current LifecycleDesiredState, action LifecycleActio
 	return target, current != target, nil
 }
 
-// LifecycleOperation stores immutable command identity and bounded outcome
-// metadata. It intentionally contains no credentials or caller-controlled
-// diagnostic strings.
+// LifecycleOperation stores immutable command identity, safe authorization
+// evidence, and bounded outcome metadata. It intentionally contains no
+// credentials, raw policy text, or caller-controlled diagnostic strings.
 type LifecycleOperation struct {
 	OperationID    string
 	PrincipalID    string
@@ -125,11 +125,17 @@ type LifecycleOperation struct {
 	FailureCode    string
 	DecisionID     string
 	PolicyRevision string
+	EvaluatedAt    time.Time
+	ReasonCode     string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
 func (o LifecycleOperation) Validate() error {
+	hasAuthorizationEvidence := o.DecisionID != "" ||
+		o.PolicyRevision != "" ||
+		!o.EvaluatedAt.IsZero() ||
+		o.ReasonCode != ""
 	if strings.TrimSpace(o.OperationID) == "" ||
 		strings.TrimSpace(o.PrincipalID) == "" ||
 		strings.TrimSpace(string(o.PluginID)) == "" ||
@@ -139,9 +145,20 @@ func (o LifecycleOperation) Validate() error {
 		o.CreatedAt.IsZero() ||
 		o.UpdatedAt.IsZero() ||
 		o.UpdatedAt.Before(o.CreatedAt) ||
+		len(o.OperationID) > 128 ||
+		len(o.PrincipalID) > 128 ||
+		len(string(o.PluginID)) > 256 ||
+		len(o.PluginVersion) > 128 ||
 		len(o.FailureCode) > 64 ||
 		len(o.DecisionID) > 128 ||
-		len(o.PolicyRevision) > 128 {
+		len(o.PolicyRevision) > 128 ||
+		len(o.ReasonCode) > 64 {
+		return ErrInvalidLifecycleRecord
+	}
+	if hasAuthorizationEvidence &&
+		(strings.TrimSpace(o.DecisionID) == "" ||
+			strings.TrimSpace(o.PolicyRevision) == "" ||
+			o.EvaluatedAt.IsZero()) {
 		return ErrInvalidLifecycleRecord
 	}
 	return nil
