@@ -61,14 +61,14 @@ func TestLifecycleRecordValidation(t *testing.T) {
 func TestLifecycleOperationValidation(t *testing.T) {
 	now := time.Date(2026, time.November, 26, 12, 0, 0, 0, time.UTC)
 	valid := LifecycleOperation{
-		OperationID:    "op-123",
-		PrincipalID:    "principal-1",
-		PluginID:       PluginID("example.plugin"),
-		PluginVersion:  "1.2.3",
-		Action:         LifecycleActionEnable,
-		Phase:          LifecycleOperationPhaseRequested,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		OperationID:   "op-123",
+		PrincipalID:   "principal-1",
+		PluginID:      PluginID("example.plugin"),
+		PluginVersion: "1.2.3",
+		Action:        LifecycleActionEnable,
+		Phase:         LifecycleOperationPhaseRequested,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid operation rejected: %v", err)
