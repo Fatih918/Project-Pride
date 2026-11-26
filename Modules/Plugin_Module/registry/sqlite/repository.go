@@ -64,6 +64,15 @@ func New(ctx context.Context, databasePath string) (*Repository, error) {
 		_ = db.Close()
 		return nil, fmt.Errorf("configure SQLite busy timeout: %w", err)
 	}
+	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("enable SQLite foreign key enforcement: %w", err)
+	}
+	var foreignKeys int
+	if err := db.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeys); err != nil || foreignKeys != 1 {
+		_ = db.Close()
+		return nil, fmt.Errorf("verify SQLite foreign key enforcement: enabled=%d err=%v", foreignKeys, err)
+	}
 	if err := repository.migrate(ctx); err != nil {
 		_ = db.Close()
 		return nil, err

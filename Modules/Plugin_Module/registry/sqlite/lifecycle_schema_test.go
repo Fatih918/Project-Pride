@@ -116,3 +116,21 @@ func TestLifecycleSchemaV5RejectsInvalidAuthorizationEvidenceShape(t *testing.T)
 		t.Fatal("authorization evidence constraint accepted a partial decision")
 	}
 }
+
+func TestRepositoryEnablesForeignKeyEnforcement(t *testing.T) {
+	repository, _ := openTestRepository(t)
+	var enabled int
+	if err := repository.db.QueryRowContext(context.Background(), "PRAGMA foreign_keys").Scan(&enabled); err != nil {
+		t.Fatal(err)
+	}
+	if enabled != 1 {
+		t.Fatalf("SQLite foreign_keys = %d, want 1", enabled)
+	}
+
+	_, err := repository.db.ExecContext(context.Background(), `INSERT INTO plugin_lifecycle_records (
+		plugin_id, selected_version, desired_state, runtime_observation, revision, created_at, updated_at
+	) VALUES ('plugin.missing', '1.0.0', 'DISABLED', 'UNKNOWN', 1, '2026-11-26T00:00:00.000000000Z', '2026-11-26T00:00:00.000000000Z')`)
+	if err == nil {
+		t.Fatal("lifecycle record accepted a Plugin ID that does not exist")
+	}
+}

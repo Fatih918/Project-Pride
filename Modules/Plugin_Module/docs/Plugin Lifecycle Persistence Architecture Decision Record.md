@@ -8,7 +8,7 @@
 
 ## 1. Purpose
 
-The lifecycle domain, boundary contracts, and Enable/Disable application service are now present. The next implementation step is a durable SQLite adapter. This review makes the remaining persistence decisions explicit before schema and adapter code are introduced.
+The lifecycle domain, boundary contracts, Enable/Disable application service, schema v5, and the first dedicated SQLite lifecycle repository adapter are now defined. This ADR remains the normative source for persistence invariants; the implementation-status section at the end records which parts are present and which still require follow-up.
 
 The lifecycle repository remains logically separate from the installation journal. It may share the existing SQLite database and connection infrastructure, but it must not reuse installation operation tables or phases.
 
@@ -100,7 +100,7 @@ If the selected installed version changed between reservation and commit, the co
 - `CommitDesiredState` atomically writes the lifecycle record and transitions Applying → Succeeded.
 - `FailOperation` may mark only a non-terminal operation Failed. It must not overwrite Succeeded or another terminal outcome.
 
-The existing domain operation may be extended with EvaluatedAt and ReasonCode if retaining those fields is accepted; otherwise the persistence adapter must document why they are intentionally not part of the durable domain record. Do not store extra opaque fields without a domain contract.
+The domain operation now retains EvaluatedAt and ReasonCode alongside DecisionID and PolicyRevision. All four values are validated as complete authorization evidence and persisted together; partial evidence is rejected.
 
 ### P8 — Crash recovery
 
@@ -114,7 +114,7 @@ The initial Enable/Disable flow has no RuntimePort side effects, so a process cr
 - A caller retry with the same OperationID receives a typed recovery/in-progress result; an operator or explicit retry policy must decide whether to create a new operation ID and obtain fresh authorization.
 - Recovery must never modify RuntimeObservation.
 
-The recovery coordinator and startup gate are a follow-up implementation slice; this adapter PR must not claim lifecycle production readiness until they exist.
+The SQLite adapter exposes deterministic recovery candidates and a bounded operation that classifies expired or lease-less non-terminal operations as RecoveryRequired. The recovery coordinator, startup gate, and host invocation policy remain follow-up work; the adapter alone does not make lifecycle production-ready.
 
 ### P9 — Operation retention
 
@@ -165,3 +165,35 @@ This review does not authorize:
 ## 5. Implementation requirements
 
 The implementation PR must follow P1–P10. Any required deviation must be brought back for explicit review before implementation. Update PLR-BND-0001 if the concrete repository semantics require clarification.
+
+
+## 6. Implementation status
+
+**Status of this section:** updated alongside the first SQLite lifecycle repository implementation. Code-level status is subject to the CI result on the corresponding pull request.
+
+### Implemented in the current persistence increment
+
+| Area | Implemented behavior |
+|---|---|
+| Adapter placement | Dedicated `registry/sqlite.LifecycleRepository` sharing the registry's existing `*sql.DB`; `Repository.Lifecycle()` provides the shared-handle adapter. SQLite foreign-key enforcement is enabled and verified on repository initialization |
+| Operation reservation | Validates canonical SHA-256 fingerprint; checks operation identity before and after acquiring SQLite's write reservation; binds the immutable operation version to the currently selected installed version |
+| Idempotency | Same operation ID and fingerprint returns the stored operation with `Existing=true`; a different fingerprint returns `ErrOperationIDConflict` without acquiring another lease |
+| Lease and fencing | 120-second lease; positive signed `int64` token; durable per-Plugin counter; fail-closed counter exhaustion; SQLite write serialization |
+| Expired work | Expired lease owners and non-terminal operations without a lease are classified as `RECOVERY_REQUIRED`; the old authorization is not replayed |
+| Fenced transitions | Authorization recording, apply transition, desired-state commit, and failure transition validate operation identity, token, and lease expiry in the same transaction as the mutation |
+| Authorization evidence | Decision ID, policy revision, evaluation timestamp, and reason code are stored together |
+| Desired-state commit | Lifecycle record and operation `SUCCEEDED` phase commit atomically; initial revision is 1; desired-state changes increment revision once; no-op leaves revision unchanged |
+| Runtime observation | Enable/Disable commits preserve the stored observation and never infer process health |
+| Recovery inspection | `ListRecoveryCandidates` returns bounded, deterministic non-terminal operation candidates; `MarkExpiredOperationsRecoveryRequired` performs bounded expiry classification |
+| Retention | No automatic lifecycle operation deletion is implemented |
+
+### Remaining work before production use
+
+- Add exhaustive cross-process contention tests, including simultaneous reservation from separate SQLite handles/processes.
+- Add failure-injection tests proving rollback of lifecycle record and operation phase when the commit transaction fails.
+- Add explicit tests for maximum signed fencing-token exhaustion, lease release ownership, all fenced mutation types after expiry, and reopen persistence of the counter.
+- Implement the lifecycle recovery coordinator and invoke it from the host startup gate before exposing lifecycle mutations.
+- Wire the adapter into production host composition and ensure the shared database handle and startup lock have the required lifetime.
+- Add lifecycle observability and readiness reporting without leaking authorization internals.
+
+The current adapter is a persistence implementation increment, **not a production-readiness declaration**. Runtime execution, Core authorization implementation, lifecycle SDK RPCs, and process reconciliation remain outside this increment.
