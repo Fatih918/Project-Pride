@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const schemaVersion = 4
+const schemaVersion = 5
 
 type Repository struct {
 	db *sql.DB
@@ -175,7 +175,67 @@ func (r *Repository) migrate(ctx context.Context) error {
 			return fmt.Errorf("add persisted artifact descriptor to installation journal: %w", err)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 4"); err != nil {
+	if version < 5 {
+		statements := []string{
+			`CREATE TABLE plugin_lifecycle_records (
+				plugin_id TEXT PRIMARY KEY NOT NULL REFERENCES plugins(plugin_id) ON DELETE RESTRICT,
+				selected_version TEXT NOT NULL CHECK (length(selected_version) BETWEEN 1 AND 128),
+				desired_state TEXT NOT NULL CHECK (desired_state IN ('DISABLED', 'ENABLED')),
+				runtime_observation TEXT NOT NULL CHECK (runtime_observation IN ('UNKNOWN', 'STOPPED', 'STARTING', 'RUNNING', 'STOPPING', 'FAILED')),
+				revision INTEGER NOT NULL CHECK (revision > 0),
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			`CREATE TABLE plugin_lifecycle_operations (
+				operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id) BETWEEN 1 AND 128),
+				request_fingerprint TEXT NOT NULL CHECK (length(request_fingerprint) = 64),
+				principal_id TEXT NOT NULL CHECK (length(principal_id) BETWEEN 1 AND 128),
+				plugin_id TEXT NOT NULL REFERENCES plugins(plugin_id) ON DELETE RESTRICT,
+				plugin_version TEXT NOT NULL CHECK (length(plugin_version) BETWEEN 1 AND 128),
+				action TEXT NOT NULL CHECK (action IN ('ENABLE', 'DISABLE')),
+				phase TEXT NOT NULL CHECK (phase IN ('REQUESTED', 'AUTHORIZED', 'APPLYING', 'SUCCEEDED', 'FAILED', 'RECOVERY_REQUIRED')),
+				failure_code TEXT CHECK (failure_code IS NULL OR length(failure_code) <= 64),
+				decision_id TEXT CHECK (decision_id IS NULL OR length(decision_id) BETWEEN 1 AND 128),
+				policy_revision TEXT CHECK (policy_revision IS NULL OR length(policy_revision) BETWEEN 1 AND 128),
+				evaluated_at TEXT,
+				reason_code TEXT CHECK (reason_code IS NULL OR length(reason_code) <= 64),
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				UNIQUE (operation_id, plugin_id),
+				CHECK (
+					(decision_id IS NULL AND policy_revision IS NULL AND evaluated_at IS NULL AND reason_code IS NULL)
+					OR
+					(decision_id IS NOT NULL AND policy_revision IS NOT NULL AND evaluated_at IS NOT NULL AND reason_code IS NOT NULL)
+				)
+			)`,
+			`CREATE INDEX plugin_lifecycle_operations_plugin_created
+				ON plugin_lifecycle_operations(plugin_id, created_at, operation_id)`,
+			`CREATE INDEX plugin_lifecycle_operations_phase_updated
+				ON plugin_lifecycle_operations(phase, updated_at, operation_id)`,
+			`CREATE TABLE plugin_lifecycle_leases (
+				plugin_id TEXT PRIMARY KEY NOT NULL REFERENCES plugins(plugin_id) ON DELETE RESTRICT,
+				operation_id TEXT NOT NULL UNIQUE,
+				fencing_token INTEGER NOT NULL CHECK (fencing_token > 0),
+				expires_at TEXT NOT NULL,
+				FOREIGN KEY (operation_id, plugin_id)
+					REFERENCES plugin_lifecycle_operations(operation_id, plugin_id) ON DELETE RESTRICT
+			)`,
+			`CREATE TABLE plugin_lifecycle_fencing_tokens (
+				plugin_id TEXT PRIMARY KEY NOT NULL REFERENCES plugins(plugin_id) ON DELETE RESTRICT,
+				last_token INTEGER NOT NULL CHECK (last_token > 0)
+			)`,
+		}
+		for _, statement := range statements {
+			if _, err := tx.ExecContext(ctx, statement); err != nil {
+				return fmt.Errorf("create Plugin lifecycle persistence schema: %w", err)
+			}
+		}
+		version = 5
+	}
+	if version != schemaVersion {
+		return fmt.Errorf("plugin registry migration stopped at schema version %d, expected %d", version, schemaVersion)
+	}
+	if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 5"); err != nil {
 		return fmt.Errorf("advance plugin registry schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
