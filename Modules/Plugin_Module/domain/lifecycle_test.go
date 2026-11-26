@@ -68,7 +68,7 @@ func TestLifecycleOperationValidation(t *testing.T) {
 		Action:        LifecycleActionEnable,
 		Phase:         LifecycleOperationPhaseRequested,
 		CreatedAt:     now,
-		UpdatedAt:    now,
+		UpdatedAt:     now,
 	}
 	if err := valid.Validate(); err != nil {
 		t.Fatalf("valid operation rejected: %v", err)
