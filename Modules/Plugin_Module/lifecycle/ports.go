@@ -83,15 +83,15 @@ type AuthorizationPort interface {
 	AuthorizeLifecycle(context.Context, AuthorizationRequest) (AuthorizationDecision, error)
 }
 
-// OperationLease is a repository-issued fencing capability. Every mutation
-// must reject a lease whose token is no longer current for the Plugin.
+// OperationLease is a repository-issued fencing capability. The signed
+// 64-bit token matches SQLite INTEGER and must never wrap or be reused.
 type OperationLease struct {
-	FencingToken uint64
+	FencingToken int64
 	ExpiresAt    time.Time
 }
 
 func (l OperationLease) Validate() error {
-	if l.FencingToken == 0 || l.ExpiresAt.IsZero() {
+	if l.FencingToken <= 0 || l.ExpiresAt.IsZero() {
 		return ErrInvalidReservation
 	}
 	return nil
