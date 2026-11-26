@@ -267,12 +267,7 @@ func TestExecuteRejectsInProgressReplay(t *testing.T) {
 		CreatedAt:     now.Add(-time.Minute),
 		UpdatedAt:     now,
 	}
-	repository := &repositoryStub{
-		reservation: lifecycle.OperationReservation{
-			Operation: operation,
-			Existing:  true,
-		},
-	}
+	repository := &repositoryStub{existingOperation: &operation}
 	authorization := &authorizationStub{}
 	service := newTestService(t, repository, authorization)
 
