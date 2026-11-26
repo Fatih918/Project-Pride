@@ -6,6 +6,8 @@ The Plugin Module owns SDK-neutral installed Plugin records, local persistence, 
 
 The production host boundary and required startup ordering are specified in [Plugin Module Production Host Integration Contract](docs/Plugin%20Module%20Production%20Host%20Integration%20Contract.md). The contract is not evidence that production composition is implemented.
 
+The accepted lifecycle architecture and domain transition model are specified in [Plugin Lifecycle and Runtime Architecture Decision Record](docs/Plugin%20Lifecycle%20and%20Runtime%20Architecture%20Decision%20Record.md) and [Plugin Lifecycle Domain Contract](docs/Plugin%20Lifecycle%20Domain%20Contract.md). Integration boundaries for Core authorization, lifecycle persistence, and the future isolated runtime are specified in [Plugin Lifecycle Boundary Contracts](docs/Plugin%20Lifecycle%20Boundary%20Contracts.md). These are design contracts; lifecycle implementation remains pending.
+
 ## Increment 13 — Trust configuration transport
 
 - Added `artifactverify.HTTPTrustConfigurationSource` for a distribution-configured HTTPS endpoint; no Marketplace endpoint or authentication protocol is invented.
