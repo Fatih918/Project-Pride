@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +84,23 @@ func (s *Service) Execute(ctx context.Context, request Request) (result Result, 
 		return Result{}, err
 	}
 
+	// Resolve an existing operation before looking up the currently selected
+	// version. A retry must replay its original result even if the selected
+	// Plugin version has changed since the first request.
+	existing, err := s.repository.GetOperation(ctx, request.OperationID)
+	if err == nil {
+		if !sameRequestIdentity(existing, request) {
+			return Result{}, lifecycle.ErrOperationIDConflict
+		}
+		if err := existing.Validate(); err != nil {
+			return Result{}, fmt.Errorf("validate existing lifecycle operation: %w", err)
+		}
+		return replayResult(existing)
+	}
+	if !errors.Is(err, lifecycle.ErrOperationNotFound) {
+		return Result{}, fmt.Errorf("read existing lifecycle operation: %w", err)
+	}
+
 	target, err := s.targets.ResolveSelectedTarget(ctx, request.PluginID)
 	if err != nil {
 		return Result{}, fmt.Errorf("resolve selected Plugin target: %w", err)
@@ -107,7 +123,7 @@ func (s *Service) Execute(ctx context.Context, request Request) (result Result, 
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
-	fingerprint := requestFingerprint(request, target)
+	fingerprint := requestFingerprint(request)
 	reservation, err := s.repository.ReserveOperation(ctx, operation, fingerprint)
 	if err != nil {
 		return Result{}, fmt.Errorf("reserve lifecycle operation: %w", err)
@@ -115,11 +131,14 @@ func (s *Service) Execute(ctx context.Context, request Request) (result Result, 
 	if err := reservation.Validate(); err != nil {
 		return Result{}, fmt.Errorf("validate lifecycle reservation: %w", err)
 	}
-	if !sameOperationIdentity(reservation.Operation, operation) {
+	if !sameRequestIdentity(reservation.Operation, request) {
 		return Result{}, lifecycle.ErrOperationIDConflict
 	}
 	if reservation.Existing {
 		return replayResult(reservation.Operation)
+	}
+	if !sameOperationIdentity(reservation.Operation, operation) {
+		return Result{}, lifecycle.ErrOperationIDConflict
 	}
 
 	lease := reservation.Lease
@@ -219,6 +238,13 @@ func validateRequest(request Request) error {
 	return nil
 }
 
+func sameRequestIdentity(operation domain.LifecycleOperation, request Request) bool {
+	return operation.OperationID == request.OperationID &&
+		operation.PrincipalID == request.PrincipalID &&
+		operation.PluginID == request.PluginID &&
+		operation.Action == request.Action
+}
+
 func sameOperationIdentity(left, right domain.LifecycleOperation) bool {
 	return left.OperationID == right.OperationID &&
 		left.PrincipalID == right.PrincipalID &&
@@ -227,18 +253,11 @@ func sameOperationIdentity(left, right domain.LifecycleOperation) bool {
 		left.Action == right.Action
 }
 
-func requestFingerprint(request Request, target lifecycle.SelectedTarget) string {
+func requestFingerprint(request Request) string {
 	hash := sha256.New()
 	writeFingerprintPart(hash, request.PrincipalID)
 	writeFingerprintPart(hash, string(request.PluginID))
-	writeFingerprintPart(hash, target.PluginVersion)
 	writeFingerprintPart(hash, strconv.Itoa(int(request.Action)))
-
-	permissions := append([]string(nil), target.PermissionIDs...)
-	sort.Strings(permissions)
-	for _, permissionID := range permissions {
-		writeFingerprintPart(hash, permissionID)
-	}
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
