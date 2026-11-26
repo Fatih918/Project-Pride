@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -231,7 +232,7 @@ func requestFingerprint(request Request, target lifecycle.SelectedTarget) string
 	writeFingerprintPart(hash, request.PrincipalID)
 	writeFingerprintPart(hash, string(request.PluginID))
 	writeFingerprintPart(hash, target.PluginVersion)
-	writeFingerprintPart(hash, string(rune(request.Action)))
+	writeFingerprintPart(hash, strconv.Itoa(int(request.Action)))
 
 	permissions := append([]string(nil), target.PermissionIDs...)
 	sort.Strings(permissions)
