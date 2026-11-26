@@ -94,3 +94,23 @@ func TestRuntimeObservationDoesNotChangeWithDesiredTransition(t *testing.T) {
 		t.Fatalf("runtime observation changed unexpectedly: %v", currentObservation)
 	}
 }
+
+func TestLifecycleOperationRequiresCompleteAuthorizationEvidence(t *testing.T) {
+	now := time.Date(2026, time.November, 26, 12, 0, 0, 0, time.UTC)
+	operation := LifecycleOperation{
+		OperationID: "op-evidence", PrincipalID: "principal-1",
+		PluginID: PluginID("example.plugin"), PluginVersion: "1.2.3",
+		Action: LifecycleActionEnable, Phase: LifecycleOperationPhaseAuthorized,
+		DecisionID: "decision-1", PolicyRevision: "policy-v2",
+		EvaluatedAt: now, ReasonCode: "ALLOW",
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := operation.Validate(); err != nil {
+		t.Fatalf("complete authorization evidence rejected: %v", err)
+	}
+
+	operation.EvaluatedAt = time.Time{}
+	if err := operation.Validate(); !errors.Is(err, ErrInvalidLifecycleRecord) {
+		t.Fatalf("partial authorization evidence error = %v, want ErrInvalidLifecycleRecord", err)
+	}
+}
