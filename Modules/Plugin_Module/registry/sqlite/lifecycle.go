@@ -72,7 +72,7 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 	if selected != op.PluginVersion { return lifecycle.OperationReservation{}, lifecycle.ErrVersionNotSelected }
 
 	now := r.now().UTC()
-	nowText := formatTime(now)
+	nowText := formatLifeTime(now)
 	var previousID, expiryText string
 	err = tx.QueryRowContext(ctx, "SELECT operation_id, expires_at FROM plugin_lifecycle_leases WHERE plugin_id = ?", string(op.PluginID)).Scan(&previousID, &expiryText)
 	if err == nil {
@@ -105,10 +105,10 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 		phase, failure_code, decision_id, policy_revision, evaluated_at, reason_code, created_at, updated_at
 	) VALUES (?, ?, ?, ?, ?, ?, 'REQUESTED', NULL, NULL, NULL, NULL, NULL, ?, ?)\`,
 		op.OperationID, fingerprint, op.PrincipalID, string(op.PluginID), op.PluginVersion,
-		lifeActionName(op.Action), formatTime(op.CreatedAt), formatTime(op.UpdatedAt))
+		lifeActionName(op.Action), formatLifeTime(op.CreatedAt), formatLifeTime(op.UpdatedAt))
 	if err != nil { return lifecycle.OperationReservation{}, lifePersist("insert operation", err) }
 	_, err = tx.ExecContext(ctx, "INSERT INTO plugin_lifecycle_leases (plugin_id, operation_id, fencing_token, expires_at) VALUES (?, ?, ?, ?)",
-		string(op.PluginID), op.OperationID, token, formatTime(expires))
+		string(op.PluginID), op.OperationID, token, formatLifeTime(expires))
 	if err != nil {
 		if isConstraintError(err) { return lifecycle.OperationReservation{}, lifecycle.ErrPluginOperationConflict }
 		return lifecycle.OperationReservation{}, lifePersist("insert lease", err)
@@ -124,7 +124,7 @@ func (r *LifecycleRepository) RecordAuthorization(ctx context.Context, id string
 	if err := decision.Validate(); err != nil { return err }
 	return r.mutate(ctx, id, lease, domain.LifecycleOperationPhaseRequested, func(tx *sql.Tx, _ domain.LifecycleOperation) error {
 		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='AUTHORIZED', decision_id=?, policy_revision=?, evaluated_at=?, reason_code=?, updated_at=? WHERE operation_id=? AND phase='REQUESTED'",
-			decision.DecisionID, decision.PolicyRevision, formatTime(decision.EvaluatedAt), decision.ReasonCode, formatTime(r.now().UTC()), id)
+			decision.DecisionID, decision.PolicyRevision, formatLifeTime(decision.EvaluatedAt), decision.ReasonCode, formatLifeTime(r.now().UTC()), id)
 		if err != nil { return lifePersist("record authorization", err) }
 		return lifeOneRow(result)
 	})
@@ -132,7 +132,7 @@ func (r *LifecycleRepository) RecordAuthorization(ctx context.Context, id string
 
 func (r *LifecycleRepository) BeginApply(ctx context.Context, id string, lease lifecycle.OperationLease) error {
 	return r.mutate(ctx, id, lease, domain.LifecycleOperationPhaseAuthorized, func(tx *sql.Tx, _ domain.LifecycleOperation) error {
-		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='APPLYING', updated_at=? WHERE operation_id=? AND phase='AUTHORIZED'", formatTime(r.now().UTC()), id)
+		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='APPLYING', updated_at=? WHERE operation_id=? AND phase='AUTHORIZED'", formatLifeTime(r.now().UTC()), id)
 		if err != nil { return lifePersist("begin apply", err) }
 		return lifeOneRow(result)
 	})
@@ -151,7 +151,7 @@ func (r *LifecycleRepository) CommitDesiredState(ctx context.Context, id string,
 		if errors.Is(err, sql.ErrNoRows) {
 			committed = domain.LifecycleRecord{PluginID: op.PluginID, SelectedVersion: op.PluginVersion, DesiredState: target, RuntimeObservation: domain.RuntimeObservationUnknown, Revision: 1, CreatedAt: now, UpdatedAt: now}
 			_, err = tx.ExecContext(ctx, \`INSERT INTO plugin_lifecycle_records (plugin_id, selected_version, desired_state, runtime_observation, revision, created_at, updated_at) VALUES (?, ?, ?, 'UNKNOWN', 1, ?, ?)\`,
-				string(op.PluginID), op.PluginVersion, lifeDesiredName(target), formatTime(now), formatTime(now))
+				string(op.PluginID), op.PluginVersion, lifeDesiredName(target), formatLifeTime(now), formatLifeTime(now))
 			if err != nil { return lifePersist("insert lifecycle record", err) }
 		} else if err != nil { return lifePersist("read lifecycle record", err) } else {
 			changed := committed.DesiredState != target
@@ -161,13 +161,13 @@ func (r *LifecycleRepository) CommitDesiredState(ctx context.Context, id string,
 				nextRevision := committed.Revision
 				if changed { nextRevision++ }
 				result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_records SET selected_version=?, desired_state=?, revision=?, updated_at=? WHERE plugin_id=? AND revision=?",
-					op.PluginVersion, lifeDesiredName(target), nextRevision, formatTime(now), string(op.PluginID), committed.Revision)
+					op.PluginVersion, lifeDesiredName(target), int64(nextRevision), formatLifeTime(now), string(op.PluginID), committed.Revision)
 				if err != nil { return lifePersist("update lifecycle record", err) }
 				if err := lifeOneRow(result); err != nil { return err }
 				committed.SelectedVersion, committed.DesiredState, committed.Revision, committed.UpdatedAt = op.PluginVersion, target, nextRevision, now
 			}
 		}
-		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='SUCCEEDED', updated_at=? WHERE operation_id=? AND phase='APPLYING'", formatTime(now), id)
+		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='SUCCEEDED', updated_at=? WHERE operation_id=? AND phase='APPLYING'", formatLifeTime(now), id)
 		if err != nil { return lifePersist("complete operation", err) }
 		if err := lifeOneRow(result); err != nil { return err }
 		return nil
@@ -179,8 +179,8 @@ func (r *LifecycleRepository) CommitDesiredState(ctx context.Context, id string,
 func (r *LifecycleRepository) FailOperation(ctx context.Context, id string, lease lifecycle.OperationLease, code string) error {
 	if !validLifeFailureCode(code) { return fmt.Errorf("%w: invalid bounded failure code", lifecycle.ErrPersistence) }
 	return r.mutate(ctx, id, lease, 0, func(tx *sql.Tx, _ domain.LifecycleOperation) error {
-		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='FAILED', failure_code=?, updated_at=? WHERE operation_id=? AND phase IN ('REQUESTED','AUTHORIZED','APPLYING','RECOVERY_REQUIRED')",
-			code, formatTime(r.now().UTC()), id)
+		result, err := tx.ExecContext(ctx, "UPDATE plugin_lifecycle_operations SET phase='FAILED', failure_code=?, updated_at=? WHERE operation_id=? AND phase IN ('REQUESTED','AUTHORIZED','APPLYING')",
+			code, formatLifeTime(r.now().UTC()), id)
 		if err != nil { return lifePersist("fail operation", err) }
 		return lifeOneRow(result)
 	})
@@ -257,7 +257,7 @@ func (r *LifecycleRepository) MarkExpiredOperationsRecoveryRequired(ctx context.
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil { return 0, lifePersist("begin expiry classification", err) }
 	defer func() { _ = tx.Rollback() }()
-	now := formatTime(r.now().UTC())
+	now := formatLifeTime(r.now().UTC())
 	rows, err := tx.QueryContext(ctx, \`SELECT o.operation_id FROM plugin_lifecycle_operations o LEFT JOIN plugin_lifecycle_leases l ON l.operation_id=o.operation_id
 		WHERE o.phase IN ('REQUESTED','AUTHORIZED','APPLYING') AND (l.operation_id IS NULL OR l.expires_at<=?)
 		ORDER BY o.created_at, o.operation_id LIMIT ?\`, now, limit)
@@ -345,3 +345,10 @@ func lifeOneRow(result sql.Result) error { n,err:=result.RowsAffected(); if err!
 func lifePersist(action string,err error) error { return fmt.Errorf("%w: %s: %v",lifecycle.ErrPersistence,action,err) }
 func isConstraintError(err error) bool { s:=strings.ToLower(err.Error()); return strings.Contains(s,"constraint")||strings.Contains(s,"unique") }
 func isBusyError(err error) bool { s:=strings.ToLower(err.Error()); return strings.Contains(s,"database is locked")||strings.Contains(s,"database is busy")||strings.Contains(s,"sqlite_busy") }
+
+func formatLifeTime(value time.Time) string {
+	return value.UTC().Format("2006-01-02T15:04:05.000000000Z")
+}
+
+var _ lifecycle.LifecycleRepository = (*LifecycleRepository)(nil)
+var _ lifecycle.RecoveryRepository = (*LifecycleRepository)(nil)
