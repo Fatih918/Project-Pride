@@ -88,6 +88,18 @@ func TestTrustSequenceSchemaMigrationFromVersionTwo(t *testing.T) {
 	if _, err := repository.db.Exec("DROP TABLE plugin_trust_configuration_state"); err != nil {
 		t.Fatal(err)
 	}
+	// Remove v5-only lifecycle tables so the downgraded user_version models
+	// a genuine v2 database rather than a database with a stale version marker.
+	for _, table := range []string{
+		"plugin_lifecycle_leases",
+		"plugin_lifecycle_operations",
+		"plugin_lifecycle_records",
+		"plugin_lifecycle_fencing_tokens",
+	} {
+		if _, err := repository.db.Exec("DROP TABLE " + table); err != nil {
+			t.Fatalf("remove v5-only table %q from v2 fixture: %v", table, err)
+		}
+	}
 	// Recreate the actual v2 schema shape: v2 predates descriptor_json.
 	if _, err := repository.db.Exec("ALTER TABLE plugin_installation_operations DROP COLUMN descriptor_json"); err != nil {
 		t.Fatalf("remove v4-only descriptor column from v2 fixture: %v", err)
