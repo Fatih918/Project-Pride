@@ -453,8 +453,11 @@ func scanLifeOperation(row lifeScanner) (domain.LifecycleOperation, string, erro
 		return op, "", err
 	}
 	op.FailureCode, op.DecisionID, op.PolicyRevision, op.ReasonCode = failure.String, decision.String, policy.String, reason.String
-	if evaluated.Valid { op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String); if err != nil {
-		return op, "", err }
+	if evaluated.Valid {
+		op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String)
+		if err != nil {
+			return op, "", err
+		}
 	}
 	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
 	if err != nil {
@@ -494,8 +497,11 @@ func scanLifeOperationExpiry(row lifeScanner) (domain.LifecycleOperation, sql.Nu
 		return op, expiry, err
 	}
 	op.FailureCode, op.DecisionID, op.PolicyRevision, op.ReasonCode = failure.String, decision.String, policy.String, reason.String
-	if evaluated.Valid { op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String); if err != nil {
-		return op, expiry, err }
+	if evaluated.Valid {
+		op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String)
+		if err != nil {
+			return op, expiry, err
+		}
 	}
 	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
 	if err != nil {
