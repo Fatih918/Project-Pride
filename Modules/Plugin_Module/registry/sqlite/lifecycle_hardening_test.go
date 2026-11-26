@@ -285,4 +285,3 @@ func TestLifecycleRepositoryCommitFailureRollsBackDesiredStateAndOperation(t *te
 		t.Fatalf("operation phase after rollback = %v, want APPLYING", op.Phase)
 	}
 }
-
