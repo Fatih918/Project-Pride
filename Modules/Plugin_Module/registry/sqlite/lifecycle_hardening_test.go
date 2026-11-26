@@ -13,7 +13,7 @@ import (
 	"pride-plugin-module/lifecycle"
 )
 
-func setupLifecycleHardeningRepository(t *testing.T, pluginID string) (*Repository, *LifecycleRepository, string, time.Time, func(time.Duration)) {
+func setupLifecycleHardeningRepository(t *testing.T, pluginID string) (*Repository, *LifecycleRepository, string, domain.PluginID, time.Time, func(time.Duration)) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "plugin-registry.sqlite")
 	repository, err := New(context.Background(), path)
@@ -37,11 +37,11 @@ func setupLifecycleHardeningRepository(t *testing.T, pluginID string) (*Reposito
 	current := now
 	adapter := newLifecycleRepository(repository.db, func() time.Time { return current })
 	advance := func(d time.Duration) { current = current.Add(d) }
-	return repository, adapter, path, now, advance
+	return repository, adapter, path, plugin.ID, now, advance
 }
 
 func TestLifecycleRepositorySerializesReservationsAcrossDatabaseHandles(t *testing.T) {
-	firstRepository, firstAdapter, path, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.concurrent")
+	firstRepository, firstAdapter, path, pluginID, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.concurrent")
 	secondRepository, err := New(context.Background(), path)
 	if err != nil {
 		t.Fatal(err)
@@ -64,7 +64,7 @@ func TestLifecycleRepositorySerializesReservationsAcrossDatabaseHandles(t *testi
 			opID := fmt.Sprintf("lifecycle-concurrent-%d", i)
 			reservation, err := adapter.ReserveOperation(
 				context.Background(),
-				lifecycleTestOperation(domain.PluginID("plugin.lifecycle.concurrent"), opID, now),
+				lifecycleTestOperation(pluginID, opID, now),
 				lifecycleFingerprint(opID),
 			)
 			outcomes <- outcome{reservation: reservation, err: err}
@@ -92,9 +92,9 @@ func TestLifecycleRepositorySerializesReservationsAcrossDatabaseHandles(t *testi
 }
 
 func TestLifecycleRepositoryFencingCounterSurvivesReopen(t *testing.T) {
-	repository, adapter, path, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.reopen")
+	repository, adapter, path, pluginID, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.reopen")
 	first, err := adapter.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.reopen", "lifecycle-before-reopen", now),
+		lifecycleTestOperation(pluginID, "lifecycle-before-reopen", now),
 		lifecycleFingerprint("before-reopen"))
 	if err != nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestLifecycleRepositoryFencingCounterSurvivesReopen(t *testing.T) {
 	defer reopened.Close()
 	next := newLifecycleRepository(reopened.db, func() time.Time { return now })
 	second, err := next.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.reopen", "lifecycle-after-reopen", now),
+		lifecycleTestOperation(pluginID, "lifecycle-after-reopen", now),
 		lifecycleFingerprint("after-reopen"))
 	if err != nil {
 		t.Fatal(err)
@@ -124,9 +124,9 @@ func TestLifecycleRepositoryFencingCounterSurvivesReopen(t *testing.T) {
 }
 
 func TestLifecycleRepositoryFailsClosedOnFencingTokenExhaustion(t *testing.T) {
-	_, adapter, _, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.exhaustion")
+	_, adapter, _, pluginID, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.exhaustion")
 	first, err := adapter.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.exhaustion", "lifecycle-token-seed", now),
+		lifecycleTestOperation(pluginID, "lifecycle-token-seed", now),
 		lifecycleFingerprint("token-seed"))
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +140,7 @@ func TestLifecycleRepositoryFailsClosedOnFencingTokenExhaustion(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = adapter.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.exhaustion", "lifecycle-token-overflow", now),
+		lifecycleTestOperation(pluginID, "lifecycle-token-overflow", now),
 		lifecycleFingerprint("token-overflow"))
 	if !errors.Is(err, lifecycle.ErrFencingTokenExhausted) {
 		t.Fatalf("fencing token exhaustion error = %v", err)
@@ -148,9 +148,9 @@ func TestLifecycleRepositoryFailsClosedOnFencingTokenExhaustion(t *testing.T) {
 }
 
 func TestLifecycleRepositoryOldLeaseCannotReleaseNewOwner(t *testing.T) {
-	_, adapter, _, now, advance := setupLifecycleHardeningRepository(t, "plugin.lifecycle.release-owner")
+	_, adapter, _, pluginID, now, advance := setupLifecycleHardeningRepository(t, "plugin.lifecycle.release-owner")
 	old, err := adapter.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.release-owner", "lifecycle-old-owner", now),
+		lifecycleTestOperation(pluginID, "lifecycle-old-owner", now),
 		lifecycleFingerprint("old-owner"))
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestLifecycleRepositoryOldLeaseCannotReleaseNewOwner(t *testing.T) {
 	advance(121 * time.Second)
 	currentTime := now.Add(121 * time.Second)
 	current, err := adapter.ReserveOperation(context.Background(),
-		lifecycleTestOperation("plugin.lifecycle.release-owner", "lifecycle-new-owner", currentTime),
+		lifecycleTestOperation(pluginID, "lifecycle-new-owner", currentTime),
 		lifecycleFingerprint("new-owner"))
 	if err != nil {
 		t.Fatal(err)
@@ -234,10 +234,10 @@ func TestLifecycleRepositoryFencedMutationsRejectExpiredLease(t *testing.T) {
 	}
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, repo, _, now, advance := setupLifecycleHardeningRepository(t, fmt.Sprintf("plugin.lifecycle.expired.%d", i))
+			_, repo, _, pluginID, now, advance := setupLifecycleHardeningRepository(t, fmt.Sprintf("plugin.lifecycle.expired.%d", i))
 			id := fmt.Sprintf("lifecycle-expired-%d", i)
 			reservation, err := repo.ReserveOperation(context.Background(),
-				lifecycleTestOperation(domain.PluginID(fmt.Sprintf("plugin.lifecycle.expired.%d", i)), id, now),
+				lifecycleTestOperation(pluginID, id, now),
 				lifecycleFingerprint(id))
 			if err != nil {
 				t.Fatal(err)
@@ -248,7 +248,7 @@ func TestLifecycleRepositoryFencedMutationsRejectExpiredLease(t *testing.T) {
 }
 
 func TestLifecycleRepositoryCommitFailureRollsBackDesiredStateAndOperation(t *testing.T) {
-	_, adapter, pluginID, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.rollback")
+	_, adapter, _, pluginID, now, _ := setupLifecycleHardeningRepository(t, "plugin.lifecycle.rollback")
 	reservation, err := adapter.ReserveOperation(context.Background(),
 		lifecycleTestOperation(pluginID, "lifecycle-rollback", now),
 		lifecycleFingerprint("rollback"))
