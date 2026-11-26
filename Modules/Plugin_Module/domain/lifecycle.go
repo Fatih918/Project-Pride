@@ -53,13 +53,13 @@ var (
 // LifecycleRecord is the durable administrative view of one Plugin. Runtime
 // observation is deliberately separate from desired state.
 type LifecycleRecord struct {
-	PluginID          PluginID
-	SelectedVersion   string
-	DesiredState      LifecycleDesiredState
+	PluginID           PluginID
+	SelectedVersion    string
+	DesiredState       LifecycleDesiredState
 	RuntimeObservation RuntimeObservation
-	Revision          uint64
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	Revision           uint64
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 func (r LifecycleRecord) Validate() error {
