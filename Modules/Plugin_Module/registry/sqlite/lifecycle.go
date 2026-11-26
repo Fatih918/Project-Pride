@@ -59,15 +59,9 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if existing, fp, err := scanLifeOperation(tx.QueryRowContext(ctx, lifecycleOperationSelect+" WHERE operation_id = ?", op.OperationID)); err == nil {
-		if fp != fingerprint {
-			return lifecycle.OperationReservation{}, lifecycle.ErrOperationIDConflict
-		}
-		return lifecycle.OperationReservation{Operation: existing, Existing: true}, nil
-	} else if !errors.Is(err, sql.ErrNoRows) {
-		return lifecycle.OperationReservation{}, lifePersist("read existing operation", err)
-	}
-
+	// Acquire SQLite's write reservation before any read in this transaction.
+	// A read-first deferred transaction can fail with SQLITE_BUSY when another
+	// connection commits between this transaction's initial read and write.
 	insert, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO plugin_lifecycle_fencing_tokens (plugin_id, last_token) VALUES (?, 1)", string(op.PluginID))
 	if err != nil {
 		return lifecycle.OperationReservation{}, lifePersist("lock fencing counter", err)
