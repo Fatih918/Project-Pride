@@ -93,3 +93,15 @@ func TestAuthorizationRequestClone(t *testing.T) {
 		t.Fatal("Clone() shares permission ID storage")
 	}
 }
+
+func TestOperationLeaseUsesPositiveSignedSQLiteInteger(t *testing.T) {
+	if err := (OperationLease{FencingToken: 1, ExpiresAt: time.Now().UTC()}).Validate(); err != nil {
+		t.Fatalf("positive fencing token rejected: %v", err)
+	}
+	if err := (OperationLease{FencingToken: -1, ExpiresAt: time.Now().UTC()}).Validate(); !errors.Is(err, ErrInvalidReservation) {
+		t.Fatalf("negative fencing token error = %v, want ErrInvalidReservation", err)
+	}
+	if err := (OperationLease{FencingToken: int64(^uint64(0) >> 1), ExpiresAt: time.Now().UTC()}).Validate(); err != nil {
+		t.Fatalf("maximum signed fencing token rejected: %v", err)
+	}
+}

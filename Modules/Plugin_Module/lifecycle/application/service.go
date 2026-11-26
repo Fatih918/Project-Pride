@@ -206,6 +206,8 @@ func (s *Service) Execute(ctx context.Context, request Request) (result Result, 
 	operation.Phase = domain.LifecycleOperationPhaseSucceeded
 	operation.DecisionID = decision.DecisionID
 	operation.PolicyRevision = decision.PolicyRevision
+	operation.EvaluatedAt = decision.EvaluatedAt
+	operation.ReasonCode = decision.ReasonCode
 	operation.UpdatedAt = s.now().UTC()
 	return Result{
 		Operation: operation,
