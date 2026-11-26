@@ -109,10 +109,10 @@ func (r *LifecycleRepository) ReserveOperation(ctx context.Context, op domain.Li
 	}
 
 	expires := now.Add(lifecycleLeaseDuration)
-	_, err = tx.ExecContext(ctx, \`INSERT INTO plugin_lifecycle_operations (
+	_, err = tx.ExecContext(ctx, `INSERT INTO plugin_lifecycle_operations (
 		operation_id, request_fingerprint, principal_id, plugin_id, plugin_version, action,
 		phase, failure_code, decision_id, policy_revision, evaluated_at, reason_code, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, 'REQUESTED', NULL, NULL, NULL, NULL, NULL, ?, ?)\`,
+	) VALUES (?, ?, ?, ?, ?, ?, 'REQUESTED', NULL, NULL, NULL, NULL, NULL, ?, ?)`,
 		op.OperationID, fingerprint, op.PrincipalID, string(op.PluginID), op.PluginVersion,
 		lifeActionName(op.Action), formatLifeTime(op.CreatedAt), formatLifeTime(op.UpdatedAt))
 	if err != nil { return lifecycle.OperationReservation{}, lifePersist("insert operation", err) }
@@ -159,7 +159,7 @@ func (r *LifecycleRepository) CommitDesiredState(ctx context.Context, id string,
 		err = scanLifeRecord(tx.QueryRowContext(ctx, "SELECT plugin_id, selected_version, desired_state, runtime_observation, revision, created_at, updated_at FROM plugin_lifecycle_records WHERE plugin_id=?", string(op.PluginID)), &committed)
 		if errors.Is(err, sql.ErrNoRows) {
 			committed = domain.LifecycleRecord{PluginID: op.PluginID, SelectedVersion: op.PluginVersion, DesiredState: target, RuntimeObservation: domain.RuntimeObservationUnknown, Revision: 1, CreatedAt: now, UpdatedAt: now}
-			_, err = tx.ExecContext(ctx, \`INSERT INTO plugin_lifecycle_records (plugin_id, selected_version, desired_state, runtime_observation, revision, created_at, updated_at) VALUES (?, ?, ?, 'UNKNOWN', 1, ?, ?)\`,
+			_, err = tx.ExecContext(ctx, `INSERT INTO plugin_lifecycle_records (plugin_id, selected_version, desired_state, runtime_observation, revision, created_at, updated_at) VALUES (?, ?, ?, 'UNKNOWN', 1, ?, ?)`,
 				string(op.PluginID), op.PluginVersion, lifeDesiredName(target), formatLifeTime(now), formatLifeTime(now))
 			if err != nil { return lifePersist("insert lifecycle record", err) }
 		} else if err != nil { return lifePersist("read lifecycle record", err) } else {
@@ -238,9 +238,9 @@ func (r *LifecycleRepository) mutate(ctx context.Context, id string, lease lifec
 func (r *LifecycleRepository) ListRecoveryCandidates(ctx context.Context, limit int) ([]lifecycle.RecoveryCandidate, error) {
 	if err := ctx.Err(); err != nil { return nil, err }
 	if limit < 1 || limit > 1000 { return nil, fmt.Errorf("%w: recovery limit must be 1..1000", lifecycle.ErrPersistence) }
-	rows, err := r.db.QueryContext(ctx, \`SELECT o.operation_id, o.request_fingerprint, o.principal_id, o.plugin_id, o.plugin_version, o.action, o.phase, o.failure_code, o.decision_id, o.policy_revision, o.evaluated_at, o.reason_code, o.created_at, o.updated_at, l.expires_at
+	rows, err := r.db.QueryContext(ctx, `SELECT o.operation_id, o.request_fingerprint, o.principal_id, o.plugin_id, o.plugin_version, o.action, o.phase, o.failure_code, o.decision_id, o.policy_revision, o.evaluated_at, o.reason_code, o.created_at, o.updated_at, l.expires_at
 		FROM plugin_lifecycle_operations o LEFT JOIN plugin_lifecycle_leases l ON l.operation_id=o.operation_id
-		WHERE o.phase IN ('REQUESTED','AUTHORIZED','APPLYING','RECOVERY_REQUIRED') ORDER BY o.created_at, o.operation_id LIMIT ?\`, limit)
+		WHERE o.phase IN ('REQUESTED','AUTHORIZED','APPLYING','RECOVERY_REQUIRED') ORDER BY o.created_at, o.operation_id LIMIT ?`, limit)
 	if err != nil { return nil, lifePersist("list recovery candidates", err) }
 	defer rows.Close()
 	now := r.now().UTC()
@@ -267,9 +267,9 @@ func (r *LifecycleRepository) MarkExpiredOperationsRecoveryRequired(ctx context.
 	if err != nil { return 0, lifePersist("begin expiry classification", err) }
 	defer func() { _ = tx.Rollback() }()
 	now := formatLifeTime(r.now().UTC())
-	rows, err := tx.QueryContext(ctx, \`SELECT o.operation_id FROM plugin_lifecycle_operations o LEFT JOIN plugin_lifecycle_leases l ON l.operation_id=o.operation_id
+	rows, err := tx.QueryContext(ctx, `SELECT o.operation_id FROM plugin_lifecycle_operations o LEFT JOIN plugin_lifecycle_leases l ON l.operation_id=o.operation_id
 		WHERE o.phase IN ('REQUESTED','AUTHORIZED','APPLYING') AND (l.operation_id IS NULL OR l.expires_at<=?)
-		ORDER BY o.created_at, o.operation_id LIMIT ?\`, now, limit)
+		ORDER BY o.created_at, o.operation_id LIMIT ?`, now, limit)
 	if err != nil { return 0, lifePersist("select expired operations", err) }
 	ids := make([]string, 0, limit)
 	for rows.Next() {
