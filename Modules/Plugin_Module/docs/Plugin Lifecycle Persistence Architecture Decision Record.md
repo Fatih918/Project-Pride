@@ -175,7 +175,7 @@ The implementation PR must follow P1–P10. Any required deviation must be broug
 
 | Area | Implemented behavior |
 |---|---|
-| Adapter placement | Dedicated `registry/sqlite.LifecycleRepository` sharing the registry's existing `*sql.DB`; `Repository.Lifecycle()` provides the shared-handle adapter |
+| Adapter placement | Dedicated `registry/sqlite.LifecycleRepository` sharing the registry's existing `*sql.DB`; `Repository.Lifecycle()` provides the shared-handle adapter. SQLite foreign-key enforcement is enabled and verified on repository initialization |
 | Operation reservation | Validates canonical SHA-256 fingerprint; checks operation identity before and after acquiring SQLite's write reservation; binds the immutable operation version to the currently selected installed version |
 | Idempotency | Same operation ID and fingerprint returns the stored operation with `Existing=true`; a different fingerprint returns `ErrOperationIDConflict` without acquiring another lease |
 | Lease and fencing | 120-second lease; positive signed `int64` token; durable per-Plugin counter; fail-closed counter exhaustion; SQLite write serialization |
