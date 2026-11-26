@@ -11,15 +11,15 @@ import (
 const DefaultRecoveryBatchSize = 1000
 
 var (
-	ErrRecoveryInProgress = errors.New("lifecycle recovery has active operations")
-	ErrRecoveryScanLimit = errors.New("lifecycle recovery candidate scan reached its safety limit")
+	ErrRecoveryInProgress   = errors.New("lifecycle recovery has active operations")
+	ErrRecoveryScanLimit    = errors.New("lifecycle recovery candidate scan reached its safety limit")
 	ErrRecoveryUnclassified = errors.New("lifecycle recovery found an unclassified operation")
 )
 
 // RecoveryReport contains counts only; it deliberately excludes principal IDs,
 // authorization evidence, and caller-controlled diagnostic data.
 type RecoveryReport struct {
-	Classified int
+	Classified       int
 	RecoveryRequired int
 }
 
@@ -27,7 +27,7 @@ type RecoveryReport struct {
 // authorization evidence is audit-only and must not be replayed.
 type RecoveryCoordinator struct {
 	repository RecoveryRepository
-	batchSize int
+	batchSize  int
 }
 
 func NewRecoveryCoordinator(repository RecoveryRepository, batchSize int) (*RecoveryCoordinator, error) {
