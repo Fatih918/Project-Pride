@@ -120,6 +120,8 @@ type LifecycleRepository interface {
 	ReserveOperation(context.Context, domain.LifecycleOperation, string) (OperationReservation, error)
 	RecordAuthorization(context.Context, string, OperationLease, AuthorizationDecision) error
 	BeginApply(context.Context, string, OperationLease) error
+	// CommitDesiredState atomically persists the desired state and transitions
+	// the associated operation from Applying to Succeeded.
 	CommitDesiredState(context.Context, string, OperationLease, domain.LifecycleDesiredState) (domain.LifecycleRecord, error)
 	FailOperation(context.Context, string, OperationLease, string) error
 	GetOperation(context.Context, string) (domain.LifecycleOperation, error)
