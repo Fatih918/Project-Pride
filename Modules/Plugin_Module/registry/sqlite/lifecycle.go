@@ -444,14 +444,26 @@ func scanLifeOperation(row lifeScanner) (domain.LifecycleOperation, string, erro
 		return domain.LifecycleOperation{}, "", err
 	}
 	op.PluginID = domain.PluginID(pluginID)
-	op.Action, err = parseLifeAction(action); if err != nil { return op, "", err }
-	op.Phase, err = parseLifePhase(phase); if err != nil { return op, "", err }
+	op.Action, err = parseLifeAction(action)
+	if err != nil {
+		return op, "", err
+	}
+	op.Phase, err = parseLifePhase(phase)
+	if err != nil {
+		return op, "", err
+	}
 	op.FailureCode, op.DecisionID, op.PolicyRevision, op.ReasonCode = failure.String, decision.String, policy.String, reason.String
 	if evaluated.Valid { op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String); if err != nil {
 		return op, "", err }
 	}
-	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created); if err != nil { return op, "", err }
-	op.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated); if err != nil { return op, "", err }
+	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
+	if err != nil {
+		return op, "", err
+	}
+	op.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated)
+	if err != nil {
+		return op, "", err
+	}
 	if len(fp) != 64 || strings.ToLower(fp) != fp {
 		return op, "", errors.New("invalid persisted lifecycle fingerprint")
 	}
@@ -473,14 +485,26 @@ func scanLifeOperationExpiry(row lifeScanner) (domain.LifecycleOperation, sql.Nu
 		return op, expiry, err
 	}
 	op.PluginID = domain.PluginID(pluginID)
-	op.Action, err = parseLifeAction(action); if err != nil { return op, expiry, err }
-	op.Phase, err = parseLifePhase(phase); if err != nil { return op, expiry, err }
+	op.Action, err = parseLifeAction(action)
+	if err != nil {
+		return op, expiry, err
+	}
+	op.Phase, err = parseLifePhase(phase)
+	if err != nil {
+		return op, expiry, err
+	}
 	op.FailureCode, op.DecisionID, op.PolicyRevision, op.ReasonCode = failure.String, decision.String, policy.String, reason.String
 	if evaluated.Valid { op.EvaluatedAt, err = time.Parse(time.RFC3339Nano, evaluated.String); if err != nil {
 		return op, expiry, err }
 	}
-	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created); if err != nil { return op, expiry, err }
-	op.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated); if err != nil { return op, expiry, err }
+	op.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
+	if err != nil {
+		return op, expiry, err
+	}
+	op.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated)
+	if err != nil {
+		return op, expiry, err
+	}
 	if err := op.Validate(); err != nil {
 		return op, expiry, err
 	}
@@ -495,14 +519,26 @@ func scanLifeRecord(row lifeScanner, record *domain.LifecycleRecord) error {
 	}
 	record.PluginID = domain.PluginID(pluginID)
 	var err error
-	record.DesiredState, err = parseLifeDesired(desired); if err != nil { return err }
-	record.RuntimeObservation, err = parseLifeObservation(observation); if err != nil { return err }
+	record.DesiredState, err = parseLifeDesired(desired)
+	if err != nil {
+		return err
+	}
+	record.RuntimeObservation, err = parseLifeObservation(observation)
+	if err != nil {
+		return err
+	}
 	if revision <= 0 {
 		return errors.New("invalid lifecycle revision")
 	}
 	record.Revision = uint64(revision)
-	record.CreatedAt, err = time.Parse(time.RFC3339Nano, created); if err != nil { return err }
-	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated); if err != nil { return err }
+	record.CreatedAt, err = time.Parse(time.RFC3339Nano, created)
+	if err != nil {
+		return err
+	}
+	record.UpdatedAt, err = time.Parse(time.RFC3339Nano, updated)
+	if err != nil {
+		return err
+	}
 	return record.Validate()
 }
 
