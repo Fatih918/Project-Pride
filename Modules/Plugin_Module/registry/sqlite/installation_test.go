@@ -377,8 +377,8 @@ func TestSchemaV3MigrationAddsDescriptorWithoutDroppingOperationRows(t *testing.
 	if err := repository.db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		t.Fatal(err)
 	}
-	if version != 4 {
-		t.Fatalf("schema version = %d, want 4", version)
+	if version != schemaVersion {
+		t.Fatalf("schema version = %d, want %d", version, schemaVersion)
 	}
 	var descriptorColumn int
 	if err := repository.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('plugin_installation_operations')
