@@ -32,6 +32,10 @@ A conformance runner MUST classify each negative fixture by the semantic or sche
 | `capability-schema-reference-traversal.json` | Package-relative schema path traversal |
 | `capability-unsupported-invocation-mode.json` | Unsupported invocation mode |
 | `schema-unsupported-pattern-keyword.json` | Unsupported JSON Schema keyword |
+| `duplicate-capability-id.json` | Duplicate capability identifier within one declaration set |
+| `invalid-contract-version.json` | Non-SemVer capability contract version |
+| `duplicate-json-keys.json` | Duplicate JSON object key; reject before schema validation |
+| `capability-unknown-property.json` | Unknown property in strict capability declaration |
 
 ## Determinism
 
