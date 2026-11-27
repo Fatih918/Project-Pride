@@ -89,7 +89,7 @@ func TestVersionRequirementPrereleaseExclusion(t *testing.T) {
 		want        bool
 	}{
 		{">=1.0.0 <2.0.0", "1.5.0-alpha", false},
-		{">=1.0.0-alpha <2.0.0", "1.5.0-alpha", true},
+		{">=1.0.0-alpha <2.0.0", "1.0.0-alpha", true},
 		{">=1.0.0-alpha <2.0.0", "1.5.0-beta", false},
 		{">=1.0.0-alpha <2.0.0", "1.0.0-beta", true},
 		{"=1.0.0-alpha", "1.0.0-alpha", true},
