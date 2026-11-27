@@ -34,32 +34,22 @@ func ParseVersionRequirement(raw string) (VersionRequirement, error) {
 		return VersionRequirement{}, ErrInvalidVersionRequirement
 	}
 
-	// Exact versions may be written with or without an explicit '='.
+	// A bare SemVer or explicit equality is an exact requirement.
 	if !strings.Contains(raw, " ") {
-		token := raw
-		if strings.HasPrefix(token, "=") {
-			token = token[1:]
-		} else if strings.ContainsAny(token, "<>") {
-			// Comparator clauses are also valid as a single-token conjunction.
-		} else {
-			version, err := ParseVersion(token)
-			if err != nil {
-				return VersionRequirement{}, ErrInvalidVersionRequirement
-			}
+		if version, err := ParseVersion(raw); err == nil {
 			return VersionRequirement{Comparators: []VersionComparator{{Operator: OperatorEqual, Version: version}}}, nil
 		}
-		if token == "" || strings.ContainsAny(token, "<>=") {
+		operator, versionText, ok := parseComparatorToken(raw)
+		if !ok {
 			return VersionRequirement{}, ErrInvalidVersionRequirement
 		}
-		version, err := ParseVersion(token)
+		version, err := ParseVersion(versionText)
 		if err != nil {
 			return VersionRequirement{}, ErrInvalidVersionRequirement
 		}
-		return VersionRequirement{Comparators: []VersionComparator{{Operator: OperatorEqual, Version: version}}}, nil
+		return VersionRequirement{Comparators: []VersionComparator{{Operator: operator, Version: version}}}, nil
 	}
 
-	// The grammar permits ASCII spaces only. Tabs/newlines and leading or
-	// trailing spaces are not separators and therefore remain invalid.
 	if raw[0] == ' ' || raw[len(raw)-1] == ' ' || strings.ContainsAny(raw, "\t\r\n") {
 		return VersionRequirement{}, ErrInvalidVersionRequirement
 	}
