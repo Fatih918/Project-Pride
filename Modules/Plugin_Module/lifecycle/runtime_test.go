@@ -85,7 +85,7 @@ func TestRuntimeStopAndTerminateRequireExactIdentity(t *testing.T) {
 func TestRuntimeObservationResultBindsIdentityAndStopOutcome(t *testing.T) {
 	identity := validRuntimeStartRequest().Identity
 	result := RuntimeObservationResult{
-		Identity: identity,
+		Identity:    identity,
 		Observation: domain.RuntimeObservationStopped,
 	}
 	if err := result.ValidateFor(identity, true); err != nil {
