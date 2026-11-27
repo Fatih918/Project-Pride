@@ -71,7 +71,7 @@ func TestRuntimeFailureIsBoundedAndSafe(t *testing.T) {
 
 func TestRuntimeStopAndTerminateRequireExactIdentity(t *testing.T) {
 	identity := validRuntimeStartRequest().Identity
-	if err := (RuntimeStopRequest{OperationID: "stop-1", Identity:    identity}).Validate(); err != nil {
+	if err := (RuntimeStopRequest{OperationID: "stop-1", Identity: identity}).Validate(); err != nil {
 		t.Fatalf("valid stop request rejected: %v", err)
 	}
 	if err := (RuntimeTerminateRequest{OperationID: "terminate-1", Identity: identity}).Validate(); err != nil {
