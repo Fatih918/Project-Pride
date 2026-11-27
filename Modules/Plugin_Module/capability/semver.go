@@ -90,7 +90,7 @@ func validIdentifiers(parts []string, rejectNumericLeadingZero bool) bool {
 	return true
 }
 
-func digits(value string) bool {
+func isSemVerIdentifierChar(c byte) bool {\n\treturn c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'\n}\n\nfunc digits(value string) bool {
 	for i := 0; i < len(value); i++ {
 		if value[i] < '0' || value[i] > '9' {
 			return false
