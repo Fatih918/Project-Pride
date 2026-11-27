@@ -1,12 +1,12 @@
 # Open Capability Contract Architecture Decision Record
 
-**ADR ID:** PLG-ADR-0004  
+**ADR ID:** PLR-ADR-0004  
 **Status:** Accepted  
 **Decision date:** 2026-11-27  
 **Decision owners:** PRIDE Architecture  
 **Supersedes:** None  
 **Amends:** ADR-004 — Capability Registry; ADR-013 — Unlimited Plugin Extensibility and Composition  
-**Related decisions:** PLR-ADR-0002 — Plugin Lifecycle Persistence; PLR-ADR-0003 — Plugin Runtime Execution; PLG-ADR-0003 — Platform Metadata Resolution (if referenced by repository naming)
+**Related decisions:** ADR-004 — Capability Registry; ADR-013 — Unlimited Plugin Extensibility and Composition; PLR-ADR-0002 — Plugin Lifecycle Persistence; PLR-ADR-0003 — Plugin Runtime Execution
 
 ---
 
