@@ -76,7 +76,7 @@ func validIdentifiers(parts []string, rejectNumericLeadingZero bool) bool {
 		numeric := true
 		for i := 0; i < len(part); i++ {
 			c := part[i]
-			if !isAlphaNumeric(c) && c != '-' {
+			if !isSemVerIdentifierChar(c) && c != '-' {
 				return false
 			}
 			if c < '0' || c > '9' {
