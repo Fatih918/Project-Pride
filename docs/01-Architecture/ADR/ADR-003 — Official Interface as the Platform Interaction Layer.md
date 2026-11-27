@@ -1,333 +1,258 @@
 # ADR-003 — Official Interface as the Platform Interaction Layer
 
-**Status:** Accepted
-
-**Date:** 2026-08-11
-
-**Category:** Architecture
-
-**Decision ID:** ADR-003
-
----
-
-# 1. Context
-
-PRIDE requires one consistent environment through which users interact with the platform.
-
-The platform contains multiple internal components, including Plugins, Workflow, AI, Memory, Marketplace, and other platform services.
-
-These components may evolve independently and may have different internal implementations.
-
-PRIDE therefore requires a single official user-facing interaction layer that presents the platform as one unified application without taking ownership of the internal responsibilities of those components.
+**Status:** Accepted (Amended by ADR-013)  
+**Original date:** 2026-08-11  
+**Amendment date:** 2026-11-27  
+**Category:** Architecture  
+**Decision ID:** ADR-003  
+**Amends:** ADR-013 — Unlimited Plugin Extensibility and Composition
 
 ---
 
-# 2. Decision
+## 1. Context
 
-PRIDE adopts the **Official Interface** as the official user-facing interaction layer of the platform.
+PRIDE requires a consistent and governed interaction model through which users and external interaction surfaces can access platform workflows.
 
-The Official Interface shall serve as:
+The platform contains independently evolving components, including Plugins, Workflow, AI, Memory, Marketplace, and other platform services. Their implementations must remain independent from the user-interface implementation.
 
-* The primary platform workspace.
-* The primary entry point to PRIDE.
-* The environment through which users access platform functionality.
-* The host environment for platform Workspaces.
-* The host environment for Passive Plugin interfaces.
-* The access point for Plugin management.
-* The access point for Marketplace.
-* The access point for Settings.
-* The presentation layer for platform information.
+The original ADR established the built-in Official Interface as the permanent interaction layer and allowed Passive Plugins to contribute embedded interfaces. ADR-013 subsequently established that almost all non-kernel implementations must be replaceable and explicitly accepted that a Passive Plugin may replace or disable the built-in Official Interface.
 
-The Official Interface shall remain independent from the internal implementations of the services it hosts.
+This amendment reconciles the two decisions. It preserves the Official Interface's platform interaction contract and unified-workspace goals while making the built-in interface implementation replaceable.
 
----
+## 2. Decision
 
-# 3. Official Interface Definition
+PRIDE adopts the **Official Interface** as the canonical platform interaction contract and reference experience, not as an irreplaceable application implementation.
 
-The Official Interface is the official graphical interaction environment of the PRIDE Platform.
+The Official Interface is the platform-defined interaction boundary through which a compliant user-facing implementation presents PRIDE and submits user intent into platform workflows.
 
-It is the primary workspace through which users access platform functionality.
+The built-in Official Interface is the default platform-provided implementation of that contract. A compliant Passive Plugin may extend it or replace it as the selected primary interface through a governed platform mechanism.
 
-The Official Interface does not implement the platform services themselves.
+The platform must preserve a trusted recovery and administration path independently of the currently selected interface implementation.
 
-Instead, it provides the environment in which those services and their user-facing interfaces are presented to users.
+## 3. Official Interface Definition
 
-Every user interaction begins within the Official Interface.
+The Official Interface defines the canonical user-facing interaction responsibilities and contract for PRIDE.
 
----
+It establishes how a user-facing implementation:
 
-# 4. Unified Workspace Principle
+- Presents PRIDE as a coherent platform.
+- Exposes available platform workspaces and user-facing capabilities.
+- Submits user intent through supported platform workflow boundaries.
+- Presents workflow status, results, and actionable errors.
+- Provides access to platform administration functions according to authorization.
+- Hosts compatible Plugin-provided interface extensions when the implementation supports extension hosting.
 
-PRIDE shall present itself to users as one unified workspace.
+The Official Interface contract is distinct from any specific UI framework, rendering technology, layout, navigation model, or bundled application.
 
-Regardless of how many internal:
+A platform implementation may satisfy this contract without using the built-in Official Interface code.
 
-* Modules.
-* Plugins.
-* SDKs.
-* Services.
-* Platform components.
+## 4. Built-in Interface and Replacement Model
 
-exist within PRIDE, users should experience the platform as one consistent application.
+The built-in Official Interface is the default implementation supplied by PRIDE. It is not a permanent architectural dependency.
 
-The Official Interface therefore acts as the permanent interaction layer of PRIDE.
+A compliant Passive Plugin may:
 
----
+- Contribute interface extensions hosted by the currently selected interface.
+- Register an alternative implementation of the Official Interface contract.
+- Become the selected primary interface when explicitly activated by the user or an authorized platform policy.
+- Cause the built-in implementation to be deactivated while the replacement is selected, where the replacement meets the applicable compatibility and recovery requirements.
 
-# 5. Platform-First Presentation
+The platform must define a governed interface-selection mechanism. At minimum, that mechanism must address:
 
-The Official Interface represents the PRIDE Platform itself.
+- Interface registration and identity.
+- Contract and platform-version compatibility.
+- Selection and activation authority.
+- Replacement conflicts and deterministic selection.
+- Deactivation and rollback.
+- Health/readiness checks where applicable.
+- Failure fallback to a known-good interface.
+- Auditability of selection changes.
 
-Plugins, AI, Memory, Marketplace, and future platform services shall appear as parts of the platform rather than as independent applications.
+This ADR establishes the architectural requirement, not the detailed selection protocol or UI Plugin packaging format. Those require a separate contract.
 
-The Official Interface provides the environment in which these services are presented to the user while preserving their architectural independence.
+A Plugin category such as Passive is descriptive. It does not itself grant authority to replace the primary interface. Replacement requires explicit platform authorization and successful contract validation.
 
----
+## 5. Unified Workspace Principle
 
-# 6. Service Independence
+PRIDE should provide a coherent platform experience even when the selected interface is implemented by a Plugin.
 
-Every platform service remains architecturally independent from the Official Interface.
+The unified-workspace principle concerns consistency of platform identity, workflow access, capability presentation, and administration boundaries. It does not require one immutable UI implementation or one visual design.
 
-The Official Interface hosts and presents these services without coupling itself to their internal implementations.
+Different interface implementations may present PRIDE differently, provided they preserve the required platform contracts and do not bypass platform governance.
 
-A service may evolve internally without requiring the Official Interface to assume responsibility for that service's implementation.
+## 6. Platform-First Presentation
 
-This preserves implementation independence while maintaining a unified user experience.
+The selected interface presents platform services and Plugin capabilities as parts of the PRIDE ecosystem.
 
----
+The interface may organize, compose, and present those capabilities according to its own user-experience design. It does not become the owner of the services or capabilities it presents.
 
-# 7. Plugin Interface Integration
+A replacement interface may introduce a substantially different interaction paradigm. PRIDE does not require visual or navigational equivalence with the built-in implementation.
 
-Passive Plugins may extend the Official Interface by contributing additional user interfaces.
+## 7. Service Independence
 
-The Official Interface provides the hosting environment.
+Every platform service remains architecturally independent from the selected interface implementation.
 
-Plugins provide their own functionality and determine their presentation type.
+The interface communicates with platform services through supported SDKs and contracts. It must not depend on private implementation details, internal database handles, direct process access, or other unsupported boundaries.
 
-Examples of presentation types include:
+A service may evolve independently without requiring the interface implementation to assume responsibility for its internal behavior.
 
-* Navigation Workspace.
-* Floating Panel.
-* Sidebar.
-* Dialog Window.
-* Settings Extension.
+## 8. Passive Plugin Interface Integration
 
-The Plugin determines **what presentation type** it provides.
+Passive Plugins may provide user-facing experiences at two levels:
 
-The Official Interface determines **where that presentation is hosted**.
+1. **Embedded extension:** contributes a navigation workspace, panel, sidebar, dialog, settings surface, or another supported extension point to the selected interface.
+2. **Primary interface replacement:** implements the Official Interface contract and may be selected as the primary user-facing implementation.
 
-A compliant Official Interface communicates with Plugins through the Plugin SDK.
+The Plugin determines the experience it implements. The platform-defined extension or replacement contract determines how that experience is registered, activated, authorized, and connected to PRIDE.
 
----
+A compliant interface implementation communicates with platform services through official SDKs and contracts.
 
-# 8. User Interaction Model
+## 9. User Interaction and Workflow Boundary
 
-All user interaction begins with the Official Interface.
+User intent may originate from the built-in Official Interface, a Passive Plugin replacement, another authorized interface, or a supported non-graphical interaction surface.
 
-The standard interaction model is:
+Regardless of its origin, a user request that invokes platform workflow must enter through the canonical platform workflow boundary.
+
+The interface must not execute or bypass Core-owned workflow orchestration, capability authorization, or platform policy.
+
+The logical interaction flow is:
 
 ```text
-User
-  ↓
-Official Interface
-  ↓
-Workflow
-  ↓
-Platform Services
-  ↓
-Official Interface
-  ↓
-User
+User or Authorized Interaction Surface
+                 |
+                 v
+       Selected Interface
+                 |
+                 v
+      Official Interface Contract
+                 |
+                 v
+       Core Workflow Boundary
+                 |
+                 v
+       Platform Capabilities
+                 |
+                 v
+       Selected Interface
+                 |
+                 v
+                User
 ```
 
-The Official Interface shall not bypass the Workflow architecture.
+This diagram represents the logical boundary. It does not mandate a specific transport or require every internal platform operation to originate from a graphical interface.
 
-User requests continue through the standardized platform pipeline before results are presented back through the Official Interface.
+## 10. Official Interface Responsibilities
 
----
+The selected implementation of the Official Interface contract is responsible for the user-facing responsibilities it claims and is authorized to provide, including:
 
-# 9. Official Interface Responsibilities
+1. Presenting PRIDE as a coherent platform experience.
+2. Presenting available platform workspaces and capabilities.
+3. Submitting user intent through supported workflow contracts.
+4. Presenting platform results, status, and errors.
+5. Hosting compatible Passive Plugin interface extensions when supported.
+6. Exposing Plugin management, Marketplace, and Settings entry points when its contract profile requires them.
+7. Respecting platform authorization and user-confirmation requirements.
+8. Maintaining compatibility with the platform interaction contract.
 
-The Official Interface is responsible for:
+Not every interface implementation must provide every optional presentation surface. Required and optional contract profiles must be defined separately.
 
-1. Providing the primary platform workspace.
-2. Hosting platform Workspaces.
-3. Hosting Passive Plugin interfaces.
-4. Providing Plugin management access.
-5. Providing Marketplace access.
-6. Providing Settings access.
-7. Providing UI customization.
-8. Presenting platform information consistently.
-9. Acting as the primary interaction layer of the PRIDE Platform.
+## 11. Non-Responsibilities
 
----
+The Official Interface contract and its implementations are not responsible for:
 
-# 10. Non-Responsibilities
-
-The Official Interface is not responsible for:
-
-* Workflow execution.
-* Planning.
-* Artificial Intelligence reasoning.
-* Plugin implementation.
-* Memory implementation.
-* Capability matching.
-* SDK communication.
-* Permission management.
+- Core workflow orchestration.
+- Planning or task decomposition as a platform authority.
+- AI reasoning or Agentic orchestration.
+- Plugin implementation or lifecycle authority.
+- Memory implementation.
+- Capability matching and authorization decisions.
+- Credential or secret ownership.
+- SDK transport implementation beyond using supported SDKs.
+- Platform trust-root management.
 
 These responsibilities belong to their respective platform components.
 
-The Official Interface therefore remains an interaction layer rather than becoming the implementation layer for platform services.
+## 12. Trusted Recovery and Administration
 
----
+Replacing the built-in interface must not remove the user's ability to recover or administer PRIDE.
 
-# 11. UI Replaceability
+The platform must retain a trusted recovery path that is not controlled solely by the currently selected interface Plugin.
 
-The visual appearance of the Official Interface may be replaced or extended through UI Plugins.
+At minimum, recovery must allow an authorized user or operator to:
 
-Changing the visual appearance shall not modify platform behavior.
+- Deactivate a failed or incompatible replacement.
+- Restore a known-good interface implementation.
+- Access Plugin lifecycle and security administration.
+- Inspect safe failure information needed for recovery.
 
-User interface customization affects presentation only.
+The recovery path must be protected by platform authentication and authorization. A replacement interface cannot disable, impersonate, or silently take ownership of this path.
 
-The underlying platform architecture remains independent from the visual implementation of the Official Interface.
+The concrete recovery surface and its host integration are deferred to a dedicated design.
 
----
+## 13. Stable Interaction Contract
 
-# 12. Stable Interaction Model
+The stable element is the Official Interface contract and its workflow boundary, not the visual implementation.
 
-The interaction model of the Official Interface shall remain stable across future platform versions.
+The contract must be versioned and evolve through explicit compatibility rules. Interface implementations may adopt different UI frameworks, layouts, navigation models, and interaction paradigms while remaining compliant.
 
-New services may be introduced without requiring users to learn an entirely new interaction paradigm.
+## 14. Architectural Invariants
 
-Future interface technologies may change the presentation mechanism while preserving the Official Interface's role as the permanent interaction layer.
+1. PRIDE defines one canonical Official Interface interaction contract.
+2. The built-in Official Interface is the default implementation, not an irreplaceable platform authority.
+3. A compliant Passive Plugin may extend or replace the selected primary interface through a governed mechanism.
+4. Interface replacement requires explicit activation authority and compatibility validation.
+5. The platform retains a trusted recovery and administration path independent of the selected replacement.
+6. User-facing implementations submit workflow requests through supported platform boundaries.
+7. The interface does not own or bypass Core workflow orchestration.
+8. The interface does not become the implementation owner of AI, Memory, Plugins, capability matching, or authorization.
+9. Interface implementations communicate with platform services through official SDKs and contracts.
+10. Unified platform identity and workflow access do not require visual or implementation uniformity.
+11. Plugin categories do not independently grant interface replacement authority.
+12. The Official Interface contract is versioned and implementation-neutral.
 
----
+## 15. Consequences
 
-# 13. Architectural Invariants
+### Positive Consequences
 
-The following rules are established as architectural invariants:
+- **Replaceable experience:** users and organizations can choose alternative interface implementations.
+- **Stable platform boundary:** workflow and security responsibilities remain independent from UI technology.
+- **Plugin extensibility:** Passive Plugins can provide embedded or complete interface experiences.
+- **Recovery safety:** a broken replacement cannot permanently remove platform administration.
+- **Implementation independence:** interface implementations can evolve without coupling to service internals.
 
-1. PRIDE has one Official Interface serving as the official user-facing interaction layer.
-2. The Official Interface is the primary platform workspace.
-3. The Official Interface is the primary entry point to PRIDE.
-4. All user interaction begins within the Official Interface.
-5. The Official Interface presents PRIDE as one unified workspace.
-6. The Official Interface remains independent from internal platform implementations.
-7. The Official Interface does not execute workflows.
-8. The Official Interface does not perform AI reasoning.
-9. The Official Interface does not implement Plugins.
-10. The Official Interface does not implement Memory.
-11. The Official Interface does not perform capability matching.
-12. The Official Interface does not define SDK communication.
-13. The Official Interface does not bypass the Workflow architecture.
-14. Passive Plugins may extend the Official Interface with user-facing interfaces.
-15. Plugin communication is performed through the Plugin SDK.
-16. UI customization shall not modify platform behavior.
-17. The Official Interface shall preserve a stable interaction model as the platform evolves.
+### Costs and Risks
 
----
+- **Interface governance:** selection, compatibility, activation, and fallback require explicit contracts.
+- **Recovery complexity:** the platform must maintain a protected recovery path.
+- **Compatibility burden:** interface contracts require versioning and conformance tests.
+- **Security surface:** replacement implementations require strict authorization and runtime boundaries.
 
-# 14. Consequences
+## 16. Alternatives Considered
 
-## Positive Consequences
+### 16.1 Built-in Official Interface as a Permanent Implementation
 
-### Unified User Experience
+**Rejected.** This conflicts with ADR-013's replaceability decision and creates unnecessary implementation lock-in.
 
-Users interact with PRIDE through one consistent environment regardless of the number of internal services.
+### 16.2 Independent Uncoordinated Interfaces for Every Service
 
-### Service Independence
+**Rejected.** Interfaces may differ, but they must still use the canonical platform contracts and preserve coherent access to PRIDE.
 
-Internal platform components can evolve without making the Official Interface responsible for their implementation.
+### 16.3 Plugin Directly Replaces Core Workflow
 
-### Plugin Extensibility
+**Rejected.** Replacing a presentation implementation does not grant authority over Core workflow orchestration, identity, authorization, or platform policy.
 
-Plugins can contribute user-facing interfaces while the Official Interface remains responsible for hosting them.
+## 17. Relationship With Other Decisions
 
-### Stable Interaction Model
+- **ADR-013 — Unlimited Plugin Extensibility and Composition:** establishes the replaceability requirement and is authoritative where earlier wording treated the built-in interface as permanent.
+- **ADR-002 — Plugin SDK:** remains the official communication boundary for Plugin-facing interactions.
+- **ADR-004 — Capability Registry:** remains responsible for capability matching and selection, not UI implementation.
+- **ADR-009 — Stable Core Workflow:** remains authoritative for Core workflow orchestration.
+- **PLR-ADR-0003 — Runtime Execution:** remains authoritative for Plugin runtime isolation and host enforcement.
 
-Future platform services can be introduced without fundamentally changing how users interact with PRIDE.
+## 18. Decision Outcome
 
-### Implementation Independence
+PRIDE shall maintain a canonical **Official Interface contract** and a default built-in implementation, while allowing a compliant Passive Plugin to replace the selected primary interface through explicit platform governance.
 
-The Official Interface remains separated from Workflow execution, AI reasoning, Memory implementation, Capability matching, and SDK implementation.
+The interface implementation may change. The platform workflow, authorization, trust, and recovery boundaries remain stable.
 
----
-
-## Negative Consequences
-
-### Interface Governance
-
-The Official Interface must maintain a stable interaction model while supporting an evolving platform.
-
-### Hosting Complexity
-
-As more platform services and Plugin interfaces are introduced, the Official Interface must provide a consistent way to host and present them.
-
-### Plugin Coordination
-
-Plugin-provided interfaces must conform to the hosting and interaction boundaries established by the Official Interface and Plugin SDK.
-
----
-
-# 15. Alternatives Considered
-
-## 15.1 Independent Interfaces for Each Platform Service
-
-Each platform service could provide its own independent user interface.
-
-**Rejected.**
-
-This would fragment the user experience and conflict with the unified workspace principle.
-
----
-
-## 15.2 Plugin as the Primary User Interface
-
-Plugins could provide the primary interface through which users interact with PRIDE.
-
-**Rejected.**
-
-Plugins are extensions of the platform, while the Official Interface represents the platform itself.
-
----
-
-## 15.3 Direct User Interaction With Internal Components
-
-Users could interact directly with Workflow, AI, Memory, or other internal platform components.
-
-**Rejected.**
-
-The Official Interface is explicitly established as the primary interaction layer, while internal components retain their own responsibilities.
-
----
-
-# 16. Relationship With Other Decisions
-
-This ADR establishes the official user-facing interaction boundary of PRIDE.
-
-It provides the architectural basis for:
-
-* Plugin interface hosting.
-* Plugin management access.
-* Marketplace access.
-* Settings access.
-* Workflow interaction.
-* Future platform user experiences.
-
-The Official Interface does not replace the responsibilities of the Plugin SDK, Workflow, Capability Registry, Memory architecture, AI architecture, or other platform components.
-
-Each component remains responsible for its own architectural concern.
-
----
-
-# 17. Decision Outcome
-
-PRIDE shall use the **Official Interface as its permanent user-facing interaction layer and unified platform workspace**.
-
-Users interact with PRIDE through this environment.
-
-The Official Interface hosts and presents platform services and Plugin interfaces while remaining independent from their internal implementations.
-
-Workflow, AI, Memory, Capability Registry, SDKs, Plugins, and other platform components retain their respective responsibilities.
-
-The Official Interface therefore provides one stable interaction model for the PRIDE Platform while allowing the underlying architecture and services to evolve independently.
+The Official Interface is therefore a replaceable platform experience over a stable interaction contract, not a permanent lock-in to one UI implementation.
