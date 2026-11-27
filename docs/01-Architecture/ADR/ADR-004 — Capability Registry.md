@@ -5,7 +5,7 @@
 **Amendment date:** 2026-11-27  
 **Category:** Architecture  
 **Decision ID:** ADR-004  
-**Amends:** ADR-013 — Unlimited Plugin Extensibility and Composition
+**Amended by:** ADR-013 — Unlimited Plugin Extensibility and Composition
 
 ---
 
