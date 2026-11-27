@@ -210,7 +210,7 @@ The initial supported vocabulary is:
 | Numeric | `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf` |
 | Applicators | `allOf`, `anyOf`, `oneOf`, `not` |
 
-Supported `type` values are `object`, `array`, `string`, `number`, `integer`, `boolean`, and `null`. A type array MAY be used if it contains only these values and no duplicates. Boolean schemas are not supported.
+Supported `type` values are `object`, `array`, `string`, `number`, `integer`, `boolean`, and `null`. A type array MAY be used if it contains only these values and no duplicates. A boolean schema MUST NOT be used as a root schema or as the value of any schema-bearing keyword, except that `additionalProperties: false` is permitted and REQUIRED when an object must reject undeclared properties. `additionalProperties: true` is prohibited.
 
 A schema MAY use `$defs` and local JSON Pointer references of the form `#` or `#/$defs/<token>`. References MUST resolve within the same schema document. JSON Pointer tokens MUST follow RFC 6901 escaping rules. External, relative-file, cross-document, anchor, and dynamic references are unsupported. Reference cycles MUST be rejected.
 
