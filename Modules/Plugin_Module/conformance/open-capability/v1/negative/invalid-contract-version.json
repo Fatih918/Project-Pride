@@ -1,0 +1,9 @@
+{
+  "id": "com.example/document.summarize",
+  "name": "Document Summarization",
+  "description": "Example",
+  "contract_version": "v1.2",
+  "invocation_mode": "io.pride.invocation/request-response",
+  "input_schema_ref": "schemas/request.schema.json",
+  "output_schema_ref": "schemas/response.schema.json"
+}
