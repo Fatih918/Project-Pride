@@ -81,3 +81,27 @@ func TestRuntimeStopAndTerminateRequireExactIdentity(t *testing.T) {
 		t.Fatalf("valid observe request rejected: %v", err)
 	}
 }
+
+func TestRuntimeObservationResultBindsIdentityAndStopOutcome(t *testing.T) {
+	identity := validRuntimeStartRequest().Identity
+	result := RuntimeObservationResult{
+		Identity: identity,
+		Observation: domain.RuntimeObservationStopped,
+	}
+	if err := result.ValidateFor(identity, true); err != nil {
+		t.Fatalf("valid stopped result rejected: %v", err)
+	}
+
+	result.Observation = domain.RuntimeObservationUnknown
+	if !errors.Is(result.ValidateFor(identity, true), ErrInvalidRuntimeResult) {
+		t.Fatal("unknown stop outcome was accepted as stopped")
+	}
+	if err := result.ValidateFor(identity, false); err != nil {
+		t.Fatalf("valid unknown observation rejected: %v", err)
+	}
+
+	result.Identity.InstanceID = "other-instance"
+	if !errors.Is(result.ValidateFor(identity, false), ErrInvalidRuntimeResult) {
+		t.Fatal("observation for another instance was accepted")
+	}
+}
