@@ -156,6 +156,24 @@ func (i RuntimeInstance) ValidateFor(request RuntimeStartRequest) error {
 	return nil
 }
 
+// RuntimeObservationResult binds an observed state to the exact instance that
+// was inspected. Stop and Terminate results must be STOPPED; Observe may return
+// any valid state, including UNKNOWN.
+type RuntimeObservationResult struct {
+	Identity    RuntimeIdentity
+	Observation domain.RuntimeObservation
+}
+
+func (r RuntimeObservationResult) ValidateFor(expected RuntimeIdentity, requireStopped bool) error {
+	if r.Identity.Validate() != nil || r.Identity != expected || !r.Observation.Valid() {
+		return ErrInvalidRuntimeResult
+	}
+	if requireStopped && r.Observation != domain.RuntimeObservationStopped {
+		return fmt.Errorf("%w: successful termination must report Stopped", ErrInvalidRuntimeResult)
+	}
+	return nil
+}
+
 // RuntimePort is the SDK-neutral boundary to a host-managed isolated worker.
 // Implementations own process creation, peer authentication, IPC, resource
 // enforcement, and supervision. They must be idempotent for repeated requests
