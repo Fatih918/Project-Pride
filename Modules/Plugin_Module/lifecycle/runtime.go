@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	ErrInvalidRuntimeRequest  = errors.New("invalid runtime request")
-	ErrInvalidRuntimeResult   = errors.New("invalid runtime result")
+	ErrInvalidRuntimeRequest   = errors.New("invalid runtime request")
+	ErrInvalidRuntimeResult    = errors.New("invalid runtime result")
 	ErrRuntimeIdentityMismatch = errors.New("runtime identity mismatch")
-	ErrRuntimeUnavailable     = errors.New("runtime unavailable")
-	ErrRuntimeOutcomeUnknown  = errors.New("runtime outcome unknown")
+	ErrRuntimeUnavailable      = errors.New("runtime unavailable")
+	ErrRuntimeOutcomeUnknown   = errors.New("runtime outcome unknown")
 )
 
 type RuntimeFailureCode string
@@ -92,10 +92,10 @@ func (i RuntimeIdentity) Validate() error {
 }
 
 type RuntimeStartRequest struct {
-	OperationID          string
-	Identity             RuntimeIdentity
-	ConfigurationRef     string
-	IsolationProfileRef  string
+	OperationID         string
+	Identity            RuntimeIdentity
+	ConfigurationRef    string
+	IsolationProfileRef string
 }
 
 func (r RuntimeStartRequest) Validate() error {
