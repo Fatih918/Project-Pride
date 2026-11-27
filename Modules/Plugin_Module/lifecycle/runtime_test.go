@@ -13,12 +13,12 @@ func validRuntimeStartRequest() RuntimeStartRequest {
 		Identity: RuntimeIdentity{
 			InstanceID: "instance-1",
 			Artifact: RuntimeArtifact{
-				PluginID: "plugin.example",
+				PluginID:      "plugin.example",
 				PluginVersion: "1.2.3",
-				SHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+				SHA256:        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			},
 		},
-		ConfigurationRef: "runtime-config-1",
+		ConfigurationRef:    "runtime-config-1",
 		IsolationProfileRef: "isolation-profile-1",
 	}
 }
@@ -38,7 +38,7 @@ func TestRuntimeStartRequestValidation(t *testing.T) {
 func TestRuntimeStartResultRequiresAuthenticatedRunningIdentity(t *testing.T) {
 	request := validRuntimeStartRequest()
 	result := RuntimeInstance{
-		Identity: request.Identity,
+		Identity:    request.Identity,
 		Observation: domain.RuntimeObservationRunning,
 	}
 	if err := result.ValidateFor(request); err != nil {
@@ -71,7 +71,7 @@ func TestRuntimeFailureIsBoundedAndSafe(t *testing.T) {
 
 func TestRuntimeStopAndTerminateRequireExactIdentity(t *testing.T) {
 	identity := validRuntimeStartRequest().Identity
-	if err := (RuntimeStopRequest{OperationID: "stop-1", Identity: identity}).Validate(); err != nil {
+	if err := (RuntimeStopRequest{OperationID: "stop-1", Identity:    identity}).Validate(); err != nil {
 		t.Fatalf("valid stop request rejected: %v", err)
 	}
 	if err := (RuntimeTerminateRequest{OperationID: "terminate-1", Identity: identity}).Validate(); err != nil {
