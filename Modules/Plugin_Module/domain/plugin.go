@@ -53,10 +53,37 @@ type Capability struct {
 	Description string
 }
 
+// CapabilityContract is a versioned, signed declaration exposed by a Plugin.
+// It remains declarative metadata: storing it does not resolve dependencies,
+// authorize access, or enable invocation.
+type CapabilityContract struct {
+	ID                    string                       `json:"id"`
+	Name                  string                       `json:"name"`
+	Description           string                       `json:"description"`
+	ContractVersion       string                       `json:"contract_version"`
+	InvocationMode        string                       `json:"invocation_mode"`
+	InputSchemaRef        string                       `json:"input_schema_ref"`
+	OutputSchemaRef       string                       `json:"output_schema_ref"`
+	PlatformCompatibility *CapabilityPlatformCompatibility `json:"platform_compatibility,omitempty"`
+	Dependencies          []CapabilityDependency       `json:"dependencies,omitempty"`
+}
+
+type CapabilityPlatformCompatibility struct {
+	PrideVersion      string   `json:"pride_version,omitempty"`
+	RuntimeProfileIDs []string `json:"runtime_profile_ids,omitempty"`
+}
+
+type CapabilityDependency struct {
+	CapabilityID       string `json:"capability_id"`
+	VersionRequirement string `json:"version_requirement"`
+	Kind               string `json:"kind"`
+}
+
 // ProtectedMetadata contains platform/Marketplace-owned declarations and
 // analysis. Permission IDs are metadata only; they are not authorization.
 type ProtectedMetadata struct {
 	Capabilities        []Capability
+	CapabilityContracts []CapabilityContract `json:"capability_contracts,omitempty"`
 	PermissionIDs       []string
 	CompatibilityStatus string
 	Attributes          map[string]any
@@ -79,6 +106,7 @@ func (p Plugin) Clone() Plugin {
 	p.Manifest.Keywords = append([]string(nil), p.Manifest.Keywords...)
 	p.Manifest.Screenshots = append([]string(nil), p.Manifest.Screenshots...)
 	p.Protected.Capabilities = append([]Capability(nil), p.Protected.Capabilities...)
+	p.Protected.CapabilityContracts = cloneCapabilityContracts(p.Protected.CapabilityContracts)
 	p.Protected.PermissionIDs = append([]string(nil), p.Protected.PermissionIDs...)
 	p.Protected.Attributes = cloneMap(p.Protected.Attributes)
 	return p
