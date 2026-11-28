@@ -39,7 +39,7 @@ func verifiedArtifact() installation.VerifiedArtifact {
 }
 
 func TestValidateReference(t *testing.T) {
-	valid := []string{"schemas/request.json", "schemas/nested/response.schema.json"}
+	valid := []string{"schemas/request.json", "schemas/nested/response.schema.json", "schemas/a%20b.json"}
 	for _, value := range valid {
 		if err := ValidateReference(value); err != nil {
 			t.Errorf("ValidateReference(%q): %v", value, err)
@@ -49,7 +49,7 @@ func TestValidateReference(t *testing.T) {
 	invalid := []string{
 		"", "request.json", "/schemas/request.json", "../schemas/request.json",
 		"schemas/../secret.json", "schemas//request.json", "schemas/./request.json",
-		"schemas\\request.json", "schemas/%2e%2e/secret.json",
+		"schemas\\request.json", "schemas/a%2fb.json", "schemas/a%5Csecret.json",
 		"schemas/request.json?download=1", "schemas/request.json#fragment",
 		"schemas/C:/request.json", "schemas/\x00request.json",
 		strings.Repeat("a", MaxReferenceBytes+1),
