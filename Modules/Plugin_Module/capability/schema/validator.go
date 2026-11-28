@@ -429,7 +429,7 @@ func (v *Validator) validate(s map[string]any, instance any, b *evaluationBudget
 				return ErrEvaluationLimit
 			}
 			ref := raw.(string)
-			target, _ := v.root.(map[string]any)
+			target := v.root
 			if ref != "#" {
 				name := strings.TrimPrefix(ref, "#/$defs/")
 				var ok bool
