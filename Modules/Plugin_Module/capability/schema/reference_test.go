@@ -10,10 +10,10 @@ import (
 )
 
 type memoryPackageReader struct {
-	path string
-	ref string
-	data []byte
-	err error
+	path  string
+	ref   string
+	data  []byte
+	err   error
 	limit int64
 }
 
@@ -30,10 +30,10 @@ func (r *memoryPackageReader) ReadPackageFile(_ context.Context, artifactPath, r
 
 func verifiedArtifact() installation.VerifiedArtifact {
 	return installation.VerifiedArtifact{
-		FinalArtifactPath: "installed/example.plugin/1.2.3",
-		DigestAlgorithm: "sha-256",
-		DigestValue: strings.Repeat("a", 64),
-		VerificationPolicy: "descriptor+sha256+ed25519",
+		FinalArtifactPath:       "installed/example.plugin/1.2.3",
+		DigestAlgorithm:         "sha-256",
+		DigestValue:             strings.Repeat("a", 64),
+		VerificationPolicy:      "descriptor+sha256+ed25519",
 		VerificationEvidenceRef: "marketplace-key:test-key",
 	}
 }
