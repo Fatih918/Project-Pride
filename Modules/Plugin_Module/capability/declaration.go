@@ -144,7 +144,7 @@ func validateDependencies(ownerID string, dependencies []CapabilityDependency) e
 	}
 	seen := make(map[string]struct{}, len(dependencies))
 	for _, dependency := range dependencies {
-		if err := ValidateID(dependency.CapabilityID); err != nil {
+		if err := validateCanonicalID(dependency.CapabilityID); err != nil {
 			return fmt.Errorf("%w: %v", ErrInvalidDependency, err)
 		}
 		if dependency.CapabilityID == ownerID {
