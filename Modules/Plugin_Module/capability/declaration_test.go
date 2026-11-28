@@ -84,3 +84,10 @@ func TestValidateDeclarationRejectsUnknownFieldsAndDuplicateDependencies(t *test
 		t.Fatalf("duplicate dependency error = %v", err)
 	}
 }
+
+func TestValidateDeclarationAllowsReferenceToPlatformOwnedCapability(t *testing.T) {
+	source := strings.Replace(validDeclaration, "org.acme/document.parse", "io.pride/text.generate", 1)
+	if _, err := ValidateDeclaration([]byte(source)); err != nil {
+		t.Fatalf("platform-owned dependency reference rejected: %v", err)
+	}
+}
