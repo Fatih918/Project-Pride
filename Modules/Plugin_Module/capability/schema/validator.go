@@ -360,3 +360,33 @@ func jsonEqual(a,b any) bool {
 func SupportedKeywords() []string {
 	out:=make([]string,0,len(supportedKeywords));for key:=range supportedKeywords{out=append(out,key)};sort.Strings(out);return out
 }
+
+func validateReferences(value any, defs map[string]any) error {
+	switch x := value.(type) {
+	case map[string]any:
+		for key, child := range x {
+			if key == "$ref" {
+				ref, ok := child.(string)
+				if !ok || !validLocalRef(ref) {
+					return ErrUnsupportedSchema
+				}
+				if ref != "#" {
+					name := strings.TrimPrefix(ref, "#/$defs/")
+					if _, exists := defs[name]; !exists {
+						return ErrInvalidSchema
+					}
+				}
+			}
+			if err := validateReferences(child, defs); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range x {
+			if err := validateReferences(child, defs); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
