@@ -45,7 +45,7 @@ func TestParseVersionRequirementRejectsUnsupportedGrammar(t *testing.T) {
 		">=1.2.0\t<2.0.0", ">=1.2.0\n<2.0.0",
 		">=", "><1.2.3", "==1.2.3",
 		">=1.0.0 >=1.0.0", ">=2.0.0 <1.0.0",
-		">1.0.0 <=1.0.0", "1.2.3 <2.0.0",
+		">1.0.0 <=1.0.0", ">1.0.0 <1.0.0", "1.2.3 <2.0.0",
 		">=1.0.0 <2.0.0 <=1.5.0 >1.6.0",
 	}
 	for _, raw := range invalid {
@@ -71,7 +71,6 @@ func TestVersionRequirementMatchesComparators(t *testing.T) {
 		{"<=2.0.0", "2.0.0", true},
 		{">=1.2.0 <2.0.0", "1.8.2", true},
 		{">=1.2.0 <2.0.0", "2.0.0", false},
-		{">1.0.0 <1.0.0", "1.0.1", false},
 	}
 	for _, test := range tests {
 		requirement := mustRequirement(t, test.requirement)
