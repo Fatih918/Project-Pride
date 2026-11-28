@@ -18,10 +18,10 @@ const (
 )
 
 var (
-	ErrInvalidReference = errors.New("invalid capability schema reference")
+	ErrInvalidReference  = errors.New("invalid capability schema reference")
 	ErrUnverifiedPackage = errors.New("capability schemas require verified package evidence")
-	ErrSchemaNotFound = errors.New("capability schema document not found")
-	ErrSchemaTooLarge = errors.New("capability schema document exceeds size limit")
+	ErrSchemaNotFound    = errors.New("capability schema document not found")
+	ErrSchemaTooLarge    = errors.New("capability schema document exceeds size limit")
 )
 
 // PackageReader reads a bounded file relative to an installed package root.
