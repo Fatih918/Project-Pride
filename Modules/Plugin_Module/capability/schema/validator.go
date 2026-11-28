@@ -704,58 +704,35 @@ func SupportedKeywords() []string {
 }
 
 func validateReferences(value any, defs map[string]any) error {
-func compileTestSchema(t *testing.T, source string) *Validator {
-	t.Helper()
-	v, err := Compile([]byte(source))
-	if err != nil {
-		t.Fatalf("Compile() error = %v", err)
-	}
-	return v
-}
-
-		"properties":{"payload":{"$ref":"#/$defs/payload"}},
-		"$defs":{"payload":{"type":"object","required":["ok"],"properties":{"ok":{"const":true}},"additionalProperties":false}}
-	}`)
-	if err := v.Validate([]byte(`{"payload":{"ok":true}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if err := v.Validate([]byte(`{"payload":{"ok":false}}`)); !errors.Is(err, ErrInvalidInstance) {
-		t.Fatalf("error = %v, want ErrInvalidInstance", err)
-	}
-}
-
-func TestCompileRejectsDuplicateKeysAndUnsupportedRoot(t *testing.T) {
-		`true`,
-		`{"$schema":"https://json-schema.org/draft/2020-12/schema"}`,
-	} {
-		if _, err := Compile([]byte(source)); err == nil {
-			t.Errorf("Compile(%s) succeeded", source)
+	var walk func(any) error
+	walk = func(node any) error {
+		switch current := node.(type) {
+		case map[string]any:
+			if raw, exists := current["$ref"]; exists {
+				ref, ok := raw.(string)
+				if !ok || !validLocalRef(ref) {
+					return ErrUnsupportedSchema
+				}
+				if ref != "#" {
+					name := strings.TrimPrefix(ref, "#/$defs/")
+					if _, exists := defs[name]; !exists {
+						return fmt.Errorf("%w: unresolved local reference %q", ErrInvalidSchema, ref)
+					}
+				}
+			}
+			for _, child := range current {
+				if err := walk(child); err != nil {
+					return err
+				}
+			}
+		case []any:
+			for _, child := range current {
+				if err := walk(child); err != nil {
+					return err
+				}
+			}
 		}
+		return nil
 	}
-}
-
-func TestValidateRejectsDuplicateInstanceKeysAndBounds(t *testing.T) {
-	v := compileTestSchema(t, `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`)
-	if err := v.Validate([]byte(`{"x":1,"x":2}`)); !errors.Is(err, ErrInvalidInstance) {
-		t.Fatalf("duplicate key error = %v", err)
-	}
-	if err := v.Validate([]byte(`{"x":"` + strings.Repeat("a", MaxStringBytes+1) + `"}`)); !errors.Is(err, ErrInvalidInstance) {
-		t.Fatalf("oversized string error = %v", err)
-	}
-}
-
-func TestApplicators(t *testing.T) {
-		"allOf":[{"minimum":1},{"maximum":10}],
-		"not":{"const":5}
-	}`)
-	for _, instance := range []string{"1", "3", "10"} {
-		if err := v.Validate([]byte(instance)); err != nil {
-			t.Errorf("%s rejected: %v", instance, err)
-		}
-	}
-	for _, instance := range []string{"0", "5", "11"} {
-		if err := v.Validate([]byte(instance)); !errors.Is(err, ErrInvalidInstance) {
-			t.Errorf("%s error=%v", instance, err)
-		}
-	}
+	return walk(value)
 }
