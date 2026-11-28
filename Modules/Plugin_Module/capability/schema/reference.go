@@ -82,7 +82,7 @@ func (r *Resolver) Resolve(ctx context.Context, verified installation.VerifiedAr
 func ValidateReference(reference string) error {
 	if reference == "" || len([]byte(reference)) > MaxReferenceBytes ||
 		!utf8.ValidString(reference) || strings.ContainsAny(reference, "\\\x00?#") ||
-		strings.ContainsRune(reference, '%') || path.IsAbs(reference) ||
+		containsEncodedSeparator(reference) || path.IsAbs(reference) ||
 		path.Clean(reference) != reference || !strings.HasPrefix(reference, "schemas/") {
 		return ErrInvalidReference
 	}
@@ -117,4 +117,9 @@ func validateVerifiedArtifact(artifact installation.VerifiedArtifact) error {
 		return ErrUnverifiedPackage
 	}
 	return nil
+}
+
+func containsEncodedSeparator(value string) bool {
+	lower := strings.ToLower(value)
+	return strings.Contains(lower, "%2f") || strings.Contains(lower, "%5c")
 }
