@@ -21,7 +21,8 @@ const (
 	MaxRequired          = 128
 	MaxEnumValues        = 256
 	MaxApplicatorBranches = 32
-	MaxDefinitions       = 64\n\tMaxSchemaReferences  = 512
+	MaxDefinitions       = 64
+	MaxSchemaReferences  = 512
 	MaxReferenceResolutions = 4096
 	MaxEvaluationSteps   = 100000
 	MaxInstanceBytes     = 1048576
@@ -210,6 +211,7 @@ func inspectSchema(s map[string]any, depth int, budget *schemaBudget) error {
 			ref, ok := raw.(string)
 			if !ok || !validLocalRef(ref) { return ErrUnsupportedSchema }
 			budget.refs++
+			if budget.refs > MaxSchemaReferences { return ErrSchemaLimitExceeded }
 		case "$defs":
 			defs, ok := raw.(map[string]any)
 			if !ok || len(defs) > MaxDefinitions { return ErrInvalidSchema }
