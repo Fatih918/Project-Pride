@@ -83,7 +83,7 @@ func TestCompileRejectsDuplicateKeysAndUnsupportedRoot(t *testing.T) {
 func TestValidateRejectsDuplicateInstanceKeysAndBounds(t *testing.T) {
 	v := compileTestSchema(t, `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`)
 	if err := v.Validate([]byte(`{"x":1,"x":2}`)); !errors.Is(err, ErrInvalidInstance) { t.Fatalf("duplicate key error = %v", err) }
-	if err := v.Validate([]byte(`{"x":"`+string(make([]byte, MaxStringBytes+1))+`"}`)); !errors.Is(err, ErrInvalidInstance) { t.Fatalf("oversized string error = %v", err) }
+	if err := v.Validate([]byte(`{"x":"`+strings.Repeat("a", MaxStringBytes+1)+`"}`)); !errors.Is(err, ErrInvalidInstance) { t.Fatalf("oversized string error = %v", err) }
 }
 
 func TestApplicators(t *testing.T) {
