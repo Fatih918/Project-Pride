@@ -5,22 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"unicode/utf8"
 
 	"pride-plugin-module/capability/schema"
 )
 
 const (
-	MaxCapabilityNameBytes        = 128
-	MaxCapabilityDescriptionBytes = 1024
-	MaxCapabilityDependencies      = 64
-	MaxRuntimeProfileIDs           = 32
+	MaxCapabilityNameBytes         = 128
+	MaxCapabilityDescriptionBytes  = 1024
+	MaxCapabilityDependencies       = 64
+	MaxRuntimeProfileIDs            = 32
 )
 
 var (
-	ErrInvalidDeclaration = errors.New("invalid capability declaration")
+	ErrInvalidDeclaration    = errors.New("invalid capability declaration")
 	ErrInvalidCompatibility = errors.New("invalid capability platform compatibility")
-	ErrInvalidDependency = errors.New("invalid capability dependency")
+	ErrInvalidDependency    = errors.New("invalid capability dependency")
 )
 
 // CapabilityDeclaration is the validated, typed form of one signed capability
@@ -45,9 +46,9 @@ type PlatformCompatibility struct {
 
 // CapabilityDependency is a declarative requirement, not an invocation edge.
 type CapabilityDependency struct {
-	CapabilityID      string `json:"capability_id"`
+	CapabilityID       string `json:"capability_id"`
 	VersionRequirement string `json:"version_requirement"`
-	Kind              string `json:"kind"`
+	Kind               string `json:"kind"`
 }
 
 // ValidateDeclaration validates the POCS-0001 declaration schema and its
@@ -55,9 +56,9 @@ type CapabilityDependency struct {
 func ValidateDeclaration(document []byte) (CapabilityDeclaration, error) {
 	var declaration CapabilityDeclaration
 
-	compiled, err := schema.Compile(capabilityDeclarationSchema)
-	if err != nil {
-		return declaration, fmt.Errorf("%w: compile embedded declaration schema: %v", ErrInvalidDeclaration, err)
+	compiled := declarationValidator()
+	if declarationSchemaErr != nil {
+		return declaration, fmt.Errorf("%w: compile embedded declaration schema: %v", ErrInvalidDeclaration, declarationSchemaErr)
 	}
 	if err := compiled.Validate(document); err != nil {
 		return declaration, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
@@ -166,6 +167,19 @@ func validateDependencies(ownerID string, dependencies []CapabilityDependency) e
 
 // capabilityDeclarationSchema is embedded so validation does not depend on a
 // mutable working-directory path or package filesystem lookup.
+var (
+	declarationSchemaOnce sync.Once
+	declarationSchemaValidator *schema.Validator
+	declarationSchemaErr error
+)
+
+func declarationValidator() *schema.Validator {
+	declarationSchemaOnce.Do(func() {
+		declarationSchemaValidator, declarationSchemaErr = schema.Compile(capabilityDeclarationSchema)
+	})
+	return declarationSchemaValidator
+}
+
 var capabilityDeclarationSchema = []byte(`{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
