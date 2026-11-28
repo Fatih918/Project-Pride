@@ -109,7 +109,7 @@ func (a *Adapter) ReadPackageFile(ctx context.Context, artifactDirectory, relati
 
 func validatePackageSchemaPath(value string) error {
 	if value == "" || len([]byte(value)) > 240 ||
-		strings.ContainsAny(value, "\\\x00?#%") ||
+		strings.ContainsAny(value, "\\\x00?#") || containsEncodedPackageSeparator(value) ||
 		strings.HasPrefix(value, "/") || path.Clean(value) != value ||
 		!strings.HasPrefix(value, "schemas/") {
 		return ErrInvalidPackageFile
@@ -120,4 +120,9 @@ func validatePackageSchemaPath(value string) error {
 		}
 	}
 	return nil
+}
+
+func containsEncodedPackageSeparator(value string) bool {
+	lower := strings.ToLower(value)
+	return strings.Contains(lower, "%2f") || strings.Contains(lower, "%5c")
 }
