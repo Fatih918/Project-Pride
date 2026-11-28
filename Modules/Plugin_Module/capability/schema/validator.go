@@ -96,6 +96,9 @@ func Compile(document []byte) (*Validator, error) {
 	if err := inspectSchema(root, 1, &budget); err != nil {
 		return nil, err
 	}
+	if err := validateReferences(root, defs); err != nil {
+		return nil, err
+	}
 	return &Validator{root: root, defs: defs}, nil
 }
 
