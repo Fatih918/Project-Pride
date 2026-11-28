@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"unicode/utf8"
 
 	"pride-plugin-module/capability/schema"
@@ -172,6 +171,44 @@ func validateDependencies(ownerID string, dependencies []CapabilityDependency) e
 	return nil
 }
 
-// Keep strings imported here as an explicit guard against accidental
-// normalization being introduced into declaration validation.
-var _ = strings.Compare
+
+// capabilityDeclarationSchema is embedded so validation does not depend on a
+// mutable working-directory path or package filesystem lookup.
+var capabilityDeclarationSchema = []byte(`{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "name", "description", "contract_version", "invocation_mode", "input_schema_ref", "output_schema_ref"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1, "maxLength": 255},
+    "name": {"type": "string", "minLength": 1, "maxLength": 128},
+    "description": {"type": "string", "maxLength": 1024},
+    "contract_version": {"type": "string", "minLength": 5, "maxLength": 64},
+    "invocation_mode": {"const": "io.pride.invocation/request-response"},
+    "input_schema_ref": {"type": "string", "minLength": 9, "maxLength": 240},
+    "output_schema_ref": {"type": "string", "minLength": 9, "maxLength": 240},
+    "platform_compatibility": {"$ref": "#/$defs/platformCompatibility"},
+    "dependencies": {"type": "array", "maxItems": 64, "items": {"$ref": "#/$defs/dependency"}}
+  },
+  "$defs": {
+    "platformCompatibility": {
+      "type": "object",
+      "properties": {
+        "pride_version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "runtime_profile_ids": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128}}
+      },
+      "anyOf": [{"required": ["pride_version"]}, {"required": ["runtime_profile_ids"]}],
+      "additionalProperties": false
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["capability_id", "version_requirement", "kind"],
+      "properties": {
+        "capability_id": {"type": "string", "minLength": 1, "maxLength": 255},
+        "version_requirement": {"type": "string", "minLength": 1, "maxLength": 128},
+        "kind": {"enum": ["required", "optional"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}`)
