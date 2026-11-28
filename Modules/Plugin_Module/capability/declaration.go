@@ -12,14 +12,14 @@ import (
 )
 
 const (
-	MaxCapabilityNameBytes         = 128
-	MaxCapabilityDescriptionBytes  = 1024
-	MaxCapabilityDependencies      = 64
-	MaxRuntimeProfileIDs           = 32
+	MaxCapabilityNameBytes        = 128
+	MaxCapabilityDescriptionBytes = 1024
+	MaxCapabilityDependencies     = 64
+	MaxRuntimeProfileIDs          = 32
 )
 
 var (
-	ErrInvalidDeclaration     = errors.New("invalid capability declaration")
+	ErrInvalidDeclaration   = errors.New("invalid capability declaration")
 	ErrInvalidCompatibility = errors.New("invalid capability platform compatibility")
 	ErrInvalidDependency    = errors.New("invalid capability dependency")
 )
