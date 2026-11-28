@@ -54,7 +54,7 @@ var supportedKeywords = map[string]bool{
 }
 
 type Validator struct {
-	root any
+	root map[string]any
 	defs map[string]any
 }
 
