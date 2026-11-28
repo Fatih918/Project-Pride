@@ -68,9 +68,6 @@ func ValidateDeclaration(document []byte) (CapabilityDeclaration, error) {
 	if err := decoder.Decode(&declaration); err != nil {
 		return CapabilityDeclaration{}, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
 	}
-	if err := decoder.Decode(new(any)); err == nil {
-		return CapabilityDeclaration{}, ErrInvalidDeclaration
-	}
 
 	if err := ValidateID(declaration.ID); err != nil {
 		return CapabilityDeclaration{}, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
@@ -90,11 +87,6 @@ func ValidateDeclaration(document []byte) (CapabilityDeclaration, error) {
 	}
 	if err := schema.ValidateReference(declaration.OutputSchemaRef); err != nil {
 		return CapabilityDeclaration{}, fmt.Errorf("%w: output schema reference: %v", ErrInvalidDeclaration, err)
-	}
-	if declaration.InputSchemaRef == declaration.OutputSchemaRef {
-		// Input and output contracts are independently versioned documents.
-		// Reusing one document is permitted only when the contract is identical;
-		// semantic equivalence cannot be established from references alone.
 	}
 
 	if declaration.PlatformCompatibility != nil {
