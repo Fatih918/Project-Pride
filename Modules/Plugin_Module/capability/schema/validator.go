@@ -333,10 +333,10 @@ func (v *Validator) validate(s map[string]any, instance any, b *evaluationBudget
 			switch keyword{case "minimum":if cmp<0{return ErrInvalidInstance};case "maximum":if cmp>0{return ErrInvalidInstance};case "exclusiveMinimum":if cmp<=0{return ErrInvalidInstance};case "exclusiveMaximum":if cmp>=0{return ErrInvalidInstance};case "multipleOf":if new(big.Rat).Quo(value,limit).IsInt()==false{return ErrInvalidInstance}}
 		case "allOf","anyOf","oneOf":
 			matches:=0
-			for _,branch:=range raw.([]any){local:=*b;err:=v.validate(branch.(map[string]any),instance,&local);if err==nil{matches++};if errors.Is(err,ErrEvaluationLimit){return err};b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }}
+			for _,branch:=range raw.([]any){local:=evaluationBudget{};err:=v.validate(branch.(map[string]any),instance,&local);if err==nil{matches++};if errors.Is(err,ErrEvaluationLimit){return err};b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }}
 			if keyword=="allOf"&&matches!=len(raw.([]any)) || keyword=="anyOf"&&matches==0 || keyword=="oneOf"&&matches!=1{return ErrInvalidInstance}
 		case "not":
-			local:=*b;err:=v.validate(raw.(map[string]any),instance,&local);if errors.Is(err,ErrEvaluationLimit){return err};if err==nil{return ErrInvalidInstance};b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }
+			local:=evaluationBudget{};err:=v.validate(raw.(map[string]any),instance,&local);if errors.Is(err,ErrEvaluationLimit){return err};if err==nil{return ErrInvalidInstance};b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }
 		}
 	}
 	return nil
