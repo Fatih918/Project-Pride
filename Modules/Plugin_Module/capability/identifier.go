@@ -5,16 +5,25 @@ import "strings"
 // ValidateID validates the canonical POCS-0001 capability identifier grammar.
 // It performs no normalization: callers must compare the original identifier.
 func ValidateID(id string) error {
+	if err := validateCanonicalID(id); err != nil {
+		return err
+	}
+	namespace := strings.SplitN(id, "/", 2)[0]
+	if namespace == "io.pride" || strings.HasPrefix(namespace, "io.pride.") {
+		return ErrReservedNamespace
+	}
+	return nil
+}
+
+// validateCanonicalID checks identifier syntax without deciding namespace
+// ownership. It is also used when validating references to PRIDE-owned IDs.
+func validateCanonicalID(id string) error {
 	if len(id) == 0 || len(id) > 255 || !isASCII(id) {
 		return ErrInvalidIdentifier
 	}
-
 	parts := strings.Split(id, "/")
 	if len(parts) != 2 || !validNamespace(parts[0]) || !validSegments(parts[1]) {
 		return ErrInvalidIdentifier
-	}
-	if parts[0] == "io.pride" {
-		return ErrReservedNamespace
 	}
 	return nil
 }

@@ -21,7 +21,7 @@ func TestValidateID(t *testing.T) {
 		"com.example/", "com.example/summarize name",
 		"Com.example/summarize", "com.example/summarize/",
 		"com.example//summarize", "com.example/summarize\n",
-		"com.example/ümlaut", "io.pride/text.generate",
+		"com.example/ümlaut", "io.pride/text.generate", "io.pride.runtime.internal/execute",
 	}
 	for _, value := range invalid {
 		if err := ValidateID(value); err == nil {
