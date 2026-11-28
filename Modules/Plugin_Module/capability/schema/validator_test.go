@@ -2,6 +2,7 @@ package schema
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
