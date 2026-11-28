@@ -1,0 +1,177 @@
+package capability
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"unicode/utf8"
+
+	"pride-plugin-module/capability/schema"
+)
+
+const (
+	MaxCapabilityNameBytes        = 128
+	MaxCapabilityDescriptionBytes = 1024
+	MaxCapabilityDependencies      = 64
+	MaxRuntimeProfileIDs           = 32
+)
+
+var (
+	ErrInvalidDeclaration = errors.New("invalid capability declaration")
+	ErrInvalidCompatibility = errors.New("invalid capability platform compatibility")
+	ErrInvalidDependency = errors.New("invalid capability dependency")
+)
+
+// CapabilityDeclaration is the validated, typed form of one signed capability
+// declaration. It is metadata only; validation does not authorize invocation.
+type CapabilityDeclaration struct {
+	ID                    string                 `json:"id"`
+	Name                  string                 `json:"name"`
+	Description           string                 `json:"description"`
+	ContractVersion       string                 `json:"contract_version"`
+	InvocationMode        string                 `json:"invocation_mode"`
+	InputSchemaRef        string                 `json:"input_schema_ref"`
+	OutputSchemaRef       string                 `json:"output_schema_ref"`
+	PlatformCompatibility *PlatformCompatibility `json:"platform_compatibility,omitempty"`
+	Dependencies          []CapabilityDependency `json:"dependencies,omitempty"`
+}
+
+// PlatformCompatibility contains declarative PRIDE/runtime constraints.
+type PlatformCompatibility struct {
+	PrideVersion      string   `json:"pride_version,omitempty"`
+	RuntimeProfileIDs []string `json:"runtime_profile_ids,omitempty"`
+}
+
+// CapabilityDependency is a declarative requirement, not an invocation edge.
+type CapabilityDependency struct {
+	CapabilityID      string `json:"capability_id"`
+	VersionRequirement string `json:"version_requirement"`
+	Kind              string `json:"kind"`
+}
+
+// ValidateDeclaration validates the POCS-0001 declaration schema and its
+// cross-field semantic constraints. It performs no package or network I/O.
+func ValidateDeclaration(document []byte) (CapabilityDeclaration, error) {
+	var declaration CapabilityDeclaration
+
+	compiled, err := schema.Compile(capabilityDeclarationSchema)
+	if err != nil {
+		return declaration, fmt.Errorf("%w: compile embedded declaration schema: %v", ErrInvalidDeclaration, err)
+	}
+	if err := compiled.Validate(document); err != nil {
+		return declaration, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(document))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&declaration); err != nil {
+		return CapabilityDeclaration{}, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
+	}
+	if err := decoder.Decode(new(any)); err == nil {
+		return CapabilityDeclaration{}, ErrInvalidDeclaration
+	}
+
+	if err := ValidateID(declaration.ID); err != nil {
+		return CapabilityDeclaration{}, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
+	}
+	if !validHumanText(declaration.Name, MaxCapabilityNameBytes, false) ||
+		!validHumanText(declaration.Description, MaxCapabilityDescriptionBytes, true) {
+		return CapabilityDeclaration{}, ErrInvalidDeclaration
+	}
+	if _, err := ParseVersion(declaration.ContractVersion); err != nil {
+		return CapabilityDeclaration{}, fmt.Errorf("%w: %v", ErrInvalidDeclaration, err)
+	}
+	if declaration.InvocationMode != "io.pride.invocation/request-response" {
+		return CapabilityDeclaration{}, ErrInvalidDeclaration
+	}
+	if err := schema.ValidateReference(declaration.InputSchemaRef); err != nil {
+		return CapabilityDeclaration{}, fmt.Errorf("%w: input schema reference: %v", ErrInvalidDeclaration, err)
+	}
+	if err := schema.ValidateReference(declaration.OutputSchemaRef); err != nil {
+		return CapabilityDeclaration{}, fmt.Errorf("%w: output schema reference: %v", ErrInvalidDeclaration, err)
+	}
+	if declaration.InputSchemaRef == declaration.OutputSchemaRef {
+		// Input and output contracts are independently versioned documents.
+		// Reusing one document is permitted only when the contract is identical;
+		// semantic equivalence cannot be established from references alone.
+	}
+
+	if declaration.PlatformCompatibility != nil {
+		if err := validatePlatformCompatibility(*declaration.PlatformCompatibility); err != nil {
+			return CapabilityDeclaration{}, err
+		}
+	}
+	if err := validateDependencies(declaration.ID, declaration.Dependencies); err != nil {
+		return CapabilityDeclaration{}, err
+	}
+	return declaration, nil
+}
+
+func validHumanText(value string, maxBytes int, allowEmpty bool) bool {
+	if !utf8.ValidString(value) || len([]byte(value)) > maxBytes || (!allowEmpty && len(value) == 0) {
+		return false
+	}
+	for _, r := range value {
+		if (r < 0x20 || r == 0x7f) && r != '\\t' && r != '\\n' && r != '\\r' {
+			return false
+		}
+	}
+	return true
+}
+
+func validatePlatformCompatibility(value PlatformCompatibility) error {
+	if value.PrideVersion == "" && len(value.RuntimeProfileIDs) == 0 {
+		return ErrInvalidCompatibility
+	}
+	if value.PrideVersion != "" {
+		if _, err := ParseVersionRequirement(value.PrideVersion); err != nil {
+			return fmt.Errorf("%w: pride_version: %v", ErrInvalidCompatibility, err)
+		}
+	}
+	if len(value.RuntimeProfileIDs) > MaxRuntimeProfileIDs {
+		return ErrInvalidCompatibility
+	}
+	seen := make(map[string]struct{}, len(value.RuntimeProfileIDs))
+	for _, id := range value.RuntimeProfileIDs {
+		if err := ValidateRuntimeProfileID(id); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidCompatibility, err)
+		}
+		if _, exists := seen[id]; exists {
+			return ErrInvalidCompatibility
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
+}
+
+func validateDependencies(ownerID string, dependencies []CapabilityDependency) error {
+	if len(dependencies) > MaxCapabilityDependencies {
+		return ErrInvalidDependency
+	}
+	seen := make(map[string]struct{}, len(dependencies))
+	for _, dependency := range dependencies {
+		if err := ValidateID(dependency.CapabilityID); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidDependency, err)
+		}
+		if dependency.CapabilityID == ownerID {
+			return ErrInvalidDependency
+		}
+		if _, err := ParseVersionRequirement(dependency.VersionRequirement); err != nil {
+			return fmt.Errorf("%w: %v", ErrInvalidDependency, err)
+		}
+		if dependency.Kind != "required" && dependency.Kind != "optional" {
+			return ErrInvalidDependency
+		}
+		if _, exists := seen[dependency.CapabilityID]; exists {
+			return ErrInvalidDependency
+		}
+		seen[dependency.CapabilityID] = struct{}{}
+	}
+	return nil
+}
+
+// Keep strings imported here as an explicit guard against accidental
+// normalization being introduced into declaration validation.
+var _ = strings.Compare
