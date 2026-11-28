@@ -15,22 +15,22 @@ import (
 )
 
 const (
-	MaxSchemaDepth       = 32
-	MaxSchemaNodes       = 4096
-	MaxProperties        = 128
-	MaxRequired          = 128
-	MaxEnumValues        = 256
-	MaxApplicatorBranches = 32
-	MaxDefinitions       = 64
-	MaxSchemaReferences  = 512
+	MaxSchemaDepth          = 32
+	MaxSchemaNodes          = 4096
+	MaxProperties           = 128
+	MaxRequired             = 128
+	MaxEnumValues           = 256
+	MaxApplicatorBranches   = 32
+	MaxDefinitions          = 64
+	MaxSchemaReferences     = 512
 	MaxReferenceResolutions = 4096
-	MaxEvaluationSteps   = 100000
-	MaxInstanceBytes     = 1048576
-	MaxInstanceDepth     = 64
-	MaxObjectProperties  = 1024
-	MaxArrayElements     = 4096
-	MaxStringBytes       = 262144
-	MaxInstanceNodes     = 100000
+	MaxEvaluationSteps      = 100000
+	MaxInstanceBytes        = 1048576
+	MaxInstanceDepth        = 64
+	MaxObjectProperties     = 1024
+	MaxArrayElements        = 4096
+	MaxStringBytes          = 262144
+	MaxInstanceNodes        = 100000
 )
 
 var (
@@ -151,247 +151,611 @@ func decodeBoundedJSON(data []byte, maxDepth, maxNodes int, maxBytes int) (any, 
 			obj := make(map[string]any)
 			for dec.More() {
 				keyToken, err := dec.Token()
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 				key, ok := keyToken.(string)
-				if !ok { return nil, errors.New("object key is not a string") }
-				if _, exists := obj[key]; exists { return nil, fmt.Errorf("duplicate object key %q", key) }
+				if !ok {
+					return nil, errors.New("object key is not a string")
+				}
+				if _, exists := obj[key]; exists {
+					return nil, fmt.Errorf("duplicate object key %q", key)
+				}
 				value, err := parse(depth + 1)
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 				obj[key] = value
-				if len(obj) > MaxObjectProperties { return nil, errors.New("object property limit exceeded") }
+				if len(obj) > MaxObjectProperties {
+					return nil, errors.New("object property limit exceeded")
+				}
 			}
 			end, err := dec.Token()
-			if err != nil || end != json.Delim('}') { return nil, errors.New("unterminated object") }
+			if err != nil || end != json.Delim('}') {
+				return nil, errors.New("unterminated object")
+			}
 			return obj, nil
 		case '[':
 			arr := make([]any, 0)
 			for dec.More() {
 				value, err := parse(depth + 1)
-				if err != nil { return nil, err }
+				if err != nil {
+					return nil, err
+				}
 				arr = append(arr, value)
-				if len(arr) > MaxArrayElements { return nil, errors.New("array element limit exceeded") }
+				if len(arr) > MaxArrayElements {
+					return nil, errors.New("array element limit exceeded")
+				}
 			}
 			end, err := dec.Token()
-			if err != nil || end != json.Delim(']') { return nil, errors.New("unterminated array") }
+			if err != nil || end != json.Delim(']') {
+				return nil, errors.New("unterminated array")
+			}
 			return arr, nil
 		default:
 			return nil, errors.New("unexpected JSON delimiter")
 		}
 	}
 	value, err := parse(1)
-	if err != nil { return nil, nodes, err }
+	if err != nil {
+		return nil, nodes, err
+	}
 	if _, err := dec.Token(); err != io.EOF {
-		if err == nil { return nil, nodes, errors.New("multiple JSON values") }
+		if err == nil {
+			return nil, nodes, errors.New("multiple JSON values")
+		}
 		return nil, nodes, err
 	}
 	return value, nodes, nil
 }
 
 func inspectInstance(value any, depth int) error {
-	if depth > MaxInstanceDepth { return errors.New("instance depth exceeded") }
+	if depth > MaxInstanceDepth {
+		return errors.New("instance depth exceeded")
+	}
 	switch x := value.(type) {
 	case string:
-		if len([]byte(x)) > MaxStringBytes { return errors.New("instance string too large") }
+		if len([]byte(x)) > MaxStringBytes {
+			return errors.New("instance string too large")
+		}
 	case map[string]any:
-		if len(x) > MaxObjectProperties { return errors.New("too many object properties") }
-		for _, child := range x { if err := inspectInstance(child, depth+1); err != nil { return err } }
+		if len(x) > MaxObjectProperties {
+			return errors.New("too many object properties")
+		}
+		for _, child := range x {
+			if err := inspectInstance(child, depth+1); err != nil {
+				return err
+			}
+		}
 	case []any:
-		if len(x) > MaxArrayElements { return errors.New("too many array elements") }
-		for _, child := range x { if err := inspectInstance(child, depth+1); err != nil { return err } }
+		if len(x) > MaxArrayElements {
+			return errors.New("too many array elements")
+		}
+		for _, child := range x {
+			if err := inspectInstance(child, depth+1); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
 
 func inspectSchema(s map[string]any, depth int, budget *schemaBudget) error {
-	if depth > MaxSchemaDepth { return ErrSchemaLimitExceeded }
-	
+	if depth > MaxSchemaDepth {
+		return ErrSchemaLimitExceeded
+	}
+
 	for key, raw := range s {
-		if !supportedKeywords[key] { return fmt.Errorf("%w: keyword %q", ErrUnsupportedSchema, key) }
+		if !supportedKeywords[key] {
+			return fmt.Errorf("%w: keyword %q", ErrUnsupportedSchema, key)
+		}
 		switch key {
 		case "$schema":
-			if raw != "https://json-schema.org/draft/2020-12/schema" { return ErrUnsupportedSchema }
+			if raw != "https://json-schema.org/draft/2020-12/schema" {
+				return ErrUnsupportedSchema
+			}
 		case "$ref":
 			ref, ok := raw.(string)
-			if !ok || !validLocalRef(ref) { return ErrUnsupportedSchema }
+			if !ok || !validLocalRef(ref) {
+				return ErrUnsupportedSchema
+			}
 			budget.refs++
-			if budget.refs > MaxSchemaReferences { return ErrSchemaLimitExceeded }
+			if budget.refs > MaxSchemaReferences {
+				return ErrSchemaLimitExceeded
+			}
 		case "$defs":
 			defs, ok := raw.(map[string]any)
-			if !ok || len(defs) > MaxDefinitions { return ErrInvalidSchema }
+			if !ok || len(defs) > MaxDefinitions {
+				return ErrInvalidSchema
+			}
 			for _, child := range defs {
-				obj, ok := child.(map[string]any); if !ok { return ErrUnsupportedSchema }
-				if err := inspectSchema(obj, depth+1, budget); err != nil { return err }
+				obj, ok := child.(map[string]any)
+				if !ok {
+					return ErrUnsupportedSchema
+				}
+				if err := inspectSchema(obj, depth+1, budget); err != nil {
+					return err
+				}
 			}
 		case "type":
-			if !validType(raw) { return ErrUnsupportedSchema }
+			if !validType(raw) {
+				return ErrUnsupportedSchema
+			}
 		case "enum":
-			a, ok := raw.([]any); if !ok || len(a) == 0 || len(a) > MaxEnumValues { return ErrInvalidSchema }
+			a, ok := raw.([]any)
+			if !ok || len(a) == 0 || len(a) > MaxEnumValues {
+				return ErrInvalidSchema
+			}
 		case "const":
 			// Any JSON value is permitted.
 		case "properties":
-			props, ok := raw.(map[string]any); if !ok || len(props) > MaxProperties { return ErrInvalidSchema }
+			props, ok := raw.(map[string]any)
+			if !ok || len(props) > MaxProperties {
+				return ErrInvalidSchema
+			}
 			for _, child := range props {
-				obj, ok := child.(map[string]any); if !ok { return ErrUnsupportedSchema }
-				if err := inspectSchema(obj, depth+1, budget); err != nil { return err }
+				obj, ok := child.(map[string]any)
+				if !ok {
+					return ErrUnsupportedSchema
+				}
+				if err := inspectSchema(obj, depth+1, budget); err != nil {
+					return err
+				}
 			}
 		case "required":
-			a, ok := raw.([]any); if !ok || len(a) > MaxRequired { return ErrSchemaLimitExceeded }
+			a, ok := raw.([]any)
+			if !ok || len(a) > MaxRequired {
+				return ErrSchemaLimitExceeded
+			}
 			seen := map[string]bool{}
-			for _, item := range a { name, ok := item.(string); if !ok || seen[name] { return ErrInvalidSchema }; seen[name] = true }
+			for _, item := range a {
+				name, ok := item.(string)
+				if !ok || seen[name] {
+					return ErrInvalidSchema
+				}
+				seen[name] = true
+			}
 		case "additionalProperties":
-			if raw != false { return ErrUnsupportedSchema }
+			if raw != false {
+				return ErrUnsupportedSchema
+			}
 		case "items", "not":
-			obj, ok := raw.(map[string]any); if !ok { return ErrUnsupportedSchema }
-			if err := inspectSchema(obj, depth+1, budget); err != nil { return err }
+			obj, ok := raw.(map[string]any)
+			if !ok {
+				return ErrUnsupportedSchema
+			}
+			if err := inspectSchema(obj, depth+1, budget); err != nil {
+				return err
+			}
 		case "allOf", "anyOf", "oneOf":
-			a, ok := raw.([]any); if !ok || len(a) == 0 || len(a) > MaxApplicatorBranches { return ErrSchemaLimitExceeded }
-			for _, child := range a { obj, ok := child.(map[string]any); if !ok { return ErrUnsupportedSchema }; if err := inspectSchema(obj, depth+1, budget); err != nil { return err } }
+			a, ok := raw.([]any)
+			if !ok || len(a) == 0 || len(a) > MaxApplicatorBranches {
+				return ErrSchemaLimitExceeded
+			}
+			for _, child := range a {
+				obj, ok := child.(map[string]any)
+				if !ok {
+					return ErrUnsupportedSchema
+				}
+				if err := inspectSchema(obj, depth+1, budget); err != nil {
+					return err
+				}
+			}
 		case "minProperties", "maxProperties", "minItems", "maxItems", "minLength", "maxLength":
-			if _, ok := nonNegativeInt(raw); !ok { return ErrInvalidSchema }
+			if _, ok := nonNegativeInt(raw); !ok {
+				return ErrInvalidSchema
+			}
 		case "uniqueItems":
-			if _, ok := raw.(bool); !ok { return ErrInvalidSchema }
+			if _, ok := raw.(bool); !ok {
+				return ErrInvalidSchema
+			}
 		case "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf":
-			if _, ok := rational(raw); !ok { return ErrInvalidSchema }
-			if key == "multipleOf" { n, _ := rational(raw); if n.Sign() <= 0 { return ErrInvalidSchema } }
+			if _, ok := rational(raw); !ok {
+				return ErrInvalidSchema
+			}
+			if key == "multipleOf" {
+				n, _ := rational(raw)
+				if n.Sign() <= 0 {
+					return ErrInvalidSchema
+				}
+			}
 		}
 	}
 	return nil
 }
 
 func validLocalRef(ref string) bool {
-	if ref == "#" { return true }
-	if !strings.HasPrefix(ref, "#/$defs/") { return false }
+	if ref == "#" {
+		return true
+	}
+	if !strings.HasPrefix(ref, "#/$defs/") {
+		return false
+	}
 	name := strings.TrimPrefix(ref, "#/$defs/")
 	return name != "" && !strings.Contains(name, "/") && !strings.Contains(name, "~") && !strings.Contains(name, "%")
 }
 
 func validType(v any) bool {
-	valid := map[string]bool{"object":true,"array":true,"string":true,"number":true,"integer":true,"boolean":true,"null":true}
-	if s, ok := v.(string); ok { return valid[s] }
-	a, ok := v.([]any); if !ok || len(a)==0 { return false }
-	seen:=map[string]bool{}
-	for _, item:=range a { s,ok:=item.(string); if !ok || !valid[s] || seen[s] { return false }; seen[s]=true }
+	valid := map[string]bool{"object": true, "array": true, "string": true, "number": true, "integer": true, "boolean": true, "null": true}
+	if s, ok := v.(string); ok {
+		return valid[s]
+	}
+	a, ok := v.([]any)
+	if !ok || len(a) == 0 {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, item := range a {
+		s, ok := item.(string)
+		if !ok || !valid[s] || seen[s] {
+			return false
+		}
+		seen[s] = true
+	}
 	return true
 }
 
 func nonNegativeInt(v any) (int, bool) {
-	n, ok := v.(json.Number); if !ok { return 0,false }
-	i, err := strconv.Atoi(string(n)); return i, err==nil && i>=0
+	n, ok := v.(json.Number)
+	if !ok {
+		return 0, false
+	}
+	i, err := strconv.Atoi(string(n))
+	return i, err == nil && i >= 0
 }
 
 func rational(v any) (*big.Rat, bool) {
-	n, ok := v.(json.Number); if !ok { return nil,false }
-	r, ok := new(big.Rat).SetString(string(n)); return r,ok
+	n, ok := v.(json.Number)
+	if !ok {
+		return nil, false
+	}
+	r, ok := new(big.Rat).SetString(string(n))
+	return r, ok
 }
 
 func (v *Validator) validate(s map[string]any, instance any, b *evaluationBudget) error {
 	for keyword, raw := range s {
-		if keyword == "$schema" || keyword == "$defs" { continue }
+		if keyword == "$schema" || keyword == "$defs" {
+			continue
+		}
 		b.steps++
-		if b.steps > MaxEvaluationSteps { return ErrEvaluationLimit }
+		if b.steps > MaxEvaluationSteps {
+			return ErrEvaluationLimit
+		}
 		switch keyword {
 		case "$ref":
-			b.refs++; if b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }
+			b.refs++
+			if b.refs > MaxReferenceResolutions {
+				return ErrEvaluationLimit
+			}
 			ref := raw.(string)
 			target, _ := v.root.(map[string]any)
 			if ref != "#" {
 				name := strings.TrimPrefix(ref, "#/$defs/")
 				var ok bool
 				target, ok = v.defs[name].(map[string]any)
-				if !ok { return ErrInvalidSchema }
+				if !ok {
+					return ErrInvalidSchema
+				}
 			}
-			if err:=v.validate(target,instance,b); err!=nil{return err}
+			if err := v.validate(target, instance, b); err != nil {
+				return err
+			}
 		case "type":
-			if !matchesType(raw,instance) { return ErrInvalidInstance }
+			if !matchesType(raw, instance) {
+				return ErrInvalidInstance
+			}
 		case "enum":
-			found:=false; for _,candidate:=range raw.([]any){if jsonEqual(candidate,instance){found=true;break}}
-			if !found{return ErrInvalidInstance}
+			found := false
+			for _, candidate := range raw.([]any) {
+				if jsonEqual(candidate, instance) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return ErrInvalidInstance
+			}
 		case "const":
-			if !jsonEqual(raw,instance){return ErrInvalidInstance}
+			if !jsonEqual(raw, instance) {
+				return ErrInvalidInstance
+			}
 		case "properties":
-			obj,ok:=instance.(map[string]any);if !ok{continue}
-			for name,child:=range raw.(map[string]any){if value,exists:=obj[name];exists{if err:=v.validate(child.(map[string]any),value,b);err!=nil{return err}}}
+			obj, ok := instance.(map[string]any)
+			if !ok {
+				continue
+			}
+			for name, child := range raw.(map[string]any) {
+				if value, exists := obj[name]; exists {
+					if err := v.validate(child.(map[string]any), value, b); err != nil {
+						return err
+					}
+				}
+			}
 		case "required":
-			obj,ok:=instance.(map[string]any);if !ok{continue}
-			for _,item:=range raw.([]any){if _,exists:=obj[item.(string)];!exists{return ErrInvalidInstance}}
+			obj, ok := instance.(map[string]any)
+			if !ok {
+				continue
+			}
+			for _, item := range raw.([]any) {
+				if _, exists := obj[item.(string)]; !exists {
+					return ErrInvalidInstance
+				}
+			}
 		case "additionalProperties":
 			// false is enforced against the declared properties when present.
 			// This is handled in the properties pass below by checking unknown keys.
-			obj,ok:=instance.(map[string]any);if !ok{continue}
-			props,_:=s["properties"].(map[string]any)
-			for name:=range obj{if _,exists:=props[name];!exists{return ErrInvalidInstance}}
-		case "minProperties","maxProperties":
-			obj,ok:=instance.(map[string]any);if !ok{continue}; n,_:=nonNegativeInt(raw)
-			if keyword=="minProperties"&&len(obj)<n || keyword=="maxProperties"&&len(obj)>n{return ErrInvalidInstance}
+			obj, ok := instance.(map[string]any)
+			if !ok {
+				continue
+			}
+			props, _ := s["properties"].(map[string]any)
+			for name := range obj {
+				if _, exists := props[name]; !exists {
+					return ErrInvalidInstance
+				}
+			}
+		case "minProperties", "maxProperties":
+			obj, ok := instance.(map[string]any)
+			if !ok {
+				continue
+			}
+			n, _ := nonNegativeInt(raw)
+			if keyword == "minProperties" && len(obj) < n || keyword == "maxProperties" && len(obj) > n {
+				return ErrInvalidInstance
+			}
 		case "items":
-			arr,ok:=instance.([]any);if !ok{continue};for _,item:=range arr{if err:=v.validate(raw.(map[string]any),item,b);err!=nil{return err}}
-		case "minItems","maxItems":
-			arr,ok:=instance.([]any);if !ok{continue};n,_:=nonNegativeInt(raw)
-			if keyword=="minItems"&&len(arr)<n || keyword=="maxItems"&&len(arr)>n{return ErrInvalidInstance}
+			arr, ok := instance.([]any)
+			if !ok {
+				continue
+			}
+			for _, item := range arr {
+				if err := v.validate(raw.(map[string]any), item, b); err != nil {
+					return err
+				}
+			}
+		case "minItems", "maxItems":
+			arr, ok := instance.([]any)
+			if !ok {
+				continue
+			}
+			n, _ := nonNegativeInt(raw)
+			if keyword == "minItems" && len(arr) < n || keyword == "maxItems" && len(arr) > n {
+				return ErrInvalidInstance
+			}
 		case "uniqueItems":
-			if raw==true {arr,ok:=instance.([]any);if ok{for i:=range arr{for j:=0;j<i;j++{if jsonEqual(arr[i],arr[j]){return ErrInvalidInstance}}}}}
-		case "minLength","maxLength":
-			str,ok:=instance.(string);if !ok{continue};n,_:=nonNegativeInt(raw);length:=len([]rune(str))
-			if keyword=="minLength"&&length<n || keyword=="maxLength"&&length>n{return ErrInvalidInstance}
-		case "minimum","maximum","exclusiveMinimum","exclusiveMaximum","multipleOf":
-			value,ok:=rational(instance);if !ok{continue};limit,_:=rational(raw);cmp:=value.Cmp(limit)
-			switch keyword{case "minimum":if cmp<0{return ErrInvalidInstance};case "maximum":if cmp>0{return ErrInvalidInstance};case "exclusiveMinimum":if cmp<=0{return ErrInvalidInstance};case "exclusiveMaximum":if cmp>=0{return ErrInvalidInstance};case "multipleOf":if new(big.Rat).Quo(value,limit).IsInt()==false{return ErrInvalidInstance}}
-		case "allOf","anyOf","oneOf":
-			matches:=0
-			for _,branch:=range raw.([]any){local:=evaluationBudget{};err:=v.validate(branch.(map[string]any),instance,&local);if err==nil{matches++} else if !errors.Is(err,ErrInvalidInstance) { return err };if errors.Is(err,ErrEvaluationLimit){return err};b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }}
-			if keyword=="allOf"&&matches!=len(raw.([]any)) || keyword=="anyOf"&&matches==0 || keyword=="oneOf"&&matches!=1{return ErrInvalidInstance}
+			if raw == true {
+				arr, ok := instance.([]any)
+				if ok {
+					for i := range arr {
+						for j := 0; j < i; j++ {
+							if jsonEqual(arr[i], arr[j]) {
+								return ErrInvalidInstance
+							}
+						}
+					}
+				}
+			}
+		case "minLength", "maxLength":
+			str, ok := instance.(string)
+			if !ok {
+				continue
+			}
+			n, _ := nonNegativeInt(raw)
+			length := len([]rune(str))
+			if keyword == "minLength" && length < n || keyword == "maxLength" && length > n {
+				return ErrInvalidInstance
+			}
+		case "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf":
+			value, ok := rational(instance)
+			if !ok {
+				continue
+			}
+			limit, _ := rational(raw)
+			cmp := value.Cmp(limit)
+			switch keyword {
+			case "minimum":
+				if cmp < 0 {
+					return ErrInvalidInstance
+				}
+			case "maximum":
+				if cmp > 0 {
+					return ErrInvalidInstance
+				}
+			case "exclusiveMinimum":
+				if cmp <= 0 {
+					return ErrInvalidInstance
+				}
+			case "exclusiveMaximum":
+				if cmp >= 0 {
+					return ErrInvalidInstance
+				}
+			case "multipleOf":
+				if new(big.Rat).Quo(value, limit).IsInt() == false {
+					return ErrInvalidInstance
+				}
+			}
+		case "allOf", "anyOf", "oneOf":
+			matches := 0
+			for _, branch := range raw.([]any) {
+				local := evaluationBudget{}
+				err := v.validate(branch.(map[string]any), instance, &local)
+				if err == nil {
+					matches++
+				} else if !errors.Is(err, ErrInvalidInstance) {
+					return err
+				}
+				if errors.Is(err, ErrEvaluationLimit) {
+					return err
+				}
+				b.steps += local.steps
+				b.refs += local.refs
+				if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions {
+					return ErrEvaluationLimit
+				}
+			}
+			if keyword == "allOf" && matches != len(raw.([]any)) || keyword == "anyOf" && matches == 0 || keyword == "oneOf" && matches != 1 {
+				return ErrInvalidInstance
+			}
 		case "not":
-			local:=evaluationBudget{};err:=v.validate(raw.(map[string]any),instance,&local);if errors.Is(err,ErrEvaluationLimit){return err};if err==nil{return ErrInvalidInstance};if !errors.Is(err,ErrInvalidInstance) { return err };b.steps += local.steps; b.refs += local.refs; if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }
+			local := evaluationBudget{}
+			err := v.validate(raw.(map[string]any), instance, &local)
+			if errors.Is(err, ErrEvaluationLimit) {
+				return err
+			}
+			if err == nil {
+				return ErrInvalidInstance
+			}
+			if !errors.Is(err, ErrInvalidInstance) {
+				return err
+			}
+			b.steps += local.steps
+			b.refs += local.refs
+			if b.steps > MaxEvaluationSteps || b.refs > MaxReferenceResolutions {
+				return ErrEvaluationLimit
+			}
 		}
 	}
 	return nil
 }
 
 func matchesType(expected, value any) bool {
-	match:=func(name string)bool{switch name{case "object":_,ok:=value.(map[string]any);return ok;case "array":_,ok:=value.([]any);return ok;case "string":_,ok:=value.(string);return ok;case "number":_,ok:=value.(json.Number);return ok;case "integer":n,ok:=value.(json.Number);if !ok{return false};r,ok:=new(big.Rat).SetString(string(n));return ok&&r.IsInt();case "boolean":_,ok:=value.(bool);return ok;case "null":return value==nil};return false}
-	if name,ok:=expected.(string);ok{return match(name)}
-	for _,item:=range expected.([]any){if match(item.(string)){return true}}
+	match := func(name string) bool {
+		switch name {
+		case "object":
+			_, ok := value.(map[string]any)
+			return ok
+		case "array":
+			_, ok := value.([]any)
+			return ok
+		case "string":
+			_, ok := value.(string)
+			return ok
+		case "number":
+			_, ok := value.(json.Number)
+			return ok
+		case "integer":
+			n, ok := value.(json.Number)
+			if !ok {
+				return false
+			}
+			r, ok := new(big.Rat).SetString(string(n))
+			return ok && r.IsInt()
+		case "boolean":
+			_, ok := value.(bool)
+			return ok
+		case "null":
+			return value == nil
+		}
+		return false
+	}
+	if name, ok := expected.(string); ok {
+		return match(name)
+	}
+	for _, item := range expected.([]any) {
+		if match(item.(string)) {
+			return true
+		}
+	}
 	return false
 }
 
-func jsonEqual(a,b any) bool {
-	if x,ok:=rational(a);ok{y,ok:=rational(b);return ok&&x.Cmp(y)==0}
-	switch x:=a.(type){case map[string]any:y,ok:=b.(map[string]any);if !ok||len(x)!=len(y){return false};for k,v:=range x{other,exists:=y[k];if !exists||!jsonEqual(v,other){return false}};return true
-	case []any:y,ok:=b.([]any);if !ok||len(x)!=len(y){return false};for i:=range x{if !jsonEqual(x[i],y[i]){return false}};return true}
-	return reflect.DeepEqual(a,b)
+func jsonEqual(a, b any) bool {
+	if x, ok := rational(a); ok {
+		y, ok := rational(b)
+		return ok && x.Cmp(y) == 0
+	}
+	switch x := a.(type) {
+	case map[string]any:
+		y, ok := b.(map[string]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for k, v := range x {
+			other, exists := y[k]
+			if !exists || !jsonEqual(v, other) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		y, ok := b.([]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for i := range x {
+			if !jsonEqual(x[i], y[i]) {
+				return false
+			}
+		}
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // SupportedKeywords returns a stable copy of the bounded keyword vocabulary.
 func SupportedKeywords() []string {
-	out:=make([]string,0,len(supportedKeywords));for key:=range supportedKeywords{out=append(out,key)};sort.Strings(out);return out
+	out := make([]string, 0, len(supportedKeywords))
+	for key := range supportedKeywords {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func validateReferences(value any, defs map[string]any) error {
-	switch x := value.(type) {
-	case map[string]any:
-		for key, child := range x {
-			if key == "$ref" {
-				ref, ok := child.(string)
-				if !ok || !validLocalRef(ref) {
-					return ErrUnsupportedSchema
-				}
-				if ref != "#" {
-					name := strings.TrimPrefix(ref, "#/$defs/")
-					if _, exists := defs[name]; !exists {
-						return ErrInvalidSchema
-					}
-				}
-			}
-			if err := validateReferences(child, defs); err != nil {
-				return err
-			}
-		}
-	case []any:
-		for _, child := range x {
-			if err := validateReferences(child, defs); err != nil {
-				return err
-			}
+func compileTestSchema(t *testing.T, source string) *Validator {
+	t.Helper()
+	v, err := Compile([]byte(source))
+	if err != nil {
+		t.Fatalf("Compile() error = %v", err)
+	}
+	return v
+}
+
+		"properties":{"payload":{"$ref":"#/$defs/payload"}},
+		"$defs":{"payload":{"type":"object","required":["ok"],"properties":{"ok":{"const":true}},"additionalProperties":false}}
+	}`)
+	if err := v.Validate([]byte(`{"payload":{"ok":true}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := v.Validate([]byte(`{"payload":{"ok":false}}`)); !errors.Is(err, ErrInvalidInstance) {
+		t.Fatalf("error = %v, want ErrInvalidInstance", err)
+	}
+}
+
+func TestCompileRejectsDuplicateKeysAndUnsupportedRoot(t *testing.T) {
+		`true`,
+		`{"$schema":"https://json-schema.org/draft/2020-12/schema"}`,
+	} {
+		if _, err := Compile([]byte(source)); err == nil {
+			t.Errorf("Compile(%s) succeeded", source)
 		}
 	}
-	return nil
+}
+
+func TestValidateRejectsDuplicateInstanceKeysAndBounds(t *testing.T) {
+	v := compileTestSchema(t, `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`)
+	if err := v.Validate([]byte(`{"x":1,"x":2}`)); !errors.Is(err, ErrInvalidInstance) {
+		t.Fatalf("duplicate key error = %v", err)
+	}
+	if err := v.Validate([]byte(`{"x":"` + strings.Repeat("a", MaxStringBytes+1) + `"}`)); !errors.Is(err, ErrInvalidInstance) {
+		t.Fatalf("oversized string error = %v", err)
+	}
+}
+
+func TestApplicators(t *testing.T) {
+		"allOf":[{"minimum":1},{"maximum":10}],
+		"not":{"const":5}
+	}`)
+	for _, instance := range []string{"1", "3", "10"} {
+		if err := v.Validate([]byte(instance)); err != nil {
+			t.Errorf("%s rejected: %v", instance, err)
+		}
+	}
+	for _, instance := range []string{"0", "5", "11"} {
+		if err := v.Validate([]byte(instance)); !errors.Is(err, ErrInvalidInstance) {
+			t.Errorf("%s error=%v", instance, err)
+		}
+	}
 }
