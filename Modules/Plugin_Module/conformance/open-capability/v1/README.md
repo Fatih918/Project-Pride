@@ -40,3 +40,16 @@ A conformance runner MUST classify each negative fixture by the semantic or sche
 ## Determinism
 
 Fixture bytes are normative test inputs. A conformance runner MUST NOT rewrite, normalize, or reserialize a fixture before tests that concern duplicate keys, exact bytes, signatures, or digests.
+
+
+## Automated runner
+
+Run the conformance suite from the Plugin Module:
+
+```sh
+go test ./conformance/open-capability/v1
+```
+
+The runner compiles the published descriptor, platform metadata, standalone declaration, request, and response schemas; validates the positive descriptor and its capability declarations; checks declaration-set uniqueness; and requires every negative fixture to be rejected by the corresponding structural or semantic validator.
+
+The runner is a test-only conformance harness. It does not verify the positive fixture's placeholder signature or digest, install the fixture, resolve dependencies, invoke capabilities, or grant permissions. A successful conformance run is not Marketplace trust evidence.
