@@ -14,12 +14,12 @@ import (
 const (
 	MaxCapabilityNameBytes         = 128
 	MaxCapabilityDescriptionBytes  = 1024
-	MaxCapabilityDependencies       = 64
-	MaxRuntimeProfileIDs            = 32
+	MaxCapabilityDependencies      = 64
+	MaxRuntimeProfileIDs           = 32
 )
 
 var (
-	ErrInvalidDeclaration    = errors.New("invalid capability declaration")
+	ErrInvalidDeclaration     = errors.New("invalid capability declaration")
 	ErrInvalidCompatibility = errors.New("invalid capability platform compatibility")
 	ErrInvalidDependency    = errors.New("invalid capability dependency")
 )
@@ -106,7 +106,7 @@ func validHumanText(value string, maxBytes int, allowEmpty bool) bool {
 		return false
 	}
 	for _, r := range value {
-		if (r < 0x20 || r == 0x7f) && r != '\\t' && r != '\\n' && r != '\\r' {
+		if (r < 0x20 || r == 0x7f) && r != 9 && r != 10 && r != 13 {
 			return false
 		}
 	}
@@ -164,13 +164,12 @@ func validateDependencies(ownerID string, dependencies []CapabilityDependency) e
 	return nil
 }
 
-
 // capabilityDeclarationSchema is embedded so validation does not depend on a
 // mutable working-directory path or package filesystem lookup.
 var (
-	declarationSchemaOnce sync.Once
+	declarationSchemaOnce      sync.Once
 	declarationSchemaValidator *schema.Validator
-	declarationSchemaErr error
+	declarationSchemaErr       error
 )
 
 func declarationValidator() *schema.Validator {
