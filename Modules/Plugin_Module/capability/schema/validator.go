@@ -288,7 +288,7 @@ func (v *Validator) validate(s map[string]any, instance any, b *evaluationBudget
 		case "$ref":
 			b.refs++; if b.refs > MaxReferenceResolutions { return ErrEvaluationLimit }
 			ref := raw.(string)
-			target := s
+			target, _ := v.root.(map[string]any)
 			if ref != "#" {
 				name := strings.TrimPrefix(ref, "#/$defs/")
 				var ok bool
