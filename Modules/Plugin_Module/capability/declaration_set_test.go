@@ -44,9 +44,9 @@ func TestValidateDeclarationSet(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "too many declarations",
+			name:         "too many declarations",
 			declarations: makeDeclarations(MaxCapabilityDeclarations + 1),
-			wantErr: true,
+			wantErr:      true,
 		},
 	}
 
